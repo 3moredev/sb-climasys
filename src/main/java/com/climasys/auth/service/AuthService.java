@@ -9,9 +9,11 @@ import com.climasys.auth.entity.*;
 import com.climasys.entity.User;
 import com.climasys.entity.Clinic;
 import com.climasys.auth.repository.*;
+import com.climasys.common.crypto.LegacyCrypto;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -36,6 +38,9 @@ public class AuthService {
     
     @Autowired
     private ClinicMasterRepository clinicMasterRepository;
+    
+    @Value("${climasys.encryption.key:PA1ANDE61INI6}")
+    private String encryptionKey;
 
     public LoginResponse authenticateUser(String loginId, String password, String todaysDay, Integer languageId) {
         logger.info("Starting authentication for user: {}", loginId);
@@ -48,13 +53,36 @@ public class AuthService {
                 logger.debug("Language ID not provided, using default: {}", languageId);
             }
 
-            // Find user by credentials
-            Optional<User> userOpt = userMasterRepository.findActiveUserByCredentials(loginId, password);
+            // Find user by login ID only (password is encrypted in database)
+            Optional<User> userOpt = userMasterRepository.findByLoginIdAndIsActive(loginId, true);
             
             LoginResponse response = new LoginResponse();
             
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
+                
+                // Decrypt the stored password and compare with input password
+                String decryptedPassword;
+                try {
+                    decryptedPassword = LegacyCrypto.decryptUnicode(encryptionKey, user.getPassword());
+                    logger.debug("Password decryption successful for user: {}", loginId);
+                } catch (Exception e) {
+                    logger.error("Password decryption failed for user: {} - {}", loginId, e.getMessage());
+                    auditLogger.error("LOGIN_FAILED - Password decryption error for user: {}", loginId);
+                    response.setLoginStatus(0);
+                    response.setErrorMessage("Authentication error");
+                    return response;
+                }
+                
+                // Compare decrypted password with input password
+                if (!decryptedPassword.equals(password)) {
+                    logger.warn("Authentication failed - password mismatch for user: {}", loginId);
+                    auditLogger.warn("LOGIN_FAILED - Invalid password for user: {}", loginId);
+                    response.setLoginStatus(0);
+                    response.setErrorMessage("Invalid login credentials");
+                    return response;
+                }
+                
                 logger.info("User found successfully: {}", user.getLoginId());
                 
                 // Login successful
