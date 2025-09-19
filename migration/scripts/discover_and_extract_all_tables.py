@@ -1,0 +1,317 @@
+#!/usr/bin/env python3
+"""
+Discover and Extract All Tables from SQL Server
+"""
+
+import pyodbc
+import pandas as pd
+import os
+from datetime import datetime
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+def get_sqlserver_connection():
+    """Get SQL Server connection"""
+    try:
+        # Try different connection strings
+        connection_strings = [
+            # SQL Server with Windows Authentication
+            "DRIVER={SQL Server};SERVER=localhost;DATABASE=Climasys-00010;Trusted_Connection=yes;",
+            # SQL Server with SQL Authentication
+            "DRIVER={SQL Server};SERVER=localhost;DATABASE=Climasys-00010;UID=sa;PWD=your_password;",
+            # SQL Server with different server name
+            "DRIVER={SQL Server};SERVER=.;DATABASE=Climasys-00010;Trusted_Connection=yes;",
+            # SQL Server with IP
+            "DRIVER={SQL Server};SERVER=127.0.0.1;DATABASE=Climasys-00010;Trusted_Connection=yes;",
+            # Alternative driver names
+            "DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;DATABASE=Climasys-00010;Trusted_Connection=yes;",
+            "DRIVER={ODBC Driver 13 for SQL Server};SERVER=localhost;DATABASE=Climasys-00010;Trusted_Connection=yes;",
+        ]
+        
+        for conn_str in connection_strings:
+            try:
+                logger.info(f"Trying connection: {conn_str[:50]}...")
+                conn = pyodbc.connect(conn_str)
+                logger.info("✅ Connected to SQL Server successfully!")
+                return conn
+            except Exception as e:
+                logger.warning(f"Connection failed: {e}")
+                continue
+        
+        raise Exception("Could not connect to SQL Server with any connection string")
+        
+    except Exception as e:
+        logger.error(f"❌ Error connecting to SQL Server: {e}")
+        return None
+
+def discover_all_tables():
+    """Discover all tables in SQL Server database"""
+    logger.info("🔍 Discovering all tables in SQL Server...")
+    
+    conn = get_sqlserver_connection()
+    if not conn:
+        return []
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Get all tables from the database
+        cursor.execute("""
+            SELECT TABLE_NAME 
+            FROM INFORMATION_SCHEMA.TABLES 
+            WHERE TABLE_TYPE = 'BASE TABLE'
+            ORDER BY TABLE_NAME;
+        """)
+        
+        tables = [row[0] for row in cursor.fetchall()]
+        
+        cursor.close()
+        conn.close()
+        
+        logger.info(f"✅ Found {len(tables)} tables in SQL Server")
+        return tables
+        
+    except Exception as e:
+        logger.error(f"❌ Error discovering tables: {e}")
+        if conn:
+            conn.close()
+        return []
+
+def get_table_structure(table_name):
+    """Get table structure from SQL Server"""
+    conn = get_sqlserver_connection()
+    if not conn:
+        return None
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Get column information
+        cursor.execute(f"""
+            SELECT 
+                COLUMN_NAME,
+                DATA_TYPE,
+                IS_NULLABLE,
+                COLUMN_DEFAULT,
+                CHARACTER_MAXIMUM_LENGTH
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = '{table_name}'
+            ORDER BY ORDINAL_POSITION;
+        """)
+        
+        columns = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        return columns
+        
+    except Exception as e:
+        logger.error(f"❌ Error getting structure for {table_name}: {e}")
+        if conn:
+            conn.close()
+        return None
+
+def extract_table_data(table_name, limit=None):
+    """Extract data from a table"""
+    conn = get_sqlserver_connection()
+    if not conn:
+        return None
+    
+    try:
+        # Build query with optional limit
+        query = f"SELECT * FROM [dbo].[{table_name}]"
+        if limit:
+            query += f" ORDER BY 1 OFFSET 0 ROWS FETCH NEXT {limit} ROWS ONLY"
+        
+        logger.info(f"Extracting data from {table_name}...")
+        df = pd.read_sql(query, conn)
+        
+        conn.close()
+        
+        logger.info(f"✅ Extracted {len(df)} records from {table_name}")
+        return df
+        
+    except Exception as e:
+        logger.error(f"❌ Error extracting data from {table_name}: {e}")
+        if conn:
+            conn.close()
+        return None
+
+def create_extraction_queries(all_tables):
+    """Create extraction queries for all tables"""
+    logger.info("📝 Creating extraction queries for all tables...")
+    
+    queries_content = f"""-- =====================================================
+-- Complete SQL Server Data Extraction Queries
+-- Generated by discover_and_extract_all_tables.py
+-- Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+-- Total Tables: {len(all_tables)}
+-- =====================================================
+
+-- Instructions:
+-- 1. Run these queries on your SQL Server instance
+-- 2. Export results to CSV files in the extracted_data/ directory
+-- 3. Use the import script to load data into PostgreSQL
+
+"""
+    
+    for table_name in all_tables:
+        queries_content += f"""
+-- Table: {table_name}
+-- Export to: extracted_data/{table_name}.csv
+SELECT *
+FROM [dbo].[{table_name}]
+ORDER BY 1;
+"""
+    
+    # Save queries to file
+    with open('complete_sqlserver_extraction.sql', 'w', encoding='utf-8') as f:
+        f.write(queries_content)
+    
+    logger.info("✅ Created complete extraction queries: complete_sqlserver_extraction.sql")
+
+def extract_all_tables_to_csv(all_tables, sample_size=1000):
+    """Extract all tables to CSV files"""
+    logger.info(f"📥 Extracting all {len(all_tables)} tables to CSV files...")
+    
+    # Create extracted_data directory if it doesn't exist
+    os.makedirs('extracted_data', exist_ok=True)
+    
+    extracted_count = 0
+    total_records = 0
+    
+    for table_name in all_tables:
+        try:
+            # First, get a sample to understand the structure
+            sample_df = extract_table_data(table_name, limit=sample_size)
+            if sample_df is not None and len(sample_df) > 0:
+                # Save sample to CSV
+                csv_file = f'extracted_data/{table_name}.csv'
+                sample_df.to_csv(csv_file, index=False)
+                
+                # Get full count
+                conn = get_sqlserver_connection()
+                if conn:
+                    cursor = conn.cursor()
+                    cursor.execute(f"SELECT COUNT(*) FROM [dbo].[{table_name}]")
+                    full_count = cursor.fetchone()[0]
+                    cursor.close()
+                    conn.close()
+                    
+                    logger.info(f"✅ Extracted {table_name}: {len(sample_df)} sample records (Total: {full_count:,})")
+                    total_records += full_count
+                else:
+                    logger.info(f"✅ Extracted {table_name}: {len(sample_df)} sample records")
+                    total_records += len(sample_df)
+                
+                extracted_count += 1
+            else:
+                logger.warning(f"⚠️  No data found in {table_name}")
+                
+        except Exception as e:
+            logger.error(f"❌ Error extracting {table_name}: {e}")
+            continue
+    
+    logger.info(f"📊 Extraction Summary: {extracted_count}/{len(all_tables)} tables extracted")
+    logger.info(f"📊 Total Records: {total_records:,}")
+    
+    return extracted_count, total_records
+
+def create_table_analysis(all_tables):
+    """Create analysis of all tables"""
+    logger.info("📊 Creating table analysis...")
+    
+    analysis = {
+        'total_tables': len(all_tables),
+        'extraction_date': datetime.now().isoformat(),
+        'tables': []
+    }
+    
+    for table_name in all_tables:
+        try:
+            # Get table structure
+            structure = get_table_structure(table_name)
+            
+            # Get record count
+            conn = get_sqlserver_connection()
+            if conn:
+                cursor = conn.cursor()
+                cursor.execute(f"SELECT COUNT(*) FROM [dbo].[{table_name}]")
+                record_count = cursor.fetchone()[0]
+                cursor.close()
+                conn.close()
+            else:
+                record_count = 0
+            
+            table_info = {
+                'table_name': table_name,
+                'record_count': record_count,
+                'columns': [col[0] for col in structure] if structure else [],
+                'column_count': len(structure) if structure else 0
+            }
+            
+            analysis['tables'].append(table_info)
+            
+        except Exception as e:
+            logger.error(f"❌ Error analyzing {table_name}: {e}")
+            continue
+    
+    # Save analysis to JSON
+    import json
+    with open('sqlserver_table_analysis.json', 'w', encoding='utf-8') as f:
+        json.dump(analysis, f, indent=2, default=str)
+    
+    logger.info("✅ Table analysis saved: sqlserver_table_analysis.json")
+    
+    return analysis
+
+def main():
+    """Main function"""
+    logger.info("🚀 Discovering and Extracting All Tables from SQL Server")
+    logger.info("=" * 70)
+    
+    # Step 1: Discover all tables
+    all_tables = discover_all_tables()
+    if not all_tables:
+        logger.error("❌ Could not discover tables from SQL Server")
+        return False
+    
+    logger.info(f"📊 Found {len(all_tables)} tables in SQL Server")
+    
+    # Step 2: Create extraction queries
+    create_extraction_queries(all_tables)
+    
+    # Step 3: Create table analysis
+    analysis = create_table_analysis(all_tables)
+    
+    # Step 4: Extract all tables to CSV
+    extracted_count, total_records = extract_all_tables_to_csv(all_tables)
+    
+    # Step 5: Create summary
+    logger.info("🎉 SQL Server Table Discovery and Extraction Complete!")
+    logger.info("=" * 70)
+    logger.info("📁 Generated Files:")
+    logger.info("  - complete_sqlserver_extraction.sql")
+    logger.info("  - sqlserver_table_analysis.json")
+    logger.info("  - extracted_data/*.csv (CSV files)")
+    logger.info("")
+    logger.info("📊 Summary:")
+    logger.info(f"  - Total Tables Found: {len(all_tables)}")
+    logger.info(f"  - Tables Extracted: {extracted_count}")
+    logger.info(f"  - Total Records: {total_records:,}")
+    logger.info("")
+    logger.info("🎯 Next Steps:")
+    logger.info("1. Review the extracted CSV files")
+    logger.info("2. Run the import script to load data into PostgreSQL")
+    logger.info("3. Add foreign key constraints")
+    logger.info("4. Verify data integrity")
+    
+    return True
+
+if __name__ == "__main__":
+    main()
+

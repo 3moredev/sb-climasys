@@ -1,0 +1,87 @@
+{
+  "clinic_master": {
+    "status": "success",
+    "columns_added": 18,
+    "row_count": 4
+  },
+  "doctor_master": {
+    "status": "success",
+    "columns_added": 30,
+    "row_count": 4
+  },
+  "patient_master": {
+    "status": "success",
+    "columns_added": 43,
+    "row_count": 23250
+  },
+  "patient_visits": {
+    "status": "success",
+    "columns_added": 103,
+    "row_count": 16525
+  },
+  "user_master": {
+    "status": "success",
+    "columns_added": 30,
+    "row_count": 7
+  },
+  "system_params": {
+    "status": "success",
+    "columns_added": 47,
+    "row_count": 4
+  },
+  "language_master": {
+    "status": "success",
+    "columns_added": 3,
+    "row_count": 3
+  },
+  "role_master": {
+    "status": "success",
+    "columns_added": 6,
+    "row_count": 6
+  },
+  "gender_master": {
+    "status": "success",
+    "columns_added": 1,
+    "row_count": 2
+  },
+  "user_role": {
+    "status": "success",
+    "columns_added": 9,
+    "row_count": 7
+  },
+  "shift_master": {
+    "status": "success",
+    "columns_added": 9,
+    "row_count": 14
+  },
+  "model": {
+    "status": "success",
+    "columns_added": 3,
+    "row_count": 3
+  },
+  "model_config_params": {
+    "status": "success",
+    "columns_added": 3,
+    "row_count": 4
+  },
+  "license_key": {
+    "status": "success",
+    "columns_added": 10,
+    "row_count": 1
+  },
+  "doctor_clinic_shift": {
+    "status": "success",
+    "columns_added": 3,
+    "row_count": 28
+  },
+  "doctor_model": {
+    "status": "success",
+    "columns_added": 3,
+    "row_count": 4
+  },
+  "visit_prescription_overwrite": {
+    "status": "success",
+    "columns_added": 23,
+    "row_count": 86782
+  }
+}

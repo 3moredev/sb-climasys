@@ -1,0 +1,2 @@
+Doctor_ID,Clinic_ID,Installation_Date,Last_Renewal_Date,License_Validity,Valid_From,Valid_To,VerNo,License_Key,start_verification
+DR-00010,CL-00001,2019-06-04 00:00:00,2021-06-01 00:00:00,365,2021-06-01 00:00:00,2026-03-31 00:00:00,25Feb2020,CdDbgSXSls0P1UBq9zr4tJS+Yk3SaLH/uNcpsJw3URjsaj+C2XDjVIgksU1s8jwAkx0oIZAS5GduvBF/3HFx5FuBoNmvvJdNLGaUcBPT6PY=,8

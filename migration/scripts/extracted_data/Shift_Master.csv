@@ -1,0 +1,15 @@
+Shift_ID,Description,Shift_Day,Start_Time,End_Time,Created_On,CreatedBy_Name,Modified_On,ModifiedBy_Name
+1,Morning,Monday,08:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+2,Evening,Monday,19:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+3,Morning,Tuesday,08:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+4,Evening,Tuesday,19:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+5,Morning,Wednesday,08:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+6,Evening,Wednesday,19:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+7,Morning,Thursday,08:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+8,Evening,Thursday,19:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+9,Morning,Friday,08:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+10,Evening,Friday,19:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+11,Morning,Saturday,08:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+12,Evening,Saturday,19:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+13,Morning,Sunday,08:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None
+14,Evening,Sunday,19:00:00.0000000,21:00:00.0000000,2016-08-20 17:56:00,Shyam,None,None

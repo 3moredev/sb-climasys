@@ -1,0 +1,20 @@
+{
+  "doctor_master": 0,
+  "clinic_master": 0,
+  "user_master": 0,
+  "patient_master": 0,
+  "patient_visits": 0,
+  "system_params": 0,
+  "user_role": 0,
+  "blood_group_master": 0,
+  "gender_master": 0,
+  "language_master": 0,
+  "license_key": 0,
+  "role_master": 0,
+  "shift_master": 0,
+  "doctor_clinic_shift": 0,
+  "doctor_model": 0,
+  "model": 0,
+  "model_config_params": 0,
+  "visit_prescription_overwrite": 0
+}

@@ -1,0 +1,5 @@
+Doctor_ID,Clinic_ID,Clinic_Name,Clinic_Address,Country_ID,State_ID,City_ID,Area_ID,Pincode,Tips,News,Phone_No,Fax_No,Created_On,CreatedBy_Name,Modified_On,ModifiedBy_Name,IS_Print
+DR-00010,CL-00001,Tongaonkar Hospital,"Plot No. 17, Survey 47, behind Hotel Bramha, Viveknagar",IND,MAH,PUN,1,411035,None,None,020 27245766,None,2016-08-20 17:46:00,Shyam,None,None,True
+DR-00A10,CL-00001,Tongaonkar Hospital,"Plot No. 17, Survey 47, behind Hotel Bramha, Viveknagar",IND,MAH,PUN,1,411035,None,None,020 27245766,None,2016-08-20 17:46:00,Shyam,None,None,True
+DR-00B10,CL-00001,Tongaonkar Hospital,"Plot No. 17, Survey 47, behind Hotel Bramha, Viveknagar",IND,MAH,PUN,1,411035,None,None,020 27245766,None,2016-08-20 17:46:00,Shyam,None,None,True
+DR-00C10,CL-00001,Tongaonkar Hospital,"Plot No. 17, Survey 47, behind Hotel Bramha, Viveknagar",IND,MAH,PUN,1,411035,None,None,020 27245766,None,2016-08-20 17:46:00,Shyam,None,None,True

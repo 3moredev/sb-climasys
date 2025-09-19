@@ -1,0 +1,20 @@
+{
+  "Doctor_Master": 4,
+  "Clinic_Master": 4,
+  "User_Master": 7,
+  "Patient_Master": 23250,
+  "Patient_Visits": 16525,
+  "System_Params": 4,
+  "User_Role": 7,
+  "Blood_Group_Master": 0,
+  "Gender_Master": 2,
+  "Language_Master": 3,
+  "License_Key": 1,
+  "Role_Master": 6,
+  "Shift_Master": 14,
+  "Doctor_Clinic_Shift": 28,
+  "Doctor_Model": 4,
+  "Model": 3,
+  "Model_Config_Params": 4,
+  "Visit_Prescription_Overwrite": 86782
+}

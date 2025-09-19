@@ -1,0 +1,1174 @@
+
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head><title>
+	Dashboard | Dashboard
+</title><meta charset="utf-8" /><meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta http-equiv="Page-Enter" content="blendTrans(Duration=0.2)" /><meta http-equiv="Page-Exit" content="blendTrans(Duration=0.2)" /><link rel="shortcut icon" href="images/icons/favicon.ico" /><link rel="apple-touch-icon" href="images/icons/favicon.png" /><link rel="apple-touch-icon" sizes="72x72" href="images/icons/favicon-72x72.png" /><link rel="apple-touch-icon" sizes="114x114" href="images/icons/favicon-114x114.png" />
+    <!--Loading bootstrap css-->
+    <link href="styles/bootstrap.min.css" rel="stylesheet" type="text/css" /><link href="styles/googlefontfamily.css" rel="stylesheet" type="text/css" /><link href="styles/googlefontfamilyoswald.css" rel="stylesheet" type="text/css" />
+    <!--SITE CSS -->
+    <link type="text/css" rel="stylesheet" href="styles/style.css" /><link href="styles/jquery-ui-1.10.4.custom.min.css" rel="stylesheet" type="text/css" /><link href="styles/font-awesome.min.css" rel="stylesheet" type="text/css" /><link href="styles/animate.css" rel="stylesheet" type="text/css" /><link href="styles/all.css" rel="stylesheet" type="text/css" /><link href="styles/main.css" rel="stylesheet" type="text/css" /><link href="styles/main.css" rel="stylesheet" type="text/css" /><link href="styles/style-responsive.css" rel="stylesheet" type="text/css" /><link href="styles/stylev2.css" rel="stylesheet" type="text/css" /><link href="styles/style.css" rel="stylesheet" type="text/css" /><link href="css/waitMe.css" rel="stylesheet" type="text/css" /><link href="styles/waitMe.min.css" rel="stylesheet" type="text/css" />
+    <!--JAVA SCRIPT PART -->
+    <script src="../script/jquery.min.js" type="text/javascript"></script>
+    <script src="../script/jquery-migrate-1.2.1.min.js" type="text/javascript"></script>
+    <script src="../script/jquery-ui.js" type="text/javascript"></script>
+    <script src="../script/bootstrap.min.js" type="text/javascript"></script>
+    <script src="../script/bootstrap-hover-dropdown.js" type="text/javascript"></script>
+    <script src="../script/html5shiv.js" type="text/javascript"></script>
+    <script src="../script/respond.min.js" type="text/javascript"></script>
+    <script src="../script/jquery.metisMenu.js" type="text/javascript"></script>
+    <script src="../script/js/bootstrap-multiselect.js" type="text/javascript"></script>
+    <script src="../script/js/bootstrap-multiselect-collapsible-groups.js" type="text/javascript"></script>
+    <link href="css/bootstrap-multiselect.css" rel="stylesheet" type="text/css" />
+    <script src="../script/jquery.cookie.js" type="text/javascript"></script>
+    <script src="../script/icheck.min.js" type="text/javascript"></script>
+    <script src="../script/custom.min.js" type="text/javascript"></script>
+    <script src="../script/jquery.menu.js" type="text/javascript"></script>
+    <script src="../script/responsive-tabs.js" type="text/javascript"></script>
+    <script src="../script/waitMe.min.js" type="text/javascript"></script>
+    <script src="../script/waitMe.js" type="text/javascript"></script>
+    <script src="../script/index.js" type="text/javascript"></script>
+    <script src="../script/data.js" type="text/javascript"></script>
+    <script src="../script/main.js" type="text/javascript"></script>
+    <script src="../script/ErrorMessages.js" type="text/javascript"></script>
+    <script src="../script/js/bootstrap-datepicker.js" type="text/javascript"></script>
+
+
+    <link type="text/css" rel="stylesheet" href="styles/bootstrap-datepicker.css" />
+
+    <style>
+        sup
+        {
+            font-size: 90%;
+            margin-left: 69px;
+        }
+        .level2
+        {
+            background-color: #3a6f9f;
+            left: 0% !important;
+            top: 48px !important;
+        }
+        
+        #topbar .navbar-top-links li > a
+        {
+            -webkit-transition: none !important;
+            transition: none !important;
+        }
+    </style>
+    <script type="text/javascript">
+        $(function () {
+            $('#dob').datepicker({
+                format: 'mm/dd/yyyy'
+            });
+        });
+
+        function one() {
+            document.getElementById("user").classList.add("open");
+        }
+        function second() {
+            document.getElementById("user").classList.remove("open");
+        }
+
+        $("'[placeholder]'").focus(function () {
+            var input = $(this);
+            if (input.val() == input.attr("'placeholder'")) {
+                input.val("''");
+                input.removeClass("'placeholder'");
+            }
+        }).blur(function () {
+            var input = $(this);
+            if (input.val() == "''" || input.val() == input.attr("'placeholder'")) {
+                input.addClass("'placeholder'");
+                input.val(input.attr("'placeholder'"));
+            }
+        }).blur();
+
+
+    </script>
+    <style>
+        sup
+        {
+            font-size: 90%;
+            margin-left: 69px;
+        }
+        
+        .initial_hide
+        {
+            display: none !important;
+        }
+        .initial_show
+        {
+            display: block;
+        }
+        
+        
+        .dropmenu li a
+        {
+            color: #fff !important;
+            padding: 14px 24px !important;
+        }
+        .user-logo
+        {
+            background: #366794 !important;
+        }
+    </style>
+    <script src="../script/indexjquery.min.js" type="text/javascript"></script>
+    <script type="text/javascript">
+        $(document).ready(function () {
+            $("body").html(
+                    $("body").html().replace("®", "<sup>&reg;</sup>")
+                );
+
+            $('#Master_Menu').mouseover(function () {
+                $('#Ul23').show();
+            })
+            $('#Master_Menu').mouseout(function () {
+
+                $('#Ul23').hide();
+            })
+
+
+            $('#doctor_menu3').mouseover(function () {
+                $('#Ul1').show();
+            })
+            $('#treatment_menu').mouseover(function () {
+                $('#Ul3').show();
+            })
+            $('#doctor_menu3').mouseout(function () {
+
+                $('#Ul1').hide();
+            })
+            $('#treatment_menu').mouseout(function () {
+
+                $('#Ul3').hide();
+            })
+            $('.dropdown-menu').click(function () {
+
+                $('.dropdown-menu').hide();
+            })
+            $('#Registeration').mouseover(function () {
+                $('#Ul2').show();
+            })
+            $('#Registeration').mouseout(function () {
+
+                $('#Ul2').hide();
+            })
+            $('#AdminMenu').mouseover(function () {
+                $('#Ul4').show();
+            })
+            $('#AdminMenu').mouseout(function () {
+
+                $('#Ul4').hide();
+            })
+            $('#MR_MenuOperator').mouseover(function () {
+                $('#Ul5').show();
+            })
+            $('#MR_MenuOperator').mouseout(function () {
+
+                $('#Ul5').hide();
+            })
+            $('#MR_MenuDoctor').mouseover(function () {
+                $('#Ul6').show();
+            })
+            $('#MR_MenuDoctor').mouseout(function () {
+
+                $('#Ul6').hide();
+            })
+            $('#lireports').mouseover(function () {
+                $('#Ul10').show();
+            })
+            $('#lireports').mouseout(function () {
+
+                $('#Ul10').hide();
+            })
+
+            $('#lidischargecard').mouseover(function () {
+                $('#Ul8').show();
+            })
+            $('#lidischargecard').mouseout(function () {
+
+                $('#Ul8').hide();
+            })
+
+            $('#liIPDMaster').mouseover(function () {
+                $('#Ul9').show();
+            })
+            $('#liIPDMaster').mouseout(function () {
+
+                $('#Ul9').hide();
+            })
+
+            $('#LiCollection').mouseover(function () {
+                $('#Ul10').show();
+            })
+            $('#LiCollection').mouseout(function () {
+
+                $('#Ul10').hide();
+            })
+
+            $('#Future_Book').mouseover(function () {
+                $('#Ul12').show();
+            })
+            $('#Future_Book').mouseout(function () {
+
+                $('#Ul12').hide();
+            })
+
+            $('#liIPDMaster2').mouseover(function () {
+                $('#Ul14').show();
+            })
+            $('#liIPDMaster2').mouseout(function () {
+
+                $('#Ul14').hide();
+            })
+
+            $('#li45').mouseout(function () {
+
+                $('#Ul11123').hide();
+            })
+
+            $('#li45').mouseover(function () {
+                $('#Ul11123').show();
+            })
+            $('#IdServices1').mouseover(function () {
+                $('#Ul17').show();
+            })
+            $('#IdServices1').mouseout(function () {
+
+                $('#Ul17').hide();
+            })
+            $('#Services').mouseover(function () {
+                $('#Ul15').show();
+            })
+            $('#Services').mouseout(function () {
+
+                $('#Ul15').hide();
+            })
+
+
+            $('#OPDOperator').mouseover(function () {
+                $('#OpdOpera').show();
+            })
+            $('#OPDOperator').mouseout(function () {
+
+                $('#OpdOpera').hide();
+            })
+            $('#IPDMasterMenu').mouseover(function () {
+                $('#IPDid').show();
+            })
+            $('#IPDMasterMenu').mouseout(function () {
+
+                $('#IPDid').hide();
+            })
+
+
+            $('#doctrcollection').mouseover(function () {
+                $('#Ul7').show();
+            })
+            $('#doctrcollection').mouseout(function () {
+
+                $('#Ul7').hide();
+            })
+
+
+            $('#li41').mouseover(function () {
+                $('#Ul16').show();
+            })
+            $('#li41').mouseout(function () {
+
+                $('#Ul16').hide();
+            })
+            
+            $('#li13').mouseover(function () {
+                $('#Ul11').show();
+            })
+            $('#li13').mouseout(function () {
+
+                $('#Ul11').hide();
+            })
+            
+            $('#Master_Treatment').mouseover(function () {
+                $('#Ul18').show();
+            })
+            $('#Master_Treatment').mouseout(function () {
+
+                $('#Ul18').hide();
+            })
+           
+            $('#Master_Prescription').mouseover(function () {
+                $('#Ul20').show();
+            })
+            $('#Master_Prescription').mouseout(function () {
+
+                $('#Ul20').hide();
+            })
+           
+            $('#Master_Billing').mouseover(function () {
+                $('#Ul22').show();
+            })
+            $('#Master_Billing').mouseout(function () {
+
+                $('#Ul22').hide();
+            })
+
+            $('#user').mouseover(function () {
+                $('#Ul09').show();
+            })
+            $('#user').mouseout(function () {
+
+                $('#Ul09').hide();
+            })
+
+            $('#OPDReceiptsmenu').mouseover(function () {
+                $('#Ul15').show();
+            })
+            $('#OPDReceiptsmenu').mouseout(function () {
+
+                $('#Ul15').hide();
+            })
+
+        });
+
+       
+    </script>
+    
+    <script>
+        $(document).ready(function () {
+
+            $var = $('.count');
+
+            $('.count').each(function () {
+                $(this).attr('Counter', 0).animate({
+                    Counter: $(this).text()
+                }, {
+                    duration: 3000,
+                    easing: 'swing',
+                    step: function (now) {
+                        $(this).text(Math.ceil(now));
+                    }
+                });
+            });
+        });
+
+ 
+    </script>
+    <style>
+        .Counter
+        {
+            background-color: transparent;
+            height: 90px;
+            margin-top: 20px;
+            color: #428bca;
+            padding: 1px;
+            border: 1px solid #e0d3d3;
+        }
+        h2
+        {
+            font-weight: 600;
+            font-size: 27px;
+            margin-top: 10px;
+        }
+        h4
+        {
+            font-size: 16px;
+            color: #504a4a;
+        }
+        .col-lg-4
+        {
+            padding: 0 10px;
+        }
+        .btn
+        {
+            width: 190px;
+        }
+        .licenseday
+        {
+            color: red;
+        }
+        .licenseday1
+        {
+            color: #428bca;
+        }
+        .ExpiryDay1
+        {
+            display: block;
+        }
+        .ExpiryDay2
+        {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <form method="post" action="./Dashboard.aspx" id="form1" class="form-horizontal">
+<div class="aspNetHidden">
+<input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value="" />
+<input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value="" />
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwULLTE3MjIzNjU0MDIPZBYCZg9kFgICAw9kFhQCFQ8WAh4FY2xhc3MFDGluaXRpYWxfaGlkZWQCIQ8WAh8ABQxpbml0aWFsX2hpZGVkAiMPFgIfAAUMaW5pdGlhbF9oaWRlZAIpDw8WAh4EVGV4dAULMTMtU2VwLTIwMjVkZAIrDw8WAh8BBQkgMTE6MzMgQU1kZAItDw8WAh8BBQVSZWNlcGRkAjEPZBYCAgEPZBYCZg9kFhoCAQ8PFgIfAWVkZAIFDxYCHglpbm5lcmh0bWwFKA0KICAgICAgICAgICAgICAgICAgICAgICAgICAgIFNpbmNlIDIwMTlkAgcPFgIfAgU9DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgSW5zdGFsbGF0aW9uIGRhdGUgOiAwNC1KdW4tMjAxOWQCCQ8WAh8CBQUyMzI1MGQCCw8WAh8CBQEwZAINDxYCHwIFBTExNTQwZAIPDxYCHwIFBTExNzEwZAIRDxYCHwIFBTE2MTg0ZAITDxYCHwIFAjIyZAIVDxYCHwIFBTg2NzgyZAIZDxYCHwAFCkV4cGlyeURheTIWAgIBDxYEHwIFCzMxLU1hci0yMDI2HwAFC2xpY2Vuc2VkYXkxZAIbDw8WBB4IQ3NzQ2xhc3MFD2J0biBidG4tcHJpbWFyeR4EXyFTQgICFgIeBXN0eWxlBRpoZWlnaHQ6MzhweDtkaXNwbGF5OmJsb2NrO2QCHQ8PZBYCHwUFGWhlaWdodDozOHB4O2Rpc3BsYXk6bm9uZTtkAjMPDxYCHwEFGURyLiBBbmlydWRkaGEgIFRvbmdhb25rYXJkZAI1Dw8WAh8BBRNUb25nYW9ua2FyIEhvc3BpdGFsZGQCNw8PFgIfAQUkU2F0dXJkYXkgLSBNb3JuaW5nIC0gODowMEFNIC0gOTowMFBNZGQYAQUeX19Db250cm9sc1JlcXVpcmVQb3N0QmFja0tleV9fFgEFJGN0bDAwJENvbnRlbnRQbGFjZUhvbGRlcjEkYnRuQ2xvc2VBZNbj937kRDi7k4j5HYMxzUegHDfqQM7dEE8ZJV5jVPgb" />
+</div>
+
+<script type="text/javascript">
+//<![CDATA[
+var theForm = document.forms['form1'];
+if (!theForm) {
+    theForm = document.form1;
+}
+function __doPostBack(eventTarget, eventArgument) {
+    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+        theForm.__EVENTTARGET.value = eventTarget;
+        theForm.__EVENTARGUMENT.value = eventArgument;
+        theForm.submit();
+    }
+}
+//]]>
+</script>
+
+
+<script src="/WebResource.axd?d=3vUti3prE4dNh_SCCTSFrjUIwfdezouG6uX0QPhcWfUL9trzus6UfZuOdEXx5seM6mLcfiCz53HVWkHJJhrxMxDhIGF0HgNioltblY41QS01&amp;t=638883469099574018" type="text/javascript"></script>
+
+
+<script src="/ScriptResource.axd?d=5bTfX16az_fRVr4PD1IPqw7RfFp5J7T_RO2xK4Q43qab0e-go_kwJo5jE_0TdPU78OCFLEti0OjJtX3m1RWy_KHg3kEdM495c-08YmlH6zBIgEZ_ousjxhyIP9OGmhQA0&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=TqvDeslK76ryaACQFB45A32QDJpshc1xfVTf0EF7ag1aRngExmPfsxB4zZmJsGpg21X8iB00YbnR7zkS7v7orXxqhfrbAQcB_4MVDweRpyEBAOXC1o1ScHXwfxpoM83wI9YnXwsIeFDaPCl2VxtNfQ2&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=K0p8zDEb4SfrK7J-sk3jfka1uEaCEccUzwT2Wz5rgqCEayHJDAP20CKVscayNU3y--IoODUtPe8IYk1PfQ60tj6Oun4SeP5dxp6Lw8P-6H84LUdureJAePIU7HRqWgWb0&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=e8qo6ApjMKe7JgvONtRXzeRaD5usHlW9VnWCLp701gbQ-67Y9lm_0l6gD1yTi_X1GG8FmYDyBjF2BK8cJwSr-t4Q5KA8rJZKJbrS-swwJtd758vOVNB9UKKgzasERZlvGYIE18Ro2TCw-QtILlfxCg2&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=hXpdYAhEr2Uzm6J8JCmxL7nz5B7aC9zifcguwSTicLjmwY5b-SjLzgDjh0QXWqMBTTNwz84XGe5r4tJSzxUtpeTRi6WZJe4BoC3A-e2f6_J2sTDJPRsYQDXPvLbA3na54_y1tzGU6RE1T4VnB_COwS-fto1284t4X8LA69NcQ3c1&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=FdyXWrfUwt_kHMkW1pdyiOet8rzGmKh3KYw6UF-TyMeY0EuIykl0fnkYDYEuF_8ruwhxa3Z6dqZm-4tzW1xWkqw9Sp_u_uS2PH4i19x20qaEZhZlqH5Skqr_tT3L6fiGH9UQWng92f3FWijGBVAKbQ2&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=PQ9KJNZtbwG_JkG2iBlPtGeJ0qVAor7Sok8p4Bg5c0V0cfewnpGEjOIwKq2ZZ1ABewpy53qPQ76LT5UKHv22Krdo3EMNYTDyeuteEapMxjktJ6pJckH74_N32hWnAx1M-h2B_ugCrQfd36WUR7qPbQ2&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=OczTajsCSPsGg-GLFeEvhclpuXfrIn190fHHe4qi_jEfBgdsumTg15uuEfe1Ky4f0oGO5oi9aldziltaX_7EkzdwAwyNv7IEe2iy_y0ieTEeZ3QPPhaMHstpg1RyHxMy5gd-qWhn7_cA7le5mPXznA2&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=W-Dw5RsoaibdFGM66F_jc-yK7N7qbj-9lUe6Oan6s402CEvNEIxAH0Cmso_9Ig8lxa4HPTZh4zo8neGCut9VtPh9s7SdxeM03xTCdCtogl2agDo9hXGZMH-Z9dUDEer6ZJ5kjg9HUeuGNmnpZvfBnc7Ac_2lhpHulfPg7L0Mj6g1&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=XUgxaj323i89QecV9r0R27uPy7-WboOSC1qLO3x3DCbFL70KogvhG3J0juvuP1QXbiSIB0BF5gnWlbbJVOQX438rgH8DAeXAB-px1_cJjlscvHgLO4oOBeO-qfgasUTtfybpkFzGbtFT2fxAlaLtIg2&amp;t=f2cd5c5" type="text/javascript"></script>
+<script src="/ScriptResource.axd?d=zruGPWVQwFrIMg2RmsasiZDtQGbkY2e8e6DumFT8I1SUB69hofMEB8O9QPZkuCkcUUbDD9GQJ4pWDY6cGFrIyHC0to4MfDdc-mjsbhXEJzPTMRlrTRx29UkHNOz8o7mlGt2kvKoLVaQ63Wbp9IK_XQ2&amp;t=f2cd5c5" type="text/javascript"></script>
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="B543B226" />
+	<input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="/wEdAAmav4AnCbc0td3cBWMBtrQIU9yJheXk40+sq73IGoX4B412lSvIs+cvh2DKhqXzf/42Scig77oLCWgnqOnjzdvZDvSl759G71DREPhl7QZOB6FEtlKi/exBMV2297BliyCBPQ09sbhjyl/+lNS0OsHXaAcm6YcfMqQuxUAvHzDG6pRUOWyc2fp1f7qWiz+f6vN9nkUvbGlxFJckVN48mvF2KU6SJ+VTzkj/JpKTUZzxvA==" />
+</div>
+    <script type="text/javascript">
+//<![CDATA[
+Sys.WebForms.PageRequestManager._initialize('ctl00$ScriptManager1', 'form1', ['tctl00$ContentPlaceHolder1$UpdatePanel2','ContentPlaceHolder1_UpdatePanel2'], [], [], 90, 'ctl00');
+//]]>
+</script>
+
+    <div>
+        <a id="totop" href="#"><i class="fa fa-angle-up"></i></a>
+        <nav class="navbar navbar-default">
+            <div class="container-fluid">
+                <div class="navbar-header">
+                    <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1"
+                        aria-expanded="false">
+                        <span class="sr-only">Toggle navigation</span> <span class="icon-bar"></span><span
+                            class="icon-bar"></span><span class="icon-bar"></span>
+                    </button>
+                    <a class="navbar-brand" href="#">
+                        <img src="../images/logo.png" alt="">
+                    </a>
+                </div>
+                <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                    <ul class="nav navbar-nav">
+
+                        
+
+                        <li id="appointment_menu1" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="../Appointments/DailyCollection.aspx" class="dropdown-toggle">Daily OPD Collection
+                        </a></li>
+                        
+                        <li id="treatment_menu" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">Treatment<span class="caret"></span> </a>
+                            <ul id="Ul3" class="dropdown-menu dropmenu dropmenu">
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Treatment/PatientProfile.aspx">
+                                    Patient Treatment</a></li>
+                                <li id="Offline_zeromodel" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Treatment/OfflineWork.aspx">
+                                    Offline Visit</a></li>
+                            </ul>
+                        </li>
+
+
+                       
+
+                        
+                    
+
+
+                           <li id="OPDOperator" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">OPD<span class="caret"></span> </a>
+                            <ul id="OpdOpera" class="dropdown-menu dropmenu dropmenu" style="min-width: 236px !important;">
+
+                       <li id="Doctor_Appt_Menu" class="dropdown initial_hide"><a class="level2 dynamic" data-hover="dropdown" tabindex="-1"
+                            href="../Appointments/DoctorDashboard.aspx">Today's Appointments
+                        </a></li>
+
+                     
+                         <li id="Operator_Appt_Menu" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1" href="../Appointments/OperatorDashboard.aspx">
+                               Today's Appointments</a></li> 
+
+                              <li id="Group_Adhoc" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1" href="../Payment/AdhocPayment.aspx">
+                                 OPD - Collect Patient Dues</a></li> 
+
+                                    
+
+                                   
+                                  <li id="Li22" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Registration/QuickRegistration.aspx">Patient - Quick Registration</a></li>
+                                         <li id="Li27" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Registration/PendingRegistration.aspx">Patient - Detailed Registration</a></li>
+                                                   <li id="Li31" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../forms/Patient_Registration_Form.pdf">
+                                    Patient - Print Registration Form </a></li>
+                                    <li id="Li23" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Registration/DeliveryRegistration.aspx">Delivery Registration</a></li>
+                             <li id="Li48" class="dropdown initial_hide"><a class="level2 dynamic" data-hover="dropdown" tabindex="-1"
+                            href="../Appointments/DoctorAppoinmentBooking.aspx"> Direct Treatment Entry
+                        </a></li>
+                        </ul>
+                        </li>
+
+                        
+                       
+                        
+                        <li id="Compounder_Appt_Menu" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="../Appointments/CompounderDashboard.aspx" class="dropdown-toggle">Patient
+                            Appointments </a></li>
+
+                             
+
+
+
+                                              
+                        <li id="Li39" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="../Appointments/PharmacistDashboard.aspx" class="dropdown-toggle">Todays
+                            Appointments </a></li>
+
+                             
+
+                         <li id="Future_Book" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">Future Appointments<span class="caret"></span> </a>
+                            <ul id="Ul12" class="dropdown-menu dropmenu">
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ReBook/BookFuture_Appointment.aspx">
+                                    Book Appointments</a></li>
+                                <li id="Li17" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ReBook/RescheduleAppointment.aspx">
+                                  Rebook Appointments</a></li>
+                            </ul>
+                        </li>
+                        
+                        <li id="Offline_Menu" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="../Treatment/OfflineWork.aspx" class="dropdown-toggle">Offline Visit </a>
+                        </li>
+                        
+                              <li id="lireports" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">OPD Reports<span class="caret"></span> </a>
+                        
+
+                      
+                            <ul id="Ul10" class="dropdown-menu dropmenu dropmenu">
+                           
+
+                                <li id="li41" class="dropdown-submenu"><a data-hover="dropdown" href=""
+                                    class="dropdown-toggle level2 dynamic" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                    aria-expanded="false">OPD - Collection</a>
+                                    <ul id="Ul16" class="dropdown-menu  dropmenu" style="min-width: 248px !important;">
+                                        <li id="Li42" class="dropdown" style="min-width: 290px;"><a class="level2 dynamic" tabindex="-1" href="../Appointments/OPDDailyCollection.aspx"> OPD – Collection Statement</a></li>
+                                         <li id="Li43" class="dropdown" style="min-width: 290px;"><a class="level2 dynamic" tabindex="-1" href="../Receipt/IIICgenerateReceipt.aspx">OPD-IIIC Register (Service-wise collection) </a></li>
+                                        
+                                    </ul>
+                                </li>
+                           <li id="LiCollection" class="dropdown-submenu">
+
+                              
+                                   
+                                     
+                              </li>
+                                    <li id="Group_dailycollecton" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1"  href="../Appointments/DailyCollection.aspx">
+                                        OPD – Daily Collection</a>
+                                   </li>
+
+
+                                
+
+                 
+
+
+                               
+
+                                    <li id="Li_TopDefaulter" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Reports/TopDefaulter.aspx">
+                                   OPD - Defaulters</a></li>
+
+                                    <li id="OPDReceiptsmenu" class="dropdown-submenu"><a class="dropdown-toggle level2 dynamic" tabindex="-1" >
+                                    OPD - Receipts</a>
+                                     <ul id="Ul15" class="dropdown-menu dropmenu" style="min-width: 248px !important;">   
+                                         <li id="Reports_IIIC_Menu2" class="dropdown initial_show"><a class="level2 dynamic"
+                                    tabindex="-1" href="../Receipt/ConsolidatedReceipt.aspx">OPD – Generate Receipt</a></li>
+
+                                          <li id="Reports_IIIC_Menu1" class="dropdown initial_show"><a class="level2 dynamic"
+                                    tabindex="-1" href="../Receipt/ReprintReceipt.aspx">OPD - Re-print Receipts</a></li>
+                                                   
+                                     </ul>
+                                  </li>
+                               <li id="li13" class="dropdown-submenu"><a data-hover="dropdown" href=""
+                                    class="dropdown-toggle level2 dynamic" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                    aria-expanded="false">Dashboard & Reports</a>
+                                    <ul id="Ul11" class="dropdown-menu  dropmenu" style="min-width: 248px !important;">
+                                        <li id="Li14" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Reports/AreaWisePatient.aspx">Area-Wise Patient Summary</a></li>
+                                         <li id="Li15" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Reports/LabSummary.aspx">Summary of Lab Suggested</a></li>
+                                         <li id="Li16" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Reports/PrintAllPatients.aspx">Print Patient Details</a></li>
+                                         <li id="ViewPreviousVisits" class="dropdown initial_hide"><a class="level2 dynamic"
+                                    tabindex="-1" href="../Manage_Previous_Visit/Maanage_Previous_Visits.aspx">Patient Appointment History</a></li>
+                                    </ul>
+                                </li>
+                                  
+                               
+
+                                            <li id="liIIICSummary" class="ddropdown"><a class="level2 dynamic" tabindex="-1"
+                            href="../IIIC_Summary/IIIC_Summary.aspx" class="dropdown-toggle">IIIC Summary (<span id="PrintOPS2"> </span> & OPD)
+                        </a></li>
+                               
+                                
+                            </ul>
+                        </li>
+                       
+                        
+                        <li id="Registeration" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">Registration<span class="caret"></span> </a>
+                            <ul id="Ul2" class="dropdown-menu dropmenu dropmenu">
+                                <li id="Quick_Reg_ID" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Registration/QuickRegistration.aspx">
+                                    Quick Registration</a></li>
+                                <li id="Full_Reg_ID" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Registration/PendingRegistration.aspx">
+                                    Detailed Registration</a></li>
+                                <li id="Print_Form_ID" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../forms/Patient_Registration_Form.pdf">
+                                    Print Registration Form </a></li>
+                                <li id="Delivery_Form_ID1" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Registration/DeliveryRegistration.aspx">
+                                    Delivery Registration </a></li>
+
+                           
+                            </ul>
+                    </li>
+
+
+                                          
+                        <li id="Master_Menu" class="initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">OPD Master<span class="caret"></span> </a>
+
+                          <ul id="Ul23" class="dropdown-menu dropmenu setmenuwidth" style="width: 215px !important;">
+
+                            
+                                
+
+
+                             
+                                <li id="Master_Treatment" class="dropdown-submenu"><a class="dropdown-toggle level2 dynamic" tabindex="-1">
+                                   Treatment Master</a>
+                                     <ul id="Ul18" class="dropdown-menu dropmenu">
+                                         <li id="Li25" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageSymptom.aspx">Manage Complaints</a></li>
+                                         <li id="Li26" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageDisease.aspx">Manage Diagnosis</a></li>
+                                         <li id="Li28" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageProcedures.aspx">Manage Procedures</a></li>
+                                         <li id="Li24" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageLabTest.aspx">Manage Labs</a></li>
+                                         <li id="Li29" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageMedicine.aspx">Manage Medicines</a></li>
+                                         <li id="Li30" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageGynec/ManageAbdominalExam.aspx">Manage Abdomin Findings</a></li>
+
+                                     </ul>
+                              </li>
+                              <li id="Master_Prescription" class="dropdown-submenu"><a class="dropdown-toggle level2 dynamic" tabindex="-1">
+                                  Prescription Master</a>
+
+                                  <ul id="Ul20" class="dropdown-menu dropmenu">
+                                         <li id="Li32" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageCategory.aspx">Prescription Category</a></li>
+                                         <li id="Li33" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageSubCategory.aspx">Prescription Sub-Category</a></li>
+                                         <li id="Li34" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManagePrescription.aspx">Prescription Details</a></li>
+
+                                    </ul>
+
+                                   </li>
+                                     
+                               <li id="Master_Billing" class="dropdown-submenu"><a class="dropdown-toggle level2 dynamic" tabindex="-1">
+                                 Billing</a>
+                                  <ul id="Ul22" class="dropdown-menu dropmenu">
+                                         <li id="Li35" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageBillingDetail.aspx">Billing Details</a></li>
+                                         </ul>
+
+                                        </li>
+                             </ul> 
+
+
+                      
+                          </li>
+                                
+
+                       
+
+                    
+
+
+                        
+                        <li id="doctor_menu3" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">Master Data<span class="caret"></span> </a>
+                            <ul id="Ul1" class="dropdown-menu dropmenu dropmenu">
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageLabTest.aspx">
+                                    Manage Lab Test</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageCategory.aspx">
+                                    Manage Catagory</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageSubCategory.aspx">
+                                    Manage SubCatagory</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManagePrescription.aspx">
+                                    Manage Prescription</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageMedicine.aspx">
+                                    Manage Medicine</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageSymptom.aspx">
+                                    Manage Complaint</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageDisease.aspx">
+                                    Manage Diagnosis</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageProcedures.aspx">
+                                    Manage Procedures</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageMasterData/ManageBillingDetail.aspx">
+                                    Manage Billing Detail</a></li>
+                                <li id="GynecMasterMenu" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1" href="../ManageGynec/ManageAbdominalExam.aspx">
+                                   Manage Abdomen Findings</a></li>
+
+                                         <li id="lidetailed" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Registration/PendingRegistration.aspx">
+                                    Patient Registration</a></li>
+                            </ul>
+
+                            
+                          
+                        </li>
+                        
+                        <li id="AdminMenu" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">Inventory<span class="caret"></span> </a>
+                            <ul id="Ul4" class="dropdown-menu dropmenu dropmenu">
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Admin/MedicineConversion.aspx">
+                                    Medicine Conversion</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Admin/MedicineReceipt.aspx">
+                                    Record Medicine Receipts</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Admin/MedicineStockRegister.aspx">
+                                    Medicine Stock Register Form</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Admin/ReorderLevel.aspx">
+                                    Reorder Level</a></li>
+                            </ul>
+                        </li>
+                        
+                        
+                        <li id="MR_MenuOperator" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">MR<span class="caret"></span> </a>
+                            <ul id="Ul5" class="dropdown-menu dropmenu dropmenu">
+                             <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../MR/TodaysMRAppointment.aspx">
+                                   MR Appointments</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../MR/ManageMR.aspx">
+                                    Manage MR</a></li>
+                              
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../MR/AddPharmaCompany.aspx">
+                                    Manage Pharma Company</a></li>
+                            </ul>
+                        </li>
+                        
+                       
+                        <li id="MR_MenuDoctor" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false">MR<span class="caret"></span> </a>
+                            <ul id="Ul6" class="dropdown-menu dropmenu dropmenu">
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../MR/TodaysVisit.aspx">
+                                 MR Appointments</a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../MR/MRPreviousVisit.aspx">
+                                    Previous Visits of MRs </a></li>
+                                <li class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../MR/AddPharmaCompany.aspx">
+                                    Manage Pharma Company</a></li>
+                            </ul>
+                        </li>
+                        
+                               
+                               
+                              
+                           
+
+                       
+                                
+
+                    
+
+
+                        
+                         <li id="lidischargecard" class="dropdown initial_hide"><a data-hover="dropdown"
+                            href="" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                            aria-expanded="false"><span id="PrintOPS1"> </span><span class="caret"></span> </a>
+                            <ul id="Ul8" class="dropdown-menu dropmenu setmenuwidth" style="width: 215px !important;">
+                                <li id="Li2" class="dropdown"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/ManageAdmissionCard.aspx">Manage Admission Card </a></li>
+                                            <li id="Li36" class="dropdown"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/ManageAdvanceCollection.aspx">Manage Advance Collection </a></li>
+                                            <li id="Li37" class="dropdown"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/ManageDischargeCard.aspx">Manage Discharge Card </a></li>
+
+
+                                 <li id="Li1" class="dropdown"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/BillCumReceipt.aspx">Manage Hospital Bill </a>
+                                </li>
+                                <li id="Li4" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1"
+                                   style="background-color:#9ea1af;">Manage Pharmacy Bill </a></li>
+                                <li id="Li3" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/PrintDischarge.aspx">Print Discharge Card</a></li>
+
+                                     <li id="Li18" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/Print_operative_note.aspx">Print Operative Note</a></li>
+                                
+                                 <li id="li5" class="dropdown initial_hide"><a href="#" class="level2 dynamic"  style="background-color:#9ea1af;"
+                                    >Display Non Printed</a>
+                                    <ul id="Ul13" class="dropdown-menu  dropmenu">
+                                        <li id="Li8" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Manage_IPD_NonPrinted/Manage_Non_Printed_Discharge.aspx">Discharge Cards</a></li>
+                                         <li id="Li10" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Manage_IPD_NonPrinted/Manage_Non_Printed_Invoice.aspx">Pharmacy Bills</a></li>
+                                         <li id="Li11" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Manage_IPD_NonPrinted/Manage_Non_Printed_Bill.aspx">Hospital Bills</a></li>
+                                        
+                                    </ul>
+                                </li>
+                                </ul>
+                                </li>
+                           
+
+
+
+                               
+                                
+                                
+
+                                
+                        
+                                     
+                      <li id="li45" class="initial_hide"><a data-hover="dropdown" href="" class="dropdown-toggle"
+                            data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+                           <span id="CAHSLESS"></span><span class="caret"></span> </a>
+                            <ul id="Ul11123" class="dropdown-menu dropmenu setmenuwidth">
+                                <li id="Li47" class="dropdown"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/IPDCollectionStatement.aspx">IPD Collection Statement</a>
+                                </li>
+                               <li id="Li60" class="dropdown"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/List_of_CashlessHospitalBills.aspx">List of Cashless Hospital
+                                    Bills</a> </li>
+                                 <li id="Li58" class="dropdown"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/ListofDischargeCards.aspx">Discharge / Admission Card List</a>
+                                </li>
+                                 <li id="Li38" class="dropdown"><a class="level2 dynamic" tabindex="-1"
+                                    href="../DischargeCard/List_follow_up_patients_after_Discharge.aspx">Follow-up Patients After Discharge</a></li>
+
+                                     <li id="Li46" class="dropdown"><a class="level2 dynamic" tabindex="-1"
+                                   href="../DischargeCard/IIC_Register_IPD.aspx">IPD IIIC Register</a></li>
+
+
+                                       
+                            </ul>
+                        </li>
+
+
+                         
+                          <li id="IPDMasterMenu" class="initial_hide"><a data-hover="dropdown" href="" class="dropdown-toggle"
+                            data-toggle="dropdown" role="button" aria-haspopup="true" aria-expanded="false">
+                           <span id="IPDMasterSub"></span><span class="caret"></span> </a>
+
+                          <ul id="IPDid" class="dropdown-menu dropmenu dropmenu">
+                      <li id="liIPDMaster" class="dropdown-submenu"><a data-hover="dropdown" href=""
+                                    class="dropdown-toggle level2 dynamic" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                    aria-expanded="false">Manage Master Data</a>
+                                    <ul id="Ul9" class="dropdown-menu  dropmenu" style="width: 130% !important;">
+                                        <li id="Li6" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageIPD_MasterData/ManageKeyword.aspx">Manage Keyword (Operation) Master</a></li>
+                                          <li id="Li12" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageIPD_MasterData/ManageSubcategory.aspx">Manage Sub-Category</a></li>
+                                         <li id="Li7" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageIPD_MasterData/ManageCharges.aspx">Manage Hospital Charges Master</a></li>
+                                         <li id="Li9" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1" href="../ManageIPD_MasterData/Manage_IPD_Medicines.aspx">Manage Medicines Master</a></li>
+                                          <li id="Li44" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageIPD_MasterData/AddNewInsuranceCompany.aspx">Manage Insurance Company</a></li>
+                                    </ul>
+                                    </li>
+                                    <li id="liIPDMaster2" class="dropdown-submenu"><a data-hover="dropdown" href=""
+                                    class="dropdown-toggle level2 dynamic" data-toggle="dropdown" role="button" aria-haspopup="true"
+                                    aria-expanded="false">Attach Master Data</a>
+                                    <ul id="Ul14" class="dropdown-menu  dropmenu" style="width: 130% !important;">
+                                        
+                                         <li id="Li19" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageIPD_MasterData/ManageIPDDischarge.aspx">Attach Discharge Data To Keyword </a></li>
+                                         <li id="Li20" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../ManageIPD_MasterData/ManageKeywordCharges.aspx">Attach Hospital Charges To Keyword</a></li>
+                                          <li id="Li21" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1" href="../ManageIPD_MasterData/ManageInvoice_KeywordMed.aspx">Attach Medicines To Keyword</a></li>
+                                    </ul>
+                                </li>
+                            </ul>
+                   </li>
+                        
+                             
+                   
+                        <li id="IdServices1" class="dropdown initial_hide"><a data-hover="dropdown" href="../Appointments/AvailableServices.aspx" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-haspopup="true"
+                         aria-expanded="false">Services<span class="caret"></span> </a>
+                      
+                         <ul id="Ul17" class="dropdown-menu dropmenu dropmenu" style="min-width: 235px !important;">
+                         <li id="AvailableServ" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1" href="../Appointments/AvailableServices.aspx">
+                        Services - Appointments</a></li>
+                        <li id="service_collection" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Appointments/DailyServiceCollection.aspx">
+                        Services - Daily Collection</a></li>
+                           <li id="collectionreport" class="dropdown initial_hide"><a class="level2 dynamic" tabindex="-1" href="../Appointments/ServiceCollReports.aspx">
+                        Service - Collection Statement</a></li>
+                         <li id="RePrintServices" class="dropdown"><a class="level2 dynamic" tabindex="-1" href="../Receipt/RePrintReceiptServices.aspx">
+                        Services - Re-Print Receipts </a></li>
+                          <li id="GenerateServices" class="dropdown"><a class="level2 dynamic" tabindex="-1"  href="../Receipt/GenerateReceiptServices.aspx">
+                        Services - Generate Receipts</a></li>
+                        </ul>
+                        </li>
+                        
+                         
+
+
+            
+
+
+                           
+           
+                          
+                               
+                         
+                     
+
+
+                       <li id="li40" class="dropdown initial_hide"><a data-hover="dropdown"
+                           href="../Manage_Previous_Visit/Maanage_Previous_Visits.aspx" class="dropdown-toggle">Patient Appointment History
+                        </a></li>
+                        
+                    
+                      </ul>
+                                                  
+
+
+
+                    <ul class="nav navbar-nav navbar-right">
+                        <li class="dropdown"><a data-hover="dropdown" href="" class="dropdown-toggle paddingright">
+                            
+                            <span id="lblShowDate" style="font-size: 12px;  color: yellow;">13-Sep-2025</span> &nbsp; &nbsp; &nbsp;
+                         
+                             <span id="lblshowtime" style="font-size: 12px;  color: yellow;"> 11:33 AM</span>
+                        </a></li>
+                        <li class="dropdown" id="user" onmouseover="one()" onmouseout="second()"><a href="#"
+                            class="dropdown-toggle" data-toggle="dropdown" data-hover="dropdown">
+                            <img src="../images/avatar/icon-user-default.png" alt="" class="img-responsive img-circle" />&nbsp;
+                            <span class="hidden-xs">
+                                <span id="lblRollName">Recep</span></span>
+                            &nbsp;<span class="caret"></span> </a>
+                            <ul id="Ul09" class="dropdown-menu logout_color">
+                                <li><a href="/ChangePassword.aspx"><i class="fa fa-unlock-alt"></i>Change Password</a></li>
+                                    <li id="takebackup"><a href="/Backup.aspx"><i class="fa fa-download"></i>Take Backup</a></li>
+                                <li><a href="/Logout.aspx"><i class="fa fa-key"></i>Log Out</a></li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+                <!-- /.navbar-collapse -->
+            </div>
+            <!-- /.container-fluid -->
+        </nav>
+        <div>
+            
+    <div id="ContentPlaceHolder1_UpdatePanel2">
+	
+            <div id="title-breadcrumb-option-demo" class="page-title-breadcrumb">
+                <div class="row">
+                    <div class="page-header Page_Title_Align">
+                        <div class="col-xs-12 col-sm-12 col-md-3 col-lg-3">
+                            <div class="page-heading">
+                                Doctor’s Dashboard
+                            </div>
+                        </div>
+                        <div class="col-xs-12 col-sm-12 col-md-6 col-lg-6">
+                            <div class="errorBox">
+                                <span id="ContentPlaceHolder1_lblErrorMsg"></span>
+                                <span id="ContentPlaceHolder1_lblSuccessMsg" style="color: Green"></span>
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+            </div>
+            <div class="container">
+                <div class="row" style="margin-top: -10px;">
+                    <div class="col-lg-4">
+                    </div>
+                    <div class="col-lg-4">
+                        <center>
+                    <div class="Counter">
+                        <h2 id="ContentPlaceHolder1_lblSince">
+                            Since 2019</h2>
+                        <h4 id="ContentPlaceHolder1_lblInstalldate">
+                            Installation date : 04-Jun-2019</h4>
+                    </div>
+                </center>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-lg-4">
+                        <center>
+                    <div class="Counter">
+                        <h2 id="ContentPlaceHolder1_lblTotalPatients" class="count">23250</h2>
+                        <h4>
+                            Patients</h4>
+                    </div>
+                </center>
+                    </div>
+                    <div class="col-lg-4">
+                        <center>
+                    <div class="Counter">
+                        <h2 id="ContentPlaceHolder1_lblLastPatients" class="count">0</h2>
+                        <h4>
+                            New patients in last 30 days</h4>
+                    </div>
+                </center>
+                    </div>
+                    <div class="col-lg-4">
+                        <center>
+                    <div class="Counter">
+                        <h2>
+                            <span id="ContentPlaceHolder1_lblMale" class="count">11540</span> - <span id="ContentPlaceHolder1_lblFemale" class="count">11710</span></h2>
+                        <h4>
+                            Male - Female</h4>
+                    </div>
+                </center>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-lg-4">
+                        <center>
+                    <div class="Counter">
+                        <h2 id="ContentPlaceHolder1_lblToatlPatientsVisits" class="count">16184</h2>
+                        <h4>
+                            Patient Visits</h4>
+                    </div>
+                </center>
+                    </div>
+                    <div class="col-lg-4">
+                        <center>
+                    <div class="Counter">
+                        <h2 id="ContentPlaceHolder1_lblPatientsVisitsPerday" class="count">22</h2>
+                        <h4>
+                            Patients / Day</h4>
+                    </div>
+                </center>
+                    </div>
+                    <div class="col-lg-4">
+                        <center>
+                    <div class="Counter">
+                        <h2 id="ContentPlaceHolder1_lblPrescriptions" class="count">86782</h2>
+                        <h4>
+                            Prescriptions</h4>
+                    </div>
+                </center>
+                    </div>
+                </div>
+                <div class="row">
+                  <div class="col-lg-4" style="margin-top: 30px;">
+                        <center>
+                    <input type="submit" name="ctl00$ContentPlaceHolder1$btnExit" value="Exit / Logout" id="ContentPlaceHolder1_btnExit" class="btn btn-primary" style="height:38px" />
+                    
+                    </center>
+                    </div>
+                
+                 <div class="col-lg-4">
+                  <div id="ContentPlaceHolder1_ExpiryDate" class="ExpiryDay2">
+                        
+                            <center>
+                    <div class="Counter">
+                        <h2 id="ContentPlaceHolder1_lblLicenseEndDate" class="licenseday1">31-Mar-2026</h2>
+                        <h4>
+                            License Expiry</h4>
+                    </div>
+                </center>
+                   
+                    </div>
+                    </div>
+
+                     <div class="col-lg-4" style="margin-top: 30px;">
+                        <center>
+                    <input type="submit" name="ctl00$ContentPlaceHolder1$btnProceed" value="Proceed" id="ContentPlaceHolder1_btnProceed" class="btn btn-primary" style="height:38px;display:block;" />
+                    <input type="submit" name="ctl00$ContentPlaceHolder1$btnProceed1" value="Proceed" id="ContentPlaceHolder1_btnProceed1" class="btn btn-primary" style="height:38px;display:none;" />
+                        
+                        </center>
+                    </div>
+                </div>
+
+                <br />
+                <br />
+
+                <div class="row" style="margin-top: 12px;">
+                  
+                    <div class="col-lg-4">
+                    </div>
+                   
+                </div>
+            </div>
+            
+            <input type="submit" name="ctl00$ContentPlaceHolder1$Button11" value="" id="ContentPlaceHolder1_Button11" style="visibility: hidden" />
+            <div id="ContentPlaceHolder1_Panel11" class="Popup" align="center" style="display: none;">
+		
+                <div class="modal-dialog viewlabpopup">
+                    <div class="modal-content compounder-modal-dialog-adjs">
+                        <div class="modal-header">
+                            <input type="image" name="ctl00$ContentPlaceHolder1$btnCloseAd" id="ContentPlaceHolder1_btnCloseAd" class="imgbtn" src="../images/close_btn_blue.png" />
+                            
+                            <div class="container">
+                                <h3 style="margin-left: 4%;">
+                                    Please Enter License key.
+                                </h3>
+                                <div class="row" style="text-align: left;">
+                                    <div class="col-lg-offset-2 col-lg-3" style="margin-left: 20%;">
+                                        <div class="form-group">
+                                            <span id="ContentPlaceHolder1_Label2" class=" labelbold lbldobadj">License Key</span>
+                                            <input name="ctl00$ContentPlaceHolder1$txtLicenseKey" type="text" maxlength="1000" id="ContentPlaceHolder1_txtLicenseKey" class="form-control" />
+                                        </div>
+                                    </div>
+                                    <div class="col-lg-1">
+                                        <input type="submit" name="ctl00$ContentPlaceHolder1$btnSumit" value="Verify" id="ContentPlaceHolder1_btnSumit" class="btn btn-primary" style="    width: 126px;
+                                            margin-top: 17px;" />
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-lg-offset-5 col-lg-2" style="margin-left: 43.5%;">
+                                        
+                                        <input type="submit" name="ctl00$ContentPlaceHolder1$btnSkip" value="Skip to proceed" id="ContentPlaceHolder1_btnSkip" class="btn btn-primary" style="width: 126px;" />
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-offset-1 col-xs-12 col-sm-12 col-md-6 col-lg-6">
+                                        <span class="errorBox">
+                                            <span id="ContentPlaceHolder1_lblServicesErrorMsg">&nbsp</span>
+                                        </span>
+                                        <span id="ContentPlaceHolder1_lblServicesSuccessMsg" class="success-message-box"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            
+	</div>
+        
+</div>
+
+        </div>
+        <div id="footer" style="border-top: 6px solid #e5e5e5 !important; box-shadow: none !important;">
+            <div class="copyright">
+                <div class="col-xs-12 col-sm-12 col-md-9">
+                    <span id="lblDoctorName" class="label1">Dr. Aniruddha  Tongaonkar</span>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span id="lblClinicName" class="label1">Tongaonkar Hospital</span>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span id="lblShiftName" class="label1">Saturday - Morning - 8:00AM - 9:00PM</span>
+                </div>
+                <div class="col-xs-12 col-sm-12 col-md-3">
+                    <div class=" footer-right-txt ">
+                        <a href="#">Since 2016 © Bmore IT solutions</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+<script type="text/javascript">
+//<![CDATA[
+Sys.Application.add_init(function() {
+    $create(Sys.Extended.UI.ModalPopupBehavior, {"BackgroundCssClass":"Background","CancelControlID":"ImageButton11","PopupControlID":"ContentPlaceHolder1_Panel11","dynamicServicePath":"/Dashboard.aspx","id":"ShowAdvnce"}, null, null, $get("ContentPlaceHolder1_Button11"));
+});
+//]]>
+</script>
+</form>
+</body>
+</html>

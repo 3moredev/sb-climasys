@@ -1,0 +1,70 @@
+{
+  "clinic_master": {
+    "status": "success",
+    "records": 0
+  },
+  "doctor_master": {
+    "status": "success",
+    "records": 0
+  },
+  "patient_master": {
+    "status": "success",
+    "records": 0
+  },
+  "patient_visits": {
+    "status": "success",
+    "records": 0
+  },
+  "user_master": {
+    "status": "success",
+    "records": 0
+  },
+  "system_params": {
+    "status": "success",
+    "records": 0
+  },
+  "language_master": {
+    "status": "success",
+    "records": 0
+  },
+  "role_master": {
+    "status": "success",
+    "records": 0
+  },
+  "gender_master": {
+    "status": "success",
+    "records": 0
+  },
+  "user_role": {
+    "status": "success",
+    "records": 0
+  },
+  "shift_master": {
+    "status": "success",
+    "records": 0
+  },
+  "model": {
+    "status": "success",
+    "records": 0
+  },
+  "model_config_params": {
+    "status": "success",
+    "records": 0
+  },
+  "license_key": {
+    "status": "success",
+    "records": 0
+  },
+  "doctor_clinic_shift": {
+    "status": "success",
+    "records": 28
+  },
+  "doctor_model": {
+    "status": "success",
+    "records": 0
+  },
+  "visit_prescription_overwrite": {
+    "status": "success",
+    "records": 0
+  }
+}

@@ -1,0 +1,186 @@
+CREATE  PROCEDURE [dbo].[USP_Get_LoginDetails]
+	@p_nvar_Login_Id	NVARCHAR(60),
+	@p_nvar_Password	NVARCHAR(100),
+	@P_nvar_TodaysDay	NVARCHAR(20),
+	@P_nvar_Language_Id INT
+AS
+  
+BEGIN
+ -- SET NOCOUNT ON added to prevent extra result sets from
+ -- interfering with SELECT statements.
+	SET NOCOUNT ON;
+
+	DECLARE @DOCTOR_ID NVARCHAR(30);
+
+	BEGIN TRY
+		IF EXISTS 
+		(	
+			SELECT  Login_Id,
+					Password,
+					Role_Name 
+			FROM	User_Role UR join 
+					Role_Master RM on RM.Role_Id=UR.Role_Id join 
+					User_Master UM on UR.User_ID=UM.ID 
+			WHERE	Login_Id = @p_nvar_Login_Id 
+			AND		Password = @p_nvar_Password  COLLATE SQL_Latin1_General_CP1_CS_AS
+		)
+		BEGIN
+
+			SELECT 1 AS LOGIN_STATUS;
+
+
+			SELECT  UM.ID,
+					DM.Doctor_ID,
+					CM.Clinic_ID,
+					UM.Login_Id,
+					UM.First_Name,
+					UM.Password,
+					RM.Role_Name,
+					RM.Role_Id,
+					ISNULL(DM.First_Name,'') +' '+ ISNULL(DM.Middle_Name,'') +' '+ ISNULL(DM.Last_Name,'') as 'DoctorName', 
+					CM.Clinic_Name,
+					UM.Language_Id,
+					UM.Is_Active,
+					
+					
+					CASE WHEN DatePart(Month, Getdate()) >= 4
+			            THEN DatePart(Year, Getdate()) + 1 
+						ELSE DatePart(Year, Getdate()) END	AS Financial_Year,
+						DMO.Model_ID,MCP.Config_ID,MCP.IS_Enabled
+				   
+
+
+				  FROM		User_Master UM
+			INNER JOIN 		User_Role UR
+					ON		UM.ID=UR.User_ID 
+			INNER JOIN		Role_Master RM
+					ON		UR.Role_Id=RM.Role_Id
+			INNER JOIN		Doctor_Master DM
+					ON		UM.Doctor_ID=DM.Doctor_ID
+			INNER JOIN		Clinic_Master CM
+					ON		DM.Doctor_ID=CM.Doctor_ID AND 
+							UR.[Clinic_ID] = CM.Clinic_ID
+			INNER JOIN		Language_Master LM
+					ON		UM.Language_Id=LM.Language_Id
+			INNER JOIN		Doctor_Model DMO
+				    ON		--DMO.Doctor_ID = DM.Doctor_ID AND
+							DMO.Clinic_ID =  CM.Clinic_ID
+			INNER JOIN		Model M
+					ON		DMO.Model_ID = M.Model_ID
+			LEFT JOIN		Model_Config_Params MCP
+					ON		M.Model_ID = MCP.Model_ID
+			LEFT JOIN		System_Params SP
+					ON		SP.Doctor_ID=DM.Doctor_ID			
+			
+			WHERE	UM.Login_Id = @p_nvar_Login_Id 
+			AND		UM.Language_Id=@P_nvar_Language_Id 
+			AND		UR.Is_Default_Clinic = 1;
+
+			
+			
+			;WITH  ShifTimes As 
+			(  SELECT	SM.Shift_ID,                         
+							SM.Description+' - '+SM.Shift_Day+' - '+
+							LEFT(CONVERT(NVARCHAR(255),SM.Start_Time,108),2)+' - '+LEFT(CONVERT(NVARCHAR(255),SM.End_Time,108),2) as 
+							'Description',
+
+							CASE WHEN DATEDIFF(hour,GETDATE() , CONVERT(DATETIME, CONVERT(CHAR(8), Getdate(), 112) + 
+								+ ' ' + CONVERT(CHAR(8), SM.Start_Time, 108))) < 0 THEN DATEDIFF(hour,GETDATE() , CONVERT(DATETIME, CONVERT(CHAR(8), Getdate(), 112) + 
+								+ ' ' + CONVERT(CHAR(8), SM.Start_Time, 108))) * -1 ELSE DATEDIFF(hour,GETDATE() , CONVERT(DATETIME, CONVERT(CHAR(8), Getdate(), 112) + 
+								+ ' ' + CONVERT(CHAR(8), SM.Start_Time, 108)))
+								END DiffInHours
+
+					FROM
+							Shift_Master SM, 
+							Doctor_Clinic_Shift DCS,
+							Clinic_Master CM,
+							Doctor_Master DM
+					WHERE
+							SM.Shift_Day=@P_nvar_TodaysDay AND	
+							SM.Shift_ID=DCS.Shift_ID AND
+							DCS.Clinic_ID=CM.Clinic_ID AND
+							DCS.Doctor_ID=CM.Doctor_ID AND
+							DCS.Doctor_ID = DM.Doctor_ID
+			)
+			SELECT Shift_ID, Description FROM ShifTimes		
+			ORDER BY DiffInHours ASC		
+
+
+		    SELECT  Role_ID, Role_Name
+			FROM    Role_Master 
+			WHERE   Role_Name 
+			NOT IN	
+		   (SELECT  RM.Role_Name
+			FROM	User_Master UM, 
+					User_Role UR, 
+					Role_Master RM, 
+					Doctor_Master DM, 
+					Clinic_Master CM,
+					Language_Master LM
+			WHERE	UM.ID=UR.User_ID 
+			AND     UR.Role_Id=RM.Role_Id 
+			AND		UM.Doctor_ID=DM.Doctor_ID 
+			AND		DM.Doctor_ID=CM.Doctor_ID 
+			--AND		UM.Default_Clinic_ID=CM.Clinic_ID 
+			AND		UM.Language_Id=LM.Language_Id 
+			AND		UM.Login_Id = @p_nvar_Login_Id 
+			AND		UM.Language_Id=@P_nvar_Language_Id 
+			)
+				
+			
+			  
+			SELECT * FROM System_Params SP
+
+			LEFT JOIN		Doctor_Master DM
+			ON		SP.Doctor_ID=DM.Doctor_ID
+
+			INNER JOIN  Clinic_Master CM
+			ON	SP.Clinic_ID = CM.Clinic_ID
+			AND	SP.Doctor_ID = CM.Doctor_ID
+
+			INNER JOIN User_Master UM
+			ON SP.Doctor_ID = UM.Doctor_ID
+			AND SP.Clinic_ID = UM.Clinic_ID
+
+			WHERE	UM.Login_Id = @p_nvar_Login_Id
+			AND		UM.Language_Id=@P_nvar_Language_Id 
+
+
+
+			--SELECT * FROM [dbo].[User_Master] UM
+			--inner JOIN		Doctor_Master DM
+			--ON		UM.Doctor_ID=DM.Doctor_ID
+			--where Login_Id=@p_nvar_Login_Id
+
+			SELECT Doctor_ID from System_Params
+
+
+
+
+			IF EXISTS(SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[License_Key]') AND type in (N'U'))
+
+			BEGIN
+				SELECT ISNULL(License_Key,'') AS License_Key FROM License_Key LK
+				
+			END
+			
+
+			
+
+			      SELECT * FROM [dbo].[User_Master] UM
+				inner JOIN		Doctor_Master DM
+				ON		UM.Doctor_ID=DM.Doctor_ID
+				where Login_Id=@p_nvar_Login_Id
+
+
+				
+			 
+		END 
+		ELSE
+			SELECT 0 AS LOGIN_STATUS;
+	END TRY
+	BEGIN CATCH
+		SELECT	ERROR_NUMBER() AS ErrorNumber,ERROR_MESSAGE() AS ErrorMessage;
+	END CATCH
+
+END

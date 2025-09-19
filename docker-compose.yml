@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  # SQL Server Database
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: climasys-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Climasys@123
+      - MSSQL_PID=Express
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - climasys-network
+    restart: unless-stopped
+    profiles:
+      - sqlserver
+
+  # MySQL Database (Alternative)
+  mysql:
+    image: mysql:8.0
+    container_name: climasys-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=climasys123
+      - MYSQL_DATABASE=climasys
+      - MYSQL_USER=climasys
+      - MYSQL_PASSWORD=climasys123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - climasys-network
+    restart: unless-stopped
+    profiles:
+      - mysql
+
+  # PostgreSQL Database (Default)
+  postgres:
+    image: postgres:15
+    container_name: climasys-postgres
+    environment:
+      - POSTGRES_DB=climasys
+      - POSTGRES_USER=climasys
+      - POSTGRES_PASSWORD=climasys123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - climasys-network
+    restart: unless-stopped
+
+  # Spring Boot Application
+  climasys-backend:
+    build: .
+    container_name: climasys-backend
+    environment:
+      - SPRING_PROFILES_ACTIVE=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=climasys
+      - DB_USERNAME=climasys
+      - DB_PASSWORD=climasys123
+      - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+      - CLIMASYS_ENCRYPTION_KEY=PA1ANDE61INI6
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    networks:
+      - climasys-network
+    restart: unless-stopped
+
+volumes:
+  sqlserver_data:
+  mysql_data:
+  postgres_data:
+
+networks:
+  climasys-network:
+    driver: bridge

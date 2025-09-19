@@ -1,0 +1,4 @@
+Model_ID,Model_Number,Model_Description
+1,100,Doctor Only
+2,110,Doctor + Operator
+3,111,Doctor + Operator + Compounder

@@ -1,0 +1,48 @@
+CREATE  PROCEDURE [dbo].[USP_Get_DashboardData]
+
+
+AS
+  
+BEGIN
+ -- SET NOCOUNT ON added to prevent extra result sets from
+ -- interfering with SELECT statements.
+
+	SET NOCOUNT ON;
+
+
+	BEGIN TRY
+	declare @perday int
+
+	select 
+@perday = iif( count(distinct(visit_date)) =  0 ,1 , count(distinct(visit_date)))  from Patient_Visits where Delete_Flag = 0
+
+	select 
+(Select   year(Installation_Date) as dtYear  from license_key) as dtYear,
+(Select   Installation_Date as Installation_Date  from license_key) as Installation_Date,
+
+(select count(ID) from Patient_Master )  as TotalPatients ,
+(select count(ID) as lastdays from Patient_Master where Created_On > (select (getdate()-30)) ) as lastdays,
+(select  count(gender_ID) as F  from Patient_Master where Gender_ID = 'F'  group by Gender_ID  ) as Female ,
+(select  count(gender_ID) as M  from Patient_Master where Gender_ID = 'M'  group by Gender_ID  ) as Male,
+( select count(patient_id) as patientsVisits from Patient_Visits where Delete_Flag = 0) as patientsVisits,
+ (select count(patient_ID) / @perday as perday from Patient_Visits where Delete_Flag = 0) as perday,
+ (select Count(patient_ID) as prescription from Visit_Prescription_Overwrite) as prescription,
+
+(Select Valid_To  from license_key) as License_End_date
+
+select Doctor_ID from System_Params  where IS_MAIN_DOCTOR = 1
+
+
+select * from license_key  
+
+
+
+
+
+
+	END TRY
+	BEGIN CATCH
+		SELECT	ERROR_NUMBER() AS ErrorNumber,ERROR_MESSAGE() AS ErrorMessage;
+	END CATCH
+
+END
