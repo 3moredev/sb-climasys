@@ -20,6 +20,6 @@ public interface AreaRepository extends JpaRepository<Area, AreaId> {
     
     @Query("SELECT a FROM Area a WHERE a.isActivate = true AND " +
            "(CAST(a.id AS string) LIKE %:query% OR " +
-           "EXISTS (SELECT at FROM AreaTranslation at WHERE at.areaId = a.id AND at.areaName LIKE %:query%))")
+           "EXISTS (SELECT at FROM AreaTranslation at WHERE at.id.areaId = a.id AND at.areaName LIKE %:query%))")
     List<Area> searchAreas(@Param("query") String query);
 }
