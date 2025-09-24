@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,6 +40,9 @@ public class AppointmentSchedulingService {
     
     @Autowired
     private DatabaseTableConfig tableConfig;
+    
+    @Autowired
+    private AppointmentJpaService appointmentJpaService;
 
     /**
      * Get all future appointments for a doctor
@@ -69,7 +73,7 @@ public class AppointmentSchedulingService {
             }
             
             // Get all future appointments for this doctor using JPA
-            String today = LocalDate.now().toString();
+            LocalDateTime today = LocalDate.now().atStartOfDay();
             List<PatientVisit> appointments = appointmentRepository.findByDoctorIdAndVisitDateAfter(doctorId, today);
             
             // Convert to Map format for API compatibility
@@ -127,9 +131,11 @@ public class AppointmentSchedulingService {
             
             // Parse the appointment date
             LocalDate date = LocalDate.parse(appointmentDate);
+            LocalDateTime startOfDay = date.atStartOfDay();
+            LocalDateTime endOfDay = date.atTime(23, 59, 59);
             
             // Get appointments for this doctor on the specific date using JPA
-            List<PatientVisit> appointments = appointmentRepository.findByDoctorIdAndVisitDate(doctorId, appointmentDate);
+            List<PatientVisit> appointments = appointmentRepository.findByDoctorIdAndVisitDateBetween(doctorId, startOfDay, endOfDay);
             
             // Convert to Map format for API compatibility
             List<Map<String, Object>> result = new ArrayList<>();
@@ -301,5 +307,138 @@ public class AppointmentSchedulingService {
         }
         
         return mockAppointments;
+    }
+    
+    /**
+     * Book a new appointment using JPA
+     */
+    public Map<String, Object> bookAppointment(String visitDate, Integer shiftId, String clinicId, 
+                                               String doctorId, String patientId, String visitTime, 
+                                               Boolean reportsReceived, String userId, Boolean inPerson) {
+        logger.info("Booking appointment using JPA for patient: {} with doctor: {}", patientId, doctorId);
+        
+        try {
+            LocalDate date = LocalDate.parse(visitDate);
+            LocalTime time = LocalTime.parse(visitTime);
+            LocalDateTime dateTime = date.atTime(time);
+            
+            return appointmentJpaService.insertPatientAppointmentByDoctor(
+                dateTime, shiftId, clinicId, doctorId, patientId, time, 
+                reportsReceived, userId, inPerson, null, null);
+                
+        } catch (Exception e) {
+            logger.error("Error booking appointment: {}", e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to book appointment: " + e.getMessage());
+            return error;
+        }
+    }
+    
+    /**
+     * Get future appointments using JPA
+     */
+    public List<Map<String, Object>> getFutureAppointmentsJpa(String doctorId, String clinicId, String futureDate, Integer languageId) {
+        logger.info("Getting future appointments using JPA for doctor: {}", doctorId);
+        
+        try {
+            LocalDate date = LocalDate.parse(futureDate);
+            return appointmentJpaService.getFutureAppointmentsForGivenDate(doctorId, clinicId, date, languageId);
+        } catch (Exception e) {
+            logger.error("Error getting future appointments: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * Get today's appointments using JPA
+     */
+    public List<Map<String, Object>> getTodaysAppointmentsJpa(String doctorId, String clinicId, String visitDate, Integer languageId) {
+        logger.info("Getting today's appointments using JPA for doctor: {}", doctorId);
+        
+        try {
+            LocalDate date = LocalDate.parse(visitDate);
+            LocalDateTime dateTime = date.atStartOfDay();
+            return appointmentJpaService.getTodaysAppointmentsForGivenDate(doctorId, clinicId, dateTime, languageId);
+        } catch (Exception e) {
+            logger.error("Error getting today's appointments: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * Delete appointment using JPA
+     */
+    public Map<String, Object> deleteAppointment(String patientId, String visitDate, String doctorId, String userId) {
+        logger.info("Deleting appointment using JPA for patient: {}", patientId);
+        
+        try {
+            LocalDate date = LocalDate.parse(visitDate);
+            LocalDateTime dateTime = date.atStartOfDay();
+            return appointmentJpaService.deletePatientAppointment(patientId, dateTime, doctorId, userId);
+        } catch (Exception e) {
+            logger.error("Error deleting appointment: {}", e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to delete appointment: " + e.getMessage());
+            return error;
+        }
+    }
+    
+    /**
+     * Update appointment status using JPA
+     */
+    public Map<String, Object> updateAppointmentStatus(String patientId, String visitDate, String doctorId, Short statusId, String userId) {
+        logger.info("Updating appointment status using JPA for patient: {}", patientId);
+        
+        try {
+            LocalDate date = LocalDate.parse(visitDate);
+            LocalDateTime dateTime = date.atStartOfDay();
+            return appointmentJpaService.updateAppointmentStatus(patientId, dateTime, doctorId, statusId, userId);
+        } catch (Exception e) {
+            logger.error("Error updating appointment status: {}", e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to update appointment status: " + e.getMessage());
+            return error;
+        }
+    }
+    
+    /**
+     * Get patient appointment details using JPA
+     */
+    public List<Map<String, Object>> getPatientAppointmentDetails(String patientId) {
+        logger.info("Getting patient appointment details using JPA for patient: {}", patientId);
+        
+        try {
+            return appointmentJpaService.getPatientAppointmentDetails(patientId);
+        } catch (Exception e) {
+            logger.error("Error getting patient appointment details: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * Get status options using JPA
+     */
+    public List<Map<String, Object>> getStatusOptions(String clinicId) {
+        try {
+            return appointmentJpaService.getStatusOptions(clinicId);
+        } catch (Exception e) {
+            logger.error("Error getting status options: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * Get gender options using JPA
+     */
+    public List<Map<String, Object>> getGenderOptions(Integer languageId) {
+        try {
+            return appointmentJpaService.getGenderOptions(languageId);
+        } catch (Exception e) {
+            logger.error("Error getting gender options: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
     }
 }

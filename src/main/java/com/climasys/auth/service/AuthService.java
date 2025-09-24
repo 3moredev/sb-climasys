@@ -34,7 +34,7 @@ public class AuthService {
     private UserRoleRepository userRoleRepository;
     
     @Autowired
-    private DoctorMasterRepository doctorMasterRepository;
+    private AuthDoctorMasterRepository doctorMasterRepository;
     
     @Autowired
     private ClinicMasterRepository clinicMasterRepository;
@@ -97,7 +97,7 @@ public class AuthService {
                     UserRole defaultRole = userRoles.get(0);
                     
                     // Get doctor details using findByDoctorId
-                    Optional<DoctorMaster> doctorOpt = doctorMasterRepository.findByDoctorId(user.getDoctorId());
+                    Optional<AuthDoctorMaster> doctorOpt = doctorMasterRepository.findByDoctorId(user.getDoctorId());
                     logger.debug("Doctor lookup result: {}", doctorOpt.isPresent());
                     
                     // Get clinic details
@@ -105,7 +105,7 @@ public class AuthService {
                     logger.debug("Clinics found: {} clinics", clinics.size());
                     
                     if (doctorOpt.isPresent() && !clinics.isEmpty()) {
-                        DoctorMaster doctor = doctorOpt.get();
+                        AuthDoctorMaster doctor = doctorOpt.get();
                         Clinic clinic = clinics.get(0);
                         
                         // Build user details
@@ -174,7 +174,7 @@ public class AuthService {
         }
     }
     
-    private String buildDoctorName(DoctorMaster doctor) {
+    private String buildDoctorName(AuthDoctorMaster doctor) {
         StringBuilder name = new StringBuilder();
         if (doctor.getFirstName() != null) name.append(doctor.getFirstName());
         if (doctor.getMiddleName() != null) name.append(" ").append(doctor.getMiddleName());

@@ -24,7 +24,7 @@ public class DatabaseInitializer implements CommandLineRunner {
     private UserRoleRepository userRoleRepository;
     
     @Autowired
-    private DoctorMasterRepository doctorMasterRepository;
+    private AuthDoctorMasterRepository doctorMasterRepository;
     
     @Autowired
     private ClinicMasterRepository clinicMasterRepository;
@@ -55,7 +55,7 @@ public class DatabaseInitializer implements CommandLineRunner {
         
         // Create doctor if doesn't exist
         if (!doctorMasterRepository.existsById("DOC001")) {
-            DoctorMaster doctor = new DoctorMaster("DOC001", "Dr. Test", "User");
+            AuthDoctorMaster doctor = new AuthDoctorMaster("DOC001", "Dr. Test", "User");
             doctor.setSpeciality("General Medicine");
             doctor.setDoctorQual("MBBS, MD");
             doctorMasterRepository.save(doctor);

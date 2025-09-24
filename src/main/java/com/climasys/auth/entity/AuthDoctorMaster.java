@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "doctor_master")
-public class DoctorMaster {
+public class AuthDoctorMaster {
     
     @Id
     @Column(name = "doctor_id", length = 30, nullable = false)
@@ -99,9 +99,9 @@ public class DoctorMaster {
     private Boolean opdDr;
     
     // Constructors
-    public DoctorMaster() {}
+    public AuthDoctorMaster() {}
     
-    public DoctorMaster(String doctorId, String firstName, String lastName) {
+    public AuthDoctorMaster(String doctorId, String firstName, String lastName) {
         this.doctorId = doctorId;
         this.firstName = firstName;
         this.lastName = lastName;

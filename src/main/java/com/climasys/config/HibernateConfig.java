@@ -22,15 +22,19 @@ public class HibernateConfig {
                 hibernateProperties.put(AvailableSettings.ORDER_UPDATES, true);
                 hibernateProperties.put(AvailableSettings.STATEMENT_BATCH_SIZE, 25);
                 
-                // Critical fix for the NPE issue
+                // Critical fix for the NPE issue and transaction management
                 hibernateProperties.put("hibernate.connection.autocommit", false);
                 hibernateProperties.put("hibernate.jdbc.batch_size", 25);
                 hibernateProperties.put("hibernate.order_inserts", true);
                 hibernateProperties.put("hibernate.order_updates", true);
                 
-                // Additional properties to ensure proper initialization
+                // Additional properties to ensure proper initialization and transaction management
                 hibernateProperties.put("hibernate.connection.provider_disables_autocommit", true);
                 hibernateProperties.put("hibernate.jdbc.time_zone", "UTC");
+                
+                // Ensure proper transaction management
+                hibernateProperties.put("hibernate.connection.handling_mode", "delayed_acquisition_and_hold");
+                hibernateProperties.put("hibernate.transaction.coordinator_class", "jdbc");
                 
                 // Disable problematic features that can cause NPE
                 hibernateProperties.put("hibernate.temp.use_jdbc_metadata_defaults", false);

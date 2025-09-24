@@ -54,7 +54,7 @@ public class AppointmentSchedulingController {
     /**
      * Get gender options for appointments
      */
-    @GetMapping("/gender-options")
+    @GetMapping("/scheduling/gender-options")
     public ResponseEntity<List<Map<String, Object>>> getGenderOptions() {
         List<Map<String, Object>> result = appointmentSchedulingService.getGenderOptions();
         return ResponseEntity.ok(result);

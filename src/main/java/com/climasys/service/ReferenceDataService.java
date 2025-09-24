@@ -1,10 +1,10 @@
 package com.climasys.service;
 
 import com.climasys.entity.*;
-import com.climasys.auth.entity.DoctorMaster;
+import com.climasys.auth.entity.AuthDoctorMaster;
 import com.climasys.repository.*;
 import com.climasys.auth.repository.ClinicMasterRepository;
-import com.climasys.auth.repository.DoctorMasterRepository;
+import com.climasys.auth.repository.AuthDoctorMasterRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -71,7 +71,7 @@ public class ReferenceDataService {
     private ClinicMasterRepository clinicMasterRepository;
     
     @Autowired
-    private DoctorMasterRepository doctorMasterRepository;
+    private AuthDoctorMasterRepository doctorMasterRepository;
     
     @Autowired
     private PatientRepository patientRepository;
@@ -125,7 +125,7 @@ public class ReferenceDataService {
         }
     }
     
-    public List<DoctorMaster> getDoctors(String clinicId) {
+    public List<AuthDoctorMaster> getDoctors(String clinicId) {
         if (clinicId != null && !clinicId.isEmpty()) {
             // You might need to create a method in DoctorMasterRepository to find by clinic
             return doctorMasterRepository.findAll();

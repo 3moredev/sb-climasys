@@ -2,9 +2,12 @@ package com.climasys.appointments.web;
 
 import com.climasys.appointments.service.AppointmentSchedulingService;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -24,30 +27,57 @@ public class AppointmentController {
             int shiftId,
             @NotBlank String clinicId,
             @NotBlank String doctorId,
-            @NotBlank String patientId
+            @NotBlank String patientId,
+            String visitTime,
+            Boolean reportsReceived,
+            Boolean inPerson
     ) {}
 
     @PostMapping("/appointments")
-    public ResponseEntity<?> book(@RequestBody AppointmentRequest req) {
+    public ResponseEntity<?> book(@Valid @RequestBody AppointmentRequest req) {
         try {
-            // For now, return a mock response since the stored procedure doesn't exist
-            // In a real implementation, you would use JPA to create the appointment
-            Map<String, Object> result = new HashMap<>();
-            result.put("success", true);
-            result.put("message", "Appointment booking functionality is being migrated to JPA");
-            result.put("appointmentId", "APT_" + System.currentTimeMillis());
-            result.put("visitDate", req.visitDate());
-            result.put("clinicId", req.clinicId());
-            result.put("doctorId", req.doctorId());
-            result.put("patientId", req.patientId());
-            result.put("status", "SCHEDULED");
+            // Use JPA service to book appointment
+            Map<String, Object> result = appointmentSchedulingService.bookAppointment(
+                req.visitDate(),
+                req.shiftId(),
+                req.clinicId(),
+                req.doctorId(),
+                req.patientId(),
+                req.visitTime() != null ? req.visitTime() : "10:00",
+                req.reportsReceived() != null ? req.reportsReceived() : false,
+                "system", // TODO: Get from authentication context
+                req.inPerson() != null ? req.inPerson() : true
+            );
             
-            return ResponseEntity.ok(result);
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
             error.put("error", "Failed to book appointment: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<?> handleJsonParseError(HttpMessageNotReadableException ex) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("success", false);
+        error.put("error", "Invalid JSON format. Please check your request body.");
+        error.put("details", "JSON parsing error: " + ex.getMessage());
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<?> handleValidationError(MethodArgumentNotValidException ex) {
+        Map<String, Object> error = new HashMap<>();
+        error.put("success", false);
+        error.put("error", "Validation failed. Please check your request data.");
+        error.put("details", ex.getBindingResult().getFieldErrors());
+        return ResponseEntity.badRequest().body(error);
     }
 
     @GetMapping("/appointments/today")
@@ -55,7 +85,8 @@ public class AppointmentController {
         try {
             // Use JPA implementation to get today's appointments
             String today = LocalDate.now().toString();
-            List<Map<String, Object>> appointments = appointmentSchedulingService.getFutureAppointmentsForDate(doctorId, today);
+            List<Map<String, Object>> appointments = appointmentSchedulingService.getTodaysAppointmentsJpa(
+                doctorId, clinicId, today, 1); // Default language ID = 1
             
             // Create response structure similar to the original stored procedure
             Map<String, Object> result = new HashMap<>();
@@ -73,6 +104,139 @@ public class AppointmentController {
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", "Failed to get today's visits: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @GetMapping("/appointments/future")
+    public ResponseEntity<?> getFutureAppointments(
+            @RequestParam String doctorId, 
+            @RequestParam String clinicId, 
+            @RequestParam String futureDate,
+            @RequestParam(defaultValue = "1") Integer languageId) {
+        try {
+            List<Map<String, Object>> appointments = appointmentSchedulingService.getFutureAppointmentsJpa(
+                doctorId, clinicId, futureDate, languageId);
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("appointments", appointments);
+            result.put("count", appointments.size());
+            result.put("doctorId", doctorId);
+            result.put("clinicId", clinicId);
+            result.put("futureDate", futureDate);
+            result.put("languageId", languageId);
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get future appointments: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @GetMapping("/appointments/patient/{patientId}")
+    public ResponseEntity<?> getPatientAppointments(@PathVariable String patientId) {
+        try {
+            List<Map<String, Object>> appointments = appointmentSchedulingService.getPatientAppointmentDetails(patientId);
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("appointments", appointments);
+            result.put("count", appointments.size());
+            result.put("patientId", patientId);
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get patient appointments: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @DeleteMapping("/appointments")
+    public ResponseEntity<?> deleteAppointment(
+            @RequestParam String patientId,
+            @RequestParam String visitDate,
+            @RequestParam String doctorId,
+            @RequestParam(defaultValue = "system") String userId) {
+        try {
+            Map<String, Object> result = appointmentSchedulingService.deleteAppointment(
+                patientId, visitDate, doctorId, userId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to delete appointment: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @PutMapping("/appointments/status")
+    public ResponseEntity<?> updateAppointmentStatus(
+            @RequestParam String patientId,
+            @RequestParam String visitDate,
+            @RequestParam String doctorId,
+            @RequestParam Short statusId,
+            @RequestParam(defaultValue = "system") String userId) {
+        try {
+            Map<String, Object> result = appointmentSchedulingService.updateAppointmentStatus(
+                patientId, visitDate, doctorId, statusId, userId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to update appointment status: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @GetMapping("/appointments/status-options")
+    public ResponseEntity<?> getStatusOptions(@RequestParam String clinicId) {
+        try {
+            List<Map<String, Object>> statusOptions = appointmentSchedulingService.getStatusOptions(clinicId);
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("statusOptions", statusOptions);
+            result.put("clinicId", clinicId);
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get status options: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @GetMapping("/appointments/gender-options")
+    public ResponseEntity<?> getGenderOptions(@RequestParam(defaultValue = "1") Integer languageId) {
+        try {
+            List<Map<String, Object>> genderOptions = appointmentSchedulingService.getGenderOptions(languageId);
+            
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", true);
+            result.put("genderOptions", genderOptions);
+            result.put("languageId", languageId);
+            
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get gender options: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }
