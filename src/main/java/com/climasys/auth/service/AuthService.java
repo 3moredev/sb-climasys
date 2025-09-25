@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import jakarta.servlet.http.HttpSession;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,10 +40,13 @@ public class AuthService {
     @Autowired
     private ClinicMasterRepository clinicMasterRepository;
     
+    @Autowired
+    private HttpSessionService httpSessionService;
+    
     @Value("${climasys.encryption.key:PA1ANDE61INI6}")
     private String encryptionKey;
 
-    public LoginResponse authenticateUser(String loginId, String password, String todaysDay, Integer languageId) {
+    public LoginResponse authenticateUser(String loginId, String password, String todaysDay, Integer languageId, HttpSession session) {
         logger.info("Starting authentication for user: {}", loginId);
         auditLogger.info("LOGIN_ATTEMPT - User: {}", loginId);
         
@@ -129,6 +133,10 @@ public class AuthService {
                         
                         response.setUserDetails(userDetails);
                         logger.info("User details built successfully for: {}", user.getLoginId());
+                        
+                        // Store session data in HTTP session
+                        httpSessionService.storeUserSession(session, user, doctor, clinic);
+                        logger.info("Session data stored successfully for user: {}", user.getLoginId());
                     } else {
                         logger.warn("Missing doctor or clinic data for user: {}", user.getLoginId());
                     }
@@ -218,4 +226,5 @@ public class AuthService {
         systemParams.add(param);
         return systemParams;
     }
+    
 }

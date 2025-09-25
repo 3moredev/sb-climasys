@@ -59,9 +59,6 @@ logging:
 climasys:
   encryption:
     key: ${CLIMASYS_ENCRYPTION_KEY:PA1ANDE61INI6}
-  jwt:
-    secret: ${JWT_SECRET:dev-secret-key-change-in-production}
-    expiration: 86400000 # 24 hours
   database:
     tables:
       patient_master: patient_master
