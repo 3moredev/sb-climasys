@@ -5,7 +5,9 @@ import com.climasys.entity.User;
 import com.climasys.entity.Clinic;
 import com.climasys.entity.ClinicId;
 import com.climasys.auth.repository.*;
+import com.climasys.common.crypto.LegacyCrypto;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +27,9 @@ public class DatabaseInitializer implements CommandLineRunner {
     
     @Autowired
     private AuthDoctorMasterRepository doctorMasterRepository;
+    
+    @Value("${climasys.encryption.key}")
+    private String encryptionKey;
     
     @Autowired
     private ClinicMasterRepository clinicMasterRepository;
@@ -79,7 +84,9 @@ public class DatabaseInitializer implements CommandLineRunner {
         if (!userMasterRepository.findByLoginIdAndIsActive("test_user", true).isPresent()) {
             User user = new User();
             user.setLoginId("test_user");
-            user.setPassword("test_password");
+            // Encrypt the password before storing
+            String encryptedPassword = LegacyCrypto.encryptUnicode(encryptionKey, "test_password");
+            user.setPassword(encryptedPassword);
             user.setFirstName("Test");
             user.setDoctorId("DOC001");
             user.setLanguageId(1);

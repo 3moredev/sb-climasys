@@ -57,7 +57,7 @@ public class AuthService {
                 logger.debug("Language ID not provided, using default: {}", languageId);
             }
 
-            // Find user by login ID only (password is encrypted in database)
+            // Find user by login ID only (password will be validated after decryption)
             Optional<User> userOpt = userMasterRepository.findByLoginIdAndIsActive(loginId, true);
             
             LoginResponse response = new LoginResponse();
@@ -78,7 +78,7 @@ public class AuthService {
                     return response;
                 }
                 
-                // Compare decrypted password with input password
+                // Compare decrypted password with input password (case-sensitive like stored proc)
                 if (!decryptedPassword.equals(password)) {
                     logger.warn("Authentication failed - password mismatch for user: {}", loginId);
                     auditLogger.warn("LOGIN_FAILED - Invalid password for user: {}", loginId);
@@ -93,7 +93,7 @@ public class AuthService {
                 response.setLoginStatus(1);
                 response.setErrorMessage(null);
                 
-                // Get user roles
+                // Get user roles (matching stored procedure logic)
                 List<UserRole> userRoles = userRoleRepository.findDefaultRolesByLoginId(loginId);
                 logger.debug("User roles found: {} roles", userRoles.size());
                 
@@ -104,7 +104,7 @@ public class AuthService {
                     Optional<AuthDoctorMaster> doctorOpt = doctorMasterRepository.findByDoctorId(user.getDoctorId());
                     logger.debug("Doctor lookup result: {}", doctorOpt.isPresent());
                     
-                    // Get clinic details
+                    // Get clinic details (matching stored procedure logic)
                     List<Clinic> clinics = clinicMasterRepository.findDefaultClinicsByLoginId(loginId);
                     logger.debug("Clinics found: {} clinics", clinics.size());
                     
@@ -112,7 +112,7 @@ public class AuthService {
                         AuthDoctorMaster doctor = doctorOpt.get();
                         Clinic clinic = clinics.get(0);
                         
-                        // Build user details
+                        // Build user details (matching stored procedure output)
                         UserDetails userDetails = new UserDetails();
                         userDetails.setId(user.getId());
                         userDetails.setDoctorId(user.getDoctorId());

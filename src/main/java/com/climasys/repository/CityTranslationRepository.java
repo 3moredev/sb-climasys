@@ -17,4 +17,9 @@ public interface CityTranslationRepository extends JpaRepository<CityTranslation
     
     @Query("SELECT ct FROM CityTranslation ct WHERE ct.id.cityId = :cityId")
     List<CityTranslation> findByCityId(@Param("cityId") String cityId);
+    
+    @Query("SELECT ct FROM CityTranslation ct INNER JOIN City c ON ct.id.cityId = c.id.id " +
+           "AND ct.id.stateId = c.id.stateId AND ct.id.countryId = c.id.countryId " +
+           "WHERE ct.id.languageId = :languageId AND ct.cityName LIKE %:searchStr%")
+    List<CityTranslation> searchCitiesByLanguageAndName(@Param("searchStr") String searchStr, @Param("languageId") Integer languageId);
 }

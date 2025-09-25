@@ -85,6 +85,34 @@ public class ReferenceController {
         }
     }
 
+    @GetMapping("/areas/search-advanced")
+    public ResponseEntity<?> searchAreasAdvanced(
+            @RequestParam String searchStr,
+            @RequestParam Integer languageId) {
+        try {
+            Map<String, Object> result = referenceDataService.searchAreasAdvanced(searchStr, languageId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to search areas: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @GetMapping("/areas/details")
+    public ResponseEntity<?> getAreaDetails(
+            @RequestParam String areaName,
+            @RequestParam Integer languageId) {
+        try {
+            Map<String, Object> result = referenceDataService.getAreaDetails(areaName, languageId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get area details: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
     @GetMapping("/folders/check")
     public ResponseEntity<?> checkFolderNumber(@RequestParam String folderNo) {
         try {
@@ -168,6 +196,20 @@ public class ReferenceController {
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get cities: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @GetMapping("/cities/search")
+    public ResponseEntity<?> searchCities(
+            @RequestParam String searchStr,
+            @RequestParam Integer languageId) {
+        try {
+            List<?> result = referenceDataService.searchCities(searchStr, languageId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to search cities: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }

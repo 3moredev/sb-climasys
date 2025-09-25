@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.Optional;
 
 @Service
@@ -107,6 +108,96 @@ public class ReferenceDataService {
         return areaRepository.searchAreas(query);
     }
     
+    public Map<String, Object> getAreaDetails(String areaName, Integer languageId) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // Find area translation by area name and language ID
+            AreaTranslation areaTranslation = areaTranslationRepository.findByAreaNameAndLanguageId(areaName, languageId);
+            
+            if (areaTranslation == null) {
+                result.put("error", "Area not found for name: " + areaName + " and language: " + languageId);
+                return result;
+            }
+            
+            // Get area master details
+            Area area = areaRepository.findByIdAndActive(areaTranslation.getId().getAreaId());
+            if (area == null) {
+                result.put("error", "Area master not found for ID: " + areaTranslation.getId().getAreaId());
+                return result;
+            }
+            
+            // Get city translation
+            CityTranslation cityTranslation = cityTranslationRepository.findByCityIdAndLanguageId(
+                area.getCityId(), languageId);
+            
+            // Get state translation
+            StateTranslation stateTranslation = stateTranslationRepository.findByStateIdAndLanguageId(
+                area.getStateId(), languageId);
+            
+            // Build result matching stored procedure output
+            result.put("id", area.getId());
+            result.put("cityId", area.getCityId());
+            result.put("stateId", area.getStateId());
+            result.put("countryId", area.getCountryId());
+            result.put("languageId", languageId);
+            result.put("cityName", cityTranslation != null ? cityTranslation.getCityName() : null);
+            result.put("stateName", stateTranslation != null ? stateTranslation.getStateName() : null);
+            
+        } catch (Exception e) {
+            result.put("error", "Error retrieving area details: " + e.getMessage());
+        }
+        
+        return result;
+    }
+    
+    public Map<String, Object> searchAreasAdvanced(String searchStr, Integer languageId) {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // Result Set 1: Basic Area Search
+            List<AreaTranslation> areaTranslations = areaTranslationRepository
+                .searchAreasByLanguageAndName(searchStr, languageId);
+            
+            List<Map<String, Object>> basicAreaResults = new ArrayList<>();
+            for (AreaTranslation at : areaTranslations) {
+                Map<String, Object> areaResult = new HashMap<>();
+                areaResult.put("areaName", at.getAreaName());
+                areaResult.put("areaId", at.getId().getAreaId());
+                areaResult.put("cityId", at.getId().getCityId());
+                areaResult.put("stateId", at.getId().getStateId());
+                basicAreaResults.add(areaResult);
+            }
+            result.put("basicAreaSearch", basicAreaResults);
+            
+            // Result Set 2: Area Search with Patient Count
+            List<Map<String, Object>> areaWithPatientCountResults = new ArrayList<>();
+            for (AreaTranslation at : areaTranslations) {
+                Long patientCount = patientRepository.countByAreaId(at.getId().getAreaId());
+                String searchValue = (at.getAreaName() != null ? at.getAreaName() : "") + 
+                                   "   :   " + (patientCount != null ? patientCount.toString() : "0");
+                
+                Map<String, Object> areaWithCount = new HashMap<>();
+                areaWithCount.put("searchValue", searchValue);
+                areaWithCount.put("areaName", at.getAreaName());
+                areaWithCount.put("patientCount", patientCount);
+                areaWithPatientCountResults.add(areaWithCount);
+            }
+            result.put("areaWithPatientCount", areaWithPatientCountResults);
+            
+            // Result Set 3: Lab Test Search (Note: Lab test entities not available in current codebase)
+            // This would require Lab_Test_Master and Patient_Visit_LabTestAsked entities
+            List<Map<String, Object>> labTestResults = new ArrayList<>();
+            // TODO: Implement when lab test entities are available
+            result.put("labTestSearch", labTestResults);
+            
+        } catch (Exception e) {
+            result.put("error", "Error in advanced area search: " + e.getMessage());
+        }
+        
+        return result;
+    }
+    
     public Map<String, Object> checkFolderNumber(String folderNo) {
         Map<String, Object> result = new HashMap<>();
         boolean exists = patientRepository.existsByFolderNo(folderNo);
@@ -150,6 +241,31 @@ public class ReferenceDataService {
             return cityRepository.findByStateId(stateId);
         }
         return cityRepository.findAllOrdered();
+    }
+    
+    public List<Map<String, Object>> searchCities(String searchStr, Integer languageId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        
+        try {
+            // Find city translations by search string and language ID
+            List<CityTranslation> cityTranslations = cityTranslationRepository
+                .searchCitiesByLanguageAndName(searchStr, languageId);
+            
+            for (CityTranslation ct : cityTranslations) {
+                Map<String, Object> cityResult = new HashMap<>();
+                cityResult.put("cityName", ct.getCityName());
+                cityResult.put("cityId", ct.getId().getCityId());
+                cityResult.put("stateId", ct.getId().getStateId());
+                result.add(cityResult);
+            }
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("error", "Error searching cities: " + e.getMessage());
+            result.add(errorResult);
+        }
+        
+        return result;
     }
     
     public List<State> getStates(String countryId) {
