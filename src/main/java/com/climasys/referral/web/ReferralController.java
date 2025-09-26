@@ -44,6 +44,18 @@ public class ReferralController {
     public ResponseEntity<?> getReferByTranslations(@RequestParam Integer languageId) {
         try {
             List<ReferByTranslation> result = referralService.getReferByTranslations(languageId);
+            
+            // Log for debugging
+            System.out.println("=== REFERRAL CONTROLLER DEBUG ===");
+            System.out.println("Language ID: " + languageId);
+            System.out.println("Number of translations returned: " + result.size());
+            for (int i = 0; i < result.size(); i++) {
+                ReferByTranslation t = result.get(i);
+                System.out.println("Translation " + i + ": ID=" + t.getId().getReferId() + 
+                                 ", Description=" + t.getReferByDescription());
+            }
+            System.out.println("=== END REFERRAL CONTROLLER DEBUG ===");
+            
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();

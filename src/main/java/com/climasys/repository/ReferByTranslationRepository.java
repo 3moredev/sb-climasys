@@ -12,6 +12,6 @@ import java.util.List;
 @Repository
 public interface ReferByTranslationRepository extends JpaRepository<ReferByTranslation, ReferByTranslationId> {
     
-    @Query("SELECT rbt FROM ReferByTranslation rbt WHERE rbt.id.languageId = :languageId ORDER BY rbt.id.referId")
+    @Query("SELECT DISTINCT rbt FROM ReferByTranslation rbt WHERE rbt.id.languageId = :languageId ORDER BY rbt.id.referId")
     List<ReferByTranslation> findByLanguageId(@Param("languageId") Integer languageId);
 }

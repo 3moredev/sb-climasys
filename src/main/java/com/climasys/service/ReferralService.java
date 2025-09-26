@@ -30,7 +30,19 @@ public class ReferralService {
     }
     
     public List<ReferByTranslation> getReferByTranslations(Integer languageId) {
-        return referByTranslationRepository.findByLanguageId(languageId);
+        List<ReferByTranslation> translations = referByTranslationRepository.findByLanguageId(languageId);
+        
+        // Additional safety: Remove any remaining duplicates based on referId
+        return translations.stream()
+                .collect(java.util.stream.Collectors.toMap(
+                    t -> t.getId().getReferId(),
+                    t -> t,
+                    (existing, replacement) -> existing // Keep first occurrence if duplicates found
+                ))
+                .values()
+                .stream()
+                .sorted((t1, t2) -> t1.getId().getReferId().compareTo(t2.getId().getReferId()))
+                .collect(java.util.stream.Collectors.toList());
     }
     
     public List<ReferralDoctor> getReferralDoctors(Integer languageId) {
