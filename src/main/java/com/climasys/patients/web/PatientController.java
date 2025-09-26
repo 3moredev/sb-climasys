@@ -3,7 +3,7 @@ package com.climasys.patients.web;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.simple.SimpleJdbcCall;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -34,7 +34,6 @@ public class PatientController {
             String age,
             String gender,
             String regYear,
-            String familyFolder,
             String registrationStatus,
             String userId,
             String referBy,
@@ -50,25 +49,57 @@ public class PatientController {
     ) {}
 
     @PostMapping
+    @Transactional
     public ResponseEntity<?> quickRegister(@RequestBody QuickRegistrationRequest req) {
         try {
-            // Generate a unique patient ID
-            String patientId = "P" + System.currentTimeMillis();
+            // Data validation and NULL handling (matching stored procedure logic)
+            String maritalStatus = req.maritalStatus();
+            if (maritalStatus != null && maritalStatus.trim().isEmpty()) {
+                maritalStatus = null;
+            }
             
-            // Use direct SQL INSERT instead of stored procedure for PostgreSQL compatibility
+            Integer occupation = req.occupation();
+            if (occupation != null && occupation == 0) {
+                occupation = null;
+            }
+
+            // Check for duplicate patient (matching stored procedure logic)
+            String duplicateCheckSql = "SELECT ID FROM patient_master " +
+                    "WHERE last_name = ? AND first_name = ? AND gender_id = ? AND clinic_id = ?";
+            
+            List<Map<String, Object>> existingPatients = jdbcTemplate.queryForList(duplicateCheckSql,
+                    req.lastName(), req.firstName(), req.gender(), req.clinicId());
+            
+            if (!existingPatients.isEmpty()) {
+                Map<String, Object> result = new HashMap<>();
+                result.put("SAVE_STATUS", 0);
+                result.put("message", "Duplicate patient found");
+                return ResponseEntity.ok(result);
+            }
+
+            // Generate patient ID using sequence numbers (matching stored procedure logic)
+            String patientId = generatePatientId(req.clinicId());
+            if (patientId == null) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("error", "Failed to generate patient ID");
+                return ResponseEntity.badRequest().body(error);
+            }
+
+            // Insert patient record
             String sql = "INSERT INTO patient_master (" +
                     "id, doctor_id, folder_no, first_name, middle_name, last_name, " +
                     "mobile_1, area_id, city_id, state_id, country_id, date_of_birth, " +
                     "age_given, gender_id, manual_registration_year, registration_status, " +
                     "marital_status_id, occupation_id, address_1, email_id, " +
                     "doctor_address, doctor_mobile, doctor_email, clinic_id, " +
-                    "date_of_registration, created_on, createdby_name" +
-                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                    "date_of_registration, created_on, createdby_name, modified_on, modifiedby_name, " +
+                    "patient_last_visit_no, refer_id, refer_doctor_details" +
+                    ") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-            int rowsAffected = jdbcTemplate.update(sql,
+            jdbcTemplate.update(sql,
                     patientId,
                     req.doctorId(),
-                    req.familyFolder(), // folder_no
+                    null, // folder_no - set to NULL since not required
                     req.firstName(),
                     req.middleName(),
                     req.lastName(),
@@ -82,8 +113,8 @@ public class PatientController {
                     req.gender(),
                     req.regYear() != null ? Integer.valueOf(req.regYear()) : null,
                     req.registrationStatus(),
-                    req.maritalStatus(),
-                    req.occupation(),
+                    maritalStatus,
+                    occupation,
                     req.address(),
                     req.patientEmail(),
                     req.doctorAddress(),
@@ -92,20 +123,75 @@ public class PatientController {
                     req.clinicId(),
                     java.sql.Date.valueOf(java.time.LocalDate.now()), // date_of_registration
                     java.time.LocalDateTime.now(), // created_on
-                    req.userId() // createdby_name
+                    req.userId(), // createdby_name
+                    java.time.LocalDateTime.now(), // modified_on
+                    req.userId(), // modifiedby_name
+                    0, // patient_last_visit_no
+                    req.referBy(),
+                    req.referDoctorDetails()
             );
 
+            // Return response matching stored procedure format
             Map<String, Object> result = new HashMap<>();
-            result.put("success", true);
-            result.put("patientId", patientId);
-            result.put("rowsAffected", rowsAffected);
+            result.put("SAVE_STATUS", 1);
+            result.put("ID", patientId);
             result.put("message", "Patient registered successfully");
             
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
-            error.put("error", "Failed to register patient: " + e.getMessage());
+            error.put("ErrorNumber", -1);
+            error.put("ErrorMessage", "Failed to register patient: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    private String generatePatientId(String clinicId) {
+        try {
+            // Get sequence number for PAT entity type
+            String sequenceSql = "SELECT last_sequenceno, prefix_char, total_length " +
+                    "FROM sequence_nos WHERE clinic_id = ? AND entity_type = 'PAT'";
+            
+            List<Map<String, Object>> sequenceResult = jdbcTemplate.queryForList(sequenceSql, clinicId);
+            
+            if (sequenceResult.isEmpty()) {
+                // Create default sequence entry if not exists
+                String insertSequenceSql = "INSERT INTO sequence_nos " +
+                        "(doctor_id, entity_type, entity_name, prefix_char, total_length, last_sequenceno, clinic_id) " +
+                        "VALUES (?, 'PAT', 'PATIENT', '', 5, 0, ?)";
+                jdbcTemplate.update(insertSequenceSql, "DEFAULT", clinicId);
+                
+                // Retry getting sequence
+                sequenceResult = jdbcTemplate.queryForList(sequenceSql, clinicId);
+                if (sequenceResult.isEmpty()) {
+                    return null;
+                }
+            }
+            
+            Map<String, Object> sequenceData = sequenceResult.get(0);
+            Long lastSequenceNo = ((Number) sequenceData.get("last_sequenceno")).longValue();
+            Integer totalLength = ((Number) sequenceData.get("total_length")).intValue();
+            
+            // Increment sequence number
+            lastSequenceNo = lastSequenceNo + 1;
+            
+            // Generate patient ID in format: DD-MM-YYYY-XXXXX
+            java.time.LocalDate today = java.time.LocalDate.now();
+            String dateStr = String.format("%02d-%02d-%04d", 
+                    today.getDayOfMonth(), today.getMonthValue(), today.getYear());
+            
+            // Pad sequence number with zeros
+            String paddedSequence = String.format("%0" + totalLength + "d", lastSequenceNo);
+            String patientId = dateStr + "-" + paddedSequence;
+            
+            // Update sequence number
+            String updateSequenceSql = "UPDATE sequence_nos SET last_sequenceno = ? " +
+                    "WHERE clinic_id = ? AND entity_type = 'PAT'";
+            jdbcTemplate.update(updateSequenceSql, lastSequenceNo, clinicId);
+            
+            return patientId;
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -124,7 +210,6 @@ public class PatientController {
             String age,
             String gender,
             String regYear,
-            String familyFolder,
             String registrationStatus,
             String userId,
             String referBy,
@@ -213,7 +298,7 @@ public class PatientController {
 
             int rowsAffected = jdbcTemplate.update(sql,
                     req.doctorId(),
-                    req.familyFolder(), // folder_no
+                    null, // folder_no - set to NULL since not required
                     req.firstName(),
                     req.middleName(),
                     req.lastName(),

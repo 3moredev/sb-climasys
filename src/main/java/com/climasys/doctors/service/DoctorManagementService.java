@@ -1,7 +1,7 @@
 package com.climasys.doctors.service;
 
-import com.climasys.entity.DoctorMaster;
-import com.climasys.repository.DoctorMasterRepository;
+import com.climasys.auth.entity.AuthDoctorMaster;
+import com.climasys.auth.repository.AuthDoctorMasterRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 public class DoctorManagementService {
 
     @Autowired
-    private DoctorMasterRepository doctorMasterRepository;
+    private AuthDoctorMasterRepository doctorMasterRepository;
 
     /**
      * Get all available doctors in the system
@@ -26,10 +26,9 @@ public class DoctorManagementService {
      */
     public List<Map<String, Object>> getAllDoctors() {
         try {
-            List<DoctorMaster> doctors = doctorMasterRepository.findAllActive();
+            List<AuthDoctorMaster> doctors = doctorMasterRepository.findAll();
             
             return doctors.stream()
-                    .filter(doctor -> doctor.getIsActive() != null && doctor.getIsActive())
                     .map(this::convertDoctorToMap)
                     .collect(Collectors.toList());
         } catch (Exception e) {
@@ -71,7 +70,7 @@ public class DoctorManagementService {
      */
     public List<Map<String, Object>> getDoctorDetails(String doctorId) {
         try {
-            return doctorMasterRepository.findByDoctorIdAndActive(doctorId)
+            return doctorMasterRepository.findByDoctorId(doctorId)
                     .map(doctor -> List.of(convertDoctorToMap(doctor)))
                     .orElse(List.of());
         } catch (Exception e) {
@@ -85,11 +84,9 @@ public class DoctorManagementService {
      */
     public List<Map<String, Object>> getDoctorCount() {
         try {
-            List<DoctorMaster> allDoctors = doctorMasterRepository.findAll();
+            List<AuthDoctorMaster> allDoctors = doctorMasterRepository.findAll();
             long totalDoctors = allDoctors.size();
-            long activeDoctors = allDoctors.stream()
-                    .filter(doctor -> doctor.getIsActive() != null && doctor.getIsActive())
-                    .count();
+            long activeDoctors = allDoctors.size(); // All doctors are considered active in this schema
             long inactiveDoctors = totalDoctors - activeDoctors;
             
             Map<String, Object> countData = new HashMap<>();
@@ -165,28 +162,32 @@ public class DoctorManagementService {
     }
 
     /**
-     * Helper method to convert DoctorMaster entity to Map
+     * Helper method to convert AuthDoctorMaster entity to Map
      * Based on stored procedure output format
      */
-    private Map<String, Object> convertDoctorToMap(DoctorMaster doctor) {
+    private Map<String, Object> convertDoctorToMap(AuthDoctorMaster doctor) {
         Map<String, Object> doctorMap = new HashMap<>();
         doctorMap.put("doctor_id", doctor.getDoctorId());
         
         // Build full name like in stored procedure
         StringBuilder fullName = new StringBuilder();
         if (doctor.getFirstName() != null) fullName.append(doctor.getFirstName());
+        if (doctor.getMiddleName() != null) {
+            if (fullName.length() > 0) fullName.append(" ");
+            fullName.append(doctor.getMiddleName());
+        }
         if (doctor.getLastName() != null) {
             if (fullName.length() > 0) fullName.append(" ");
             fullName.append(doctor.getLastName());
         }
         doctorMap.put("doctor_name", fullName.toString());
         
-        doctorMap.put("qualification", doctor.getQualification());
+        doctorMap.put("qualification", doctor.getDoctorQual());
         doctorMap.put("specialization", doctor.getSpeciality());
-        doctorMap.put("phone", doctor.getMobile());
-        doctorMap.put("email", doctor.getEmail());
-        doctorMap.put("is_active", doctor.getIsActive());
-        doctorMap.put("address", doctor.getAddress());
+        doctorMap.put("phone", doctor.getMobile1());
+        doctorMap.put("email", doctor.getEmailid());
+        doctorMap.put("is_active", true); // All doctors are considered active in this schema
+        doctorMap.put("address", doctor.getResidentialAdd1()); // Use residential address
         
         return doctorMap;
     }
