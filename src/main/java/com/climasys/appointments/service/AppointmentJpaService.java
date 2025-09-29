@@ -268,7 +268,7 @@ public class AppointmentJpaService {
                 Map<String, Object> statusMap = new HashMap<>();
                 statusMap.put("id", status.getId());
                 statusMap.put("description", status.getStatusDescription());
-                statusMap.put("code", status.getStatusCode());
+                statusMap.put("code", status.getStatusDescription()); // Use description as code since there's no statusCode field
                 return statusMap;
             }).collect(Collectors.toList());
         } catch (Exception e) {

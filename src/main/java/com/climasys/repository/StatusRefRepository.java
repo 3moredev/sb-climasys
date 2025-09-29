@@ -13,12 +13,12 @@ import java.util.Optional;
 @Repository
 public interface StatusRefRepository extends JpaRepository<StatusRef, StatusRefId> {
     
-    @Query("SELECT s FROM StatusRef s WHERE s.id = :id AND s.clinicId = :clinicId AND (s.deleteFlag = false OR s.deleteFlag IS NULL)")
+    @Query("SELECT s FROM StatusRef s WHERE s.id = :id AND s.clinicId = :clinicId")
     Optional<StatusRef> findByIdAndClinicIdAndActive(@Param("id") Short id, @Param("clinicId") String clinicId);
     
-    @Query("SELECT s FROM StatusRef s WHERE s.clinicId = :clinicId AND (s.deleteFlag = false OR s.deleteFlag IS NULL)")
+    @Query("SELECT s FROM StatusRef s WHERE s.clinicId = :clinicId")
     List<StatusRef> findByClinicIdAndActive(@Param("clinicId") String clinicId);
     
-    @Query("SELECT s FROM StatusRef s WHERE s.statusCode = :statusCode AND s.clinicId = :clinicId AND (s.deleteFlag = false OR s.deleteFlag IS NULL)")
-    Optional<StatusRef> findByStatusCodeAndClinicIdAndActive(@Param("statusCode") String statusCode, @Param("clinicId") String clinicId);
+    @Query("SELECT s FROM StatusRef s WHERE s.statusDescription = :statusDescription AND s.clinicId = :clinicId")
+    Optional<StatusRef> findByStatusCodeAndClinicIdAndActive(@Param("statusDescription") String statusDescription, @Param("clinicId") String clinicId);
 }

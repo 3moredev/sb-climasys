@@ -21,27 +21,9 @@ public class StatusRef {
     @Column(name = "clinic_id", length = 10, nullable = false)
     private String clinicId;
     
-    @Column(name = "status_description", length = 100)
+    @Column(name = "doctor_id", length = 30, nullable = false)
+    private String doctorId;
+    
+    @Column(name = "status_description", length = 60)
     private String statusDescription;
-    
-    @Column(name = "status_code", length = 20)
-    private String statusCode;
-    
-    @Column(name = "is_active")
-    private Boolean isActive;
-    
-    @Column(name = "created_on")
-    private java.time.LocalDateTime createdOn;
-    
-    @Column(name = "created_by", length = 50)
-    private String createdBy;
-    
-    @Column(name = "modified_on")
-    private java.time.LocalDateTime modifiedOn;
-    
-    @Column(name = "modified_by", length = 50)
-    private String modifiedBy;
-    
-    @Column(name = "delete_flag")
-    private Boolean deleteFlag;
 }
