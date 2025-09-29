@@ -1,6 +1,13 @@
 package com.climasys.appointments.web;
 
 import com.climasys.appointments.service.AppointmentSchedulingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 @CrossOrigin(origins = "*")
+@Tag(name = "Appointments", description = "Appointment management endpoints for booking, updating, and deleting appointments")
 public class AppointmentController {
 
     @Autowired
@@ -33,6 +41,14 @@ public class AppointmentController {
             Boolean inPerson
     ) {}
 
+    @Operation(
+        summary = "Book New Appointment", 
+        description = "Creates a new appointment for a patient with a specific doctor"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Appointment booked successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - Invalid appointment data")
+    })
     @PostMapping("/appointments")
     public ResponseEntity<?> book(@Valid @RequestBody AppointmentRequest req) {
         try {
@@ -156,11 +172,23 @@ public class AppointmentController {
         }
     }
     
+    @Operation(
+        summary = "Delete Appointment", 
+        description = "Soft deletes an appointment by setting deleteFlag to true"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Appointment deleted successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - Appointment not found or invalid parameters")
+    })
     @DeleteMapping("/appointments")
     public ResponseEntity<?> deleteAppointment(
+            @Parameter(description = "Patient ID", required = true, example = "P-00001")
             @RequestParam String patientId,
+            @Parameter(description = "Visit date in YYYY-MM-DD or YYYY-MM-DD HH:mm:ss format", required = true, example = "2024-01-15")
             @RequestParam String visitDate,
+            @Parameter(description = "Doctor ID", required = true, example = "DR-00010")
             @RequestParam String doctorId,
+            @Parameter(description = "User ID performing the deletion", required = false, example = "admin")
             @RequestParam(defaultValue = "system") String userId) {
         try {
             Map<String, Object> result = appointmentSchedulingService.deleteAppointment(
@@ -241,15 +269,33 @@ public class AppointmentController {
         }
     }
     
+    @Operation(
+        summary = "Update Appointment Online Time, Doctor, and Status", 
+        description = "Updates appointment online time, doctor assignment, and status in a single operation. Equivalent to USP_Update_TodaysVisitOnlineTimeDetails but with status update capability."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Appointment updated successfully",
+            content = @Content(schema = @Schema(implementation = Map.class))),
+        @ApiResponse(responseCode = "400", description = "Bad request - Invalid parameters or appointment not found",
+            content = @Content(schema = @Schema(implementation = Map.class)))
+    })
     @PutMapping("/appointments/online-time-doctor")
     public ResponseEntity<?> updateAppointmentOnlineTimeAndDoctor(
+            @Parameter(description = "Patient ID", required = true, example = "P-00001")
             @RequestParam String patientId,
+            @Parameter(description = "Patient Visit Number", required = true, example = "1")
             @RequestParam Integer patientVisitNo,
+            @Parameter(description = "Shift ID", required = true, example = "1")
             @RequestParam Short shiftId,
+            @Parameter(description = "Clinic ID", required = true, example = "CL-00001")
             @RequestParam String clinicId,
+            @Parameter(description = "Online appointment time in HH:MM format", required = false, example = "14:30")
             @RequestParam(required = false) String onlineAppointmentTime,
+            @Parameter(description = "Doctor ID to assign", required = true, example = "DR-00010")
             @RequestParam String doctorId,
+            @Parameter(description = "Status ID (1=Waiting, 2=With Doctor, 3=Completed, etc.)", required = true, example = "2")
             @RequestParam Short statusId,
+            @Parameter(description = "User ID performing the update", required = false, example = "admin")
             @RequestParam(defaultValue = "system") String userId) {
         try {
             Map<String, Object> result = appointmentSchedulingService.updateAppointmentOnlineTimeAndDoctor(
