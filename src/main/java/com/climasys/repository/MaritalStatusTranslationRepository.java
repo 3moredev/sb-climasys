@@ -17,4 +17,7 @@ public interface MaritalStatusTranslationRepository extends JpaRepository<Marita
     
     @Query("SELECT mst FROM MaritalStatusTranslation mst WHERE mst.id.maritalStatusId = :maritalStatusId")
     List<MaritalStatusTranslation> findByMaritalStatusId(@Param("maritalStatusId") String maritalStatusId);
+    
+    @Query("SELECT mst FROM MaritalStatusTranslation mst WHERE mst.id.languageId = :languageId ORDER BY mst.id.maritalStatusId")
+    List<MaritalStatusTranslation> findByLanguageId(@Param("languageId") Integer languageId);
 }

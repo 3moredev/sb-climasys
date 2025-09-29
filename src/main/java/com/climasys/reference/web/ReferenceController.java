@@ -176,6 +176,7 @@ public class ReferenceController {
         }
     }
 
+    @Operation(summary = "Get Marital Statuses", description = "Retrieve all available marital status options")
     @GetMapping("/marital-statuses")
     public ResponseEntity<?> getMaritalStatuses() {
         try {
@@ -184,6 +185,28 @@ public class ReferenceController {
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get marital statuses: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @Operation(summary = "Get Marital Statuses with Translations", description = "Retrieve all available marital status options with translations for a specific language")
+    @GetMapping("/marital-statuses/translations")
+    public ResponseEntity<?> getMaritalStatusesWithTranslations(
+            @RequestParam(defaultValue = "1") Integer languageId) {
+        try {
+            List<Map<String, Object>> result = referenceDataService.getMaritalStatusesWithTranslations(languageId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("maritalStatuses", result);
+            response.put("languageId", languageId);
+            response.put("count", result.size());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get marital statuses with translations: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }

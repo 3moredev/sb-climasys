@@ -236,6 +236,40 @@ public class ReferenceDataService {
         return maritalStatusRepository.findAllOrdered();
     }
     
+    public List<Map<String, Object>> getMaritalStatusesWithTranslations(Integer languageId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        
+        try {
+            if (languageId != null) {
+                // Get translations directly for the specified language
+                List<MaritalStatusTranslation> translations = maritalStatusTranslationRepository.findByLanguageId(languageId);
+                
+                for (MaritalStatusTranslation translation : translations) {
+                    Map<String, Object> statusMap = new HashMap<>();
+                    statusMap.put("id", translation.getId().getMaritalStatusId());
+                    statusMap.put("description", translation.getMaritalStatusDescription());
+                    result.add(statusMap);
+                }
+            } else {
+                // Fallback to basic marital statuses without translations
+                List<MaritalStatus> maritalStatuses = maritalStatusRepository.findAllOrdered();
+                
+                for (MaritalStatus maritalStatus : maritalStatuses) {
+                    Map<String, Object> statusMap = new HashMap<>();
+                    statusMap.put("id", maritalStatus.getId());
+                    statusMap.put("description", maritalStatus.getId()); // Use ID as description
+                    result.add(statusMap);
+                }
+            }
+            
+        } catch (Exception e) {
+            // Log error and return empty list
+            System.err.println("Error getting marital statuses with translations: " + e.getMessage());
+        }
+        
+        return result;
+    }
+    
     public List<City> getCities(String stateId) {
         if (stateId != null && !stateId.isEmpty()) {
             return cityRepository.findByStateId(stateId);
