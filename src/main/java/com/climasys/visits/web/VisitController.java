@@ -644,6 +644,7 @@ public class VisitController {
                 "SR.id AS Status_ID, " +
                 "TO_CHAR(PV.from_time, 'HH24:MI') AS From_time, " +
                 "FU.followup_description AS follow_up_type, " +
+                "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
                 "CASE WHEN PV.from_time IS NOT NULL AND PV.visit_time IS NOT NULL THEN " +
                 "TO_CHAR(PV.from_time - PV.visit_time, 'MI:SS') " +
                 "ELSE NULL END AS Duration " +
@@ -687,7 +688,8 @@ public class VisitController {
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
                 "TO_CHAR(PV.from_time, 'HH24:MI') AS From_time, " +
-                "FU.followup_description AS follow_up_type " +
+                "FU.followup_description AS follow_up_type, " +
+                "PV.is_submit_patient_labtest AS isSubmitPatientLabtest " +
                 "FROM patient_visits PV " +
                 "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
                 "INNER JOIN doctor_master DM ON PV.doctor_id = DM.doctor_id " +
@@ -725,6 +727,7 @@ public class VisitController {
                 "PV.visit_date as fulldate, " +
                 "PV.visit_time as full_time, " +
                 "FU.followup_description AS follow_up_type, " +
+                "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
                 "CASE WHEN PV.from_time IS NOT NULL AND PV.visit_time IS NOT NULL THEN " +
                 "TO_CHAR(PV.from_time - PV.visit_time, 'MI:SS') " +
                 "ELSE NULL END AS Duration " +
@@ -767,6 +770,7 @@ public class VisitController {
                 "PV.visit_date as fulldate, " +
                 "PV.visit_time as full_time, " +
                 "FU.followup_description AS follow_up_type, " +
+                "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
                 "CASE WHEN PV.from_time IS NOT NULL AND PV.visit_time IS NOT NULL THEN " +
                 "TO_CHAR(PV.from_time - PV.visit_time, 'MI:SS') " +
                 "ELSE NULL END AS Duration " +
