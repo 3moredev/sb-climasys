@@ -373,8 +373,16 @@ public class AppointmentSchedulingService {
         logger.info("Deleting appointment using JPA for patient: {}", patientId);
         
         try {
-            LocalDate date = LocalDate.parse(visitDate);
-            LocalDateTime dateTime = date.atStartOfDay();
+            LocalDateTime dateTime;
+            // Handle both date (YYYY-MM-DD) and datetime (YYYY-MM-DD HH:mm:ss) formats
+            if (visitDate.contains(" ")) {
+                // Contains time component - parse as LocalDateTime
+                dateTime = LocalDateTime.parse(visitDate.replace(" ", "T"));
+            } else {
+                // Only date - parse as LocalDate and convert to start of day
+                LocalDate date = LocalDate.parse(visitDate);
+                dateTime = date.atStartOfDay();
+            }
             return appointmentJpaService.deletePatientAppointment(patientId, dateTime, doctorId, userId);
         } catch (Exception e) {
             logger.error("Error deleting appointment: {}", e.getMessage(), e);
@@ -392,14 +400,49 @@ public class AppointmentSchedulingService {
         logger.info("Updating appointment status using JPA for patient: {}", patientId);
         
         try {
-            LocalDate date = LocalDate.parse(visitDate);
-            LocalDateTime dateTime = date.atStartOfDay();
+            LocalDateTime dateTime;
+            // Handle both date (YYYY-MM-DD) and datetime (YYYY-MM-DD HH:mm:ss) formats
+            if (visitDate.contains(" ")) {
+                // Contains time component - parse as LocalDateTime
+                dateTime = LocalDateTime.parse(visitDate.replace(" ", "T"));
+            } else {
+                // Only date - parse as LocalDate and convert to start of day
+                LocalDate date = LocalDate.parse(visitDate);
+                dateTime = date.atStartOfDay();
+            }
             return appointmentJpaService.updateAppointmentStatus(patientId, dateTime, doctorId, statusId, userId);
         } catch (Exception e) {
             logger.error("Error updating appointment status: {}", e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", "Failed to update appointment status: " + e.getMessage());
+            return error;
+        }
+    }
+    
+    /**
+     * Update appointment online time, doctor, and status using JPA
+     */
+    public Map<String, Object> updateAppointmentOnlineTimeAndDoctor(
+            String patientId,
+            Integer patientVisitNo,
+            Short shiftId,
+            String clinicId,
+            String onlineAppointmentTime,
+            String doctorId,
+            Short statusId,
+            String userId) {
+        logger.info("Updating appointment online time and doctor using JPA for patient: {}", patientId);
+        
+        try {
+            return appointmentJpaService.updateAppointmentOnlineTimeAndDoctor(
+                patientId, patientVisitNo, shiftId, clinicId, onlineAppointmentTime, 
+                doctorId, statusId, userId);
+        } catch (Exception e) {
+            logger.error("Error updating appointment online time and doctor: {}", e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to update appointment online time and doctor: " + e.getMessage());
             return error;
         }
     }

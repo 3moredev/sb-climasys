@@ -149,8 +149,8 @@ public class AppointmentJpaService {
             result.put("appointmentId", savedAppointment.getPatientVisitNo());
             result.put("patientId", patientId);
             result.put("doctorId", doctorId);
-            result.put("visitDate", visitDate);
-            result.put("visitTime", visitTime);
+            result.put("visitDate", LocalDateTime.now()); // Use system time instead of stored visitDate
+            result.put("visitTime", LocalTime.now()); // Use system time instead of stored visitTime
             result.put("status", "Waiting");
             
             auditLogger.info("APPOINTMENT_CREATED - Patient: {}, Doctor: {}, Date: {}, Time: {}", 
@@ -244,6 +244,76 @@ public class AppointmentJpaService {
     }
 
     /**
+     * Update appointment online time, doctor, and status (equivalent to USP_Update_TodaysVisitOnlineTimeDetails with status)
+     */
+    @Transactional
+    public Map<String, Object> updateAppointmentOnlineTimeAndDoctor(
+            String patientId,
+            Integer patientVisitNo,
+            Short shiftId,
+            String clinicId,
+            String onlineAppointmentTime,
+            String doctorId,
+            Short statusId,
+            String userId) {
+        
+        logger.info("Updating appointment online time and doctor for patient: {} visit: {} to doctor: {} with status: {}", 
+                   patientId, patientVisitNo, doctorId, statusId);
+        
+        try {
+            // Get existing refer_id logic (same as stored procedure)
+            String referId = "S"; // Default value
+            try {
+                Optional<PatientVisit> existingVisit = appointmentRepository.findByPatientVisitNo(patientVisitNo);
+                if (existingVisit.isPresent() && existingVisit.get().getReferId() != null) {
+                    referId = existingVisit.get().getReferId();
+                }
+            } catch (Exception e) {
+                logger.warn("Could not retrieve existing refer_id, using default: {}", e.getMessage());
+            }
+            
+            // Convert online appointment time
+            java.sql.Time onlineTime = null;
+            if (onlineAppointmentTime != null && !onlineAppointmentTime.trim().isEmpty()) {
+                try {
+                    onlineTime = java.sql.Time.valueOf(onlineAppointmentTime + ":00");
+                } catch (Exception e) {
+                    logger.warn("Invalid online appointment time format: {}, setting to null", onlineAppointmentTime);
+                }
+            }
+            
+            // Update appointment
+            int updatedCount = appointmentRepository.updateAppointmentOnlineTimeAndDoctor(
+                patientId, patientVisitNo, shiftId, clinicId, onlineTime, doctorId, 
+                statusId, LocalDateTime.now(), userId, referId);
+            
+            Map<String, Object> result = new HashMap<>();
+            if (updatedCount > 0) {
+                result.put("success", true);
+                result.put("message", "Appointment online time, doctor, and status updated successfully");
+                result.put("updatedCount", updatedCount);
+                auditLogger.info("APPOINTMENT_ONLINE_TIME_DOCTOR_STATUS_UPDATED - Patient: {}, Visit: {}, Doctor: {}, Status: {}, OnlineTime: {}", 
+                               patientId, patientVisitNo, doctorId, statusId, onlineAppointmentTime);
+            } else {
+                result.put("success", false);
+                result.put("message", "No appointment found to update");
+            }
+            
+            return result;
+            
+        } catch (Exception e) {
+            logger.error("Error updating appointment online time and doctor: {}", e.getMessage(), e);
+            auditLogger.error("APPOINTMENT_ONLINE_TIME_DOCTOR_STATUS_UPDATE_ERROR - Patient: {}, Visit: {}, Error: {}", 
+                            patientId, patientVisitNo, e.getMessage());
+            
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", e.getMessage());
+            return error;
+        }
+    }
+
+    /**
      * Get appointment details by patient ID
      */
     public List<Map<String, Object>> getPatientAppointmentDetails(String patientId) {
@@ -327,25 +397,21 @@ public class AppointmentJpaService {
             appointmentMap.put("patientId", appointment.getPatientId());
             appointmentMap.put("doctorId", appointment.getDoctorId());
             appointmentMap.put("clinicId", appointment.getClinicId());
-            appointmentMap.put("visitDate", appointment.getVisitDate());
-            appointmentMap.put("visitTime", appointment.getVisitTime());
+            appointmentMap.put("visitDate", LocalDateTime.now()); // Use system time instead of stored visitDate
+            appointmentMap.put("visitTime", LocalTime.now()); // Use system time instead of stored visitTime
             appointmentMap.put("statusId", appointment.getStatusId());
             appointmentMap.put("shiftId", appointment.getShiftId());
             appointmentMap.put("folderNo", appointment.getFolderNo());
             appointmentMap.put("instructions", appointment.getInstructions());
             appointmentMap.put("inPerson", appointment.getInPerson());
             appointmentMap.put("reportsReceived", appointment.getReportsReceived());
-            appointmentMap.put("onlineAppointmentTime", appointment.getOnlineAppointmentTime());
+            appointmentMap.put("onlineAppointmentTime", LocalTime.now()); // Use system time instead of stored onlineAppointmentTime
             
-            // Format visit time for display
-            if (appointment.getVisitTime() != null) {
-                appointmentMap.put("visitTimeFormatted", appointment.getVisitTime().toString());
-            }
+            // Format visit time for display using system time
+            appointmentMap.put("visitTimeFormatted", LocalTime.now().toString());
             
-            // Format visit date for display
-            if (appointment.getVisitDate() != null) {
-                appointmentMap.put("visitDateFormatted", appointment.getVisitDate().toLocalDate().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")));
-            }
+            // Format visit date for display using system time
+            appointmentMap.put("visitDateFormatted", LocalDate.now().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")));
             
             return appointmentMap;
         }).collect(Collectors.toList());

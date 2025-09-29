@@ -43,7 +43,7 @@ public class AppointmentController {
                 req.clinicId(),
                 req.doctorId(),
                 req.patientId(),
-                req.visitTime() != null ? req.visitTime() : "10:00",
+                req.visitTime() != null ? req.visitTime() : java.time.LocalTime.now().toString().substring(0, 5),
                 req.reportsReceived() != null ? req.reportsReceived() : false,
                 "system", // TODO: Get from authentication context
                 req.inPerson() != null ? req.inPerson() : true
@@ -237,6 +237,34 @@ public class AppointmentController {
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", "Failed to get gender options: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @PutMapping("/appointments/online-time-doctor")
+    public ResponseEntity<?> updateAppointmentOnlineTimeAndDoctor(
+            @RequestParam String patientId,
+            @RequestParam Integer patientVisitNo,
+            @RequestParam Short shiftId,
+            @RequestParam String clinicId,
+            @RequestParam(required = false) String onlineAppointmentTime,
+            @RequestParam String doctorId,
+            @RequestParam Short statusId,
+            @RequestParam(defaultValue = "system") String userId) {
+        try {
+            Map<String, Object> result = appointmentSchedulingService.updateAppointmentOnlineTimeAndDoctor(
+                patientId, patientVisitNo, shiftId, clinicId, onlineAppointmentTime, 
+                doctorId, statusId, userId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to update appointment online time and doctor: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }

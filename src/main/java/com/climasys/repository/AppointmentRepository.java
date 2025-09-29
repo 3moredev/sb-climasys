@@ -129,4 +129,19 @@ public interface AppointmentRepository extends JpaRepository<PatientVisit, Long>
                                 @Param("statusId") Short statusId,
                                 @Param("modifiedOn") LocalDateTime modifiedOn,
                                 @Param("modifiedBy") String modifiedBy);
+    
+    // Update appointment online time, doctor, and status
+    @Modifying
+    @Transactional
+    @Query("UPDATE PatientVisit pv SET pv.onlineAppointmentTime = :onlineAppointmentTime, pv.doctorId = :doctorId, pv.statusId = :statusId, pv.modifiedOn = :modifiedOn, pv.modifiedbyName = :modifiedBy, pv.referId = :referId WHERE pv.patientId = :patientId AND pv.patientVisitNo = :patientVisitNo AND pv.shiftId = :shiftId AND pv.clinicId = :clinicId")
+    int updateAppointmentOnlineTimeAndDoctor(@Param("patientId") String patientId,
+                                           @Param("patientVisitNo") Integer patientVisitNo,
+                                           @Param("shiftId") Short shiftId,
+                                           @Param("clinicId") String clinicId,
+                                           @Param("onlineAppointmentTime") java.sql.Time onlineAppointmentTime,
+                                           @Param("doctorId") String doctorId,
+                                           @Param("statusId") Short statusId,
+                                           @Param("modifiedOn") LocalDateTime modifiedOn,
+                                           @Param("modifiedBy") String modifiedBy,
+                                           @Param("referId") String referId);
 }
