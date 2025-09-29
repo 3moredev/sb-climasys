@@ -134,7 +134,7 @@ public class AppointmentJpaService {
             appointment.setVisitTime(java.sql.Time.valueOf(visitTime));
             appointment.setReportsReceived(reportsReceived);
             appointment.setInPerson(inPerson);
-            appointment.setStatusId((short) 3); // Default status: Scheduled
+            appointment.setStatusId((short) 1); // Default status: Waiting
             appointment.setCreatedOn(LocalDateTime.now());
             appointment.setCreatedbyName(userId);
             appointment.setDeleteFlag(false);
@@ -151,7 +151,7 @@ public class AppointmentJpaService {
             result.put("doctorId", doctorId);
             result.put("visitDate", visitDate);
             result.put("visitTime", visitTime);
-            result.put("status", "SCHEDULED");
+            result.put("status", "Waiting");
             
             auditLogger.info("APPOINTMENT_CREATED - Patient: {}, Doctor: {}, Date: {}, Time: {}", 
                            patientId, doctorId, visitDate, visitTime);
