@@ -627,7 +627,7 @@ public class VisitController {
         System.out.println("  languageId: " + languageId);
         
         String query = "SELECT " +
-                "TO_CHAR(CURRENT_TIME, 'HH24:MI') AS Visit_Time, " +
+                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS Visit_Time, " +
                 "PM.first_name || ' ' || PM.last_name AS Name, " +
                 "PV.doctor_id, " +
                 "DM.prefix || ' ' || DM.first_name || ' - ' || DM.speciality AS Doctor_Name, " +
@@ -638,15 +638,15 @@ public class VisitController {
                 "COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, PM.date_of_birth)), PM.age_given, 0) AS AgeYearsIntRound, " +
                 "GT.gender_description, " +
                 "TO_CHAR(CURRENT_DATE, 'DD-MM-YYYY') AS Visit_Date, " +
-                "CURRENT_TIME AS VTime, " +
+                "CURRENT_TIMESTAMP AS VTime, " +
                 "PV.patient_visit_no, " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
-                "TO_CHAR(CURRENT_TIME, 'HH24:MI') AS From_time, " +
+                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS From_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
-                "CASE WHEN CURRENT_TIME IS NOT NULL THEN " +
-                "TO_CHAR(CURRENT_TIME - CURRENT_TIME, 'MI:SS') " +
+                "CASE WHEN CURRENT_TIMESTAMP IS NOT NULL THEN " +
+                "TO_CHAR(CURRENT_TIMESTAMP - CURRENT_TIMESTAMP, 'MI:SS') " +
                 "ELSE NULL END AS Duration " +
                 "FROM patient_visits PV " +
                 "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
@@ -672,7 +672,7 @@ public class VisitController {
     private List<Map<String, Object>> getFutureAppointments(String clinicId, Integer languageId) {
         
         String query = "SELECT " +
-                "TO_CHAR(CURRENT_TIME, 'HH24:MI') AS Visit_Time, " +
+                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS Visit_Time, " +
                 "PM.first_name || ' ' || PM.last_name AS Name, " +
                 "PV.doctor_id, " +
                 "DM.prefix || ' ' || DM.first_name AS Doctor_Name, " +
@@ -683,11 +683,11 @@ public class VisitController {
                 "COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, PM.date_of_birth)), PM.age_given, 0) AS AgeYearsIntRound, " +
                 "GT.gender_description, " +
                 "CURRENT_DATE as visit_date, " +
-                "CURRENT_TIME AS VTime, " +
+                "CURRENT_TIMESTAMP AS VTime, " +
                 "PV.patient_visit_no, " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
-                "TO_CHAR(CURRENT_TIME, 'HH24:MI') AS From_time, " +
+                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS From_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest " +
                 "FROM patient_visits PV " +
@@ -708,7 +708,7 @@ public class VisitController {
     private List<Map<String, Object>> getTodayAndFutureAppointments(String doctorId, String clinicId, Integer languageId) {
         
         String query = "SELECT " +
-                "TO_CHAR(CURRENT_TIME, 'HH24:MI') AS Visit_Time, " +
+                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS Visit_Time, " +
                 "PM.first_name || ' ' || PM.last_name AS Name, " +
                 "PV.doctor_id, " +
                 "DM.prefix || ' ' || DM.first_name || ' - ' || DM.speciality AS Doctor_Name, " +
@@ -719,17 +719,17 @@ public class VisitController {
                 "COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, PM.date_of_birth)), PM.age_given, 0) AS AgeYearsIntRound, " +
                 "GT.gender_description, " +
                 "TO_CHAR(CURRENT_DATE, 'DD-MM-YYYY') AS Visit_Date, " +
-                "CURRENT_TIME AS VTime, " +
+                "CURRENT_TIMESTAMP AS VTime, " +
                 "PV.patient_visit_no, " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
-                "TO_CHAR(CURRENT_TIME, 'HH24:MI') AS From_time, " +
+                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS From_time, " +
                 "CURRENT_DATE as fulldate, " +
-                "CURRENT_TIME as full_time, " +
+                "CURRENT_TIMESTAMP as full_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
-                "CASE WHEN CURRENT_TIME IS NOT NULL THEN " +
-                "TO_CHAR(CURRENT_TIME - CURRENT_TIME, 'MI:SS') " +
+                "CASE WHEN CURRENT_TIMESTAMP IS NOT NULL THEN " +
+                "TO_CHAR(CURRENT_TIMESTAMP - CURRENT_TIMESTAMP, 'MI:SS') " +
                 "ELSE NULL END AS Duration " +
                 "FROM patient_visits PV " +
                 "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
@@ -751,7 +751,7 @@ public class VisitController {
             java.sql.Date futureDate, Integer languageId) {
         
         String query = "SELECT " +
-                "TO_CHAR(CURRENT_TIME, 'HH24:MI') AS Visit_Time, " +
+                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS Visit_Time, " +
                 "PM.first_name || ' ' || PM.last_name AS Name, " +
                 "PV.doctor_id, " +
                 "DM.prefix || ' ' || DM.first_name || ' - ' || DM.speciality AS Doctor_Name, " +
@@ -762,17 +762,17 @@ public class VisitController {
                 "COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, PM.date_of_birth)), PM.age_given, 0) AS AgeYearsIntRound, " +
                 "GT.gender_description, " +
                 "TO_CHAR(CURRENT_DATE, 'DD-MM-YYYY') AS Visit_Date, " +
-                "CURRENT_TIME AS VTime, " +
+                "CURRENT_TIMESTAMP AS VTime, " +
                 "PV.patient_visit_no, " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
-                "TO_CHAR(CURRENT_TIME, 'HH24:MI') AS From_time, " +
+                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS From_time, " +
                 "CURRENT_DATE as fulldate, " +
-                "CURRENT_TIME as full_time, " +
+                "CURRENT_TIMESTAMP as full_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
-                "CASE WHEN CURRENT_TIME IS NOT NULL THEN " +
-                "TO_CHAR(CURRENT_TIME - CURRENT_TIME, 'MI:SS') " +
+                "CASE WHEN CURRENT_TIMESTAMP IS NOT NULL THEN " +
+                "TO_CHAR(CURRENT_TIMESTAMP - CURRENT_TIMESTAMP, 'MI:SS') " +
                 "ELSE NULL END AS Duration " +
                 "FROM patient_visits PV " +
                 "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
