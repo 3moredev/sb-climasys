@@ -1,11 +1,17 @@
 package com.climasys.visits.web;
 
 import jakarta.validation.constraints.NotBlank;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.web.bind.annotation.*;
 
+import com.climasys.utils.TimezoneUtils;
+import com.climasys.utils.CorsUtils;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,9 +21,61 @@ import java.util.Map;
 public class VisitController {
 
     private final JdbcTemplate jdbcTemplate;
+    
+    @Autowired
+    private TimezoneUtils timezoneUtils;
+    
+    @Autowired
+    private CorsUtils corsUtils;
 
     public VisitController(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+    
+    
+    // Convert timezone in Java for time fields
+    private void convertTimezoneInRow(Map<String, Object> row) {
+        try {
+            Object rawVisitTime = row.get("Raw_Visit_Time");
+            System.out.println("DEBUG - Raw_Visit_Time: " + rawVisitTime + " (type: " + (rawVisitTime != null ? rawVisitTime.getClass().getSimpleName() : "null") + ")");
+            
+            if (rawVisitTime != null) {
+                String timeStr = rawVisitTime.toString();
+                System.out.println("DEBUG - Processing time string: " + timeStr);
+                
+                // Parse the time string (format: HH:MM:SS or HH:MM)
+                if (timeStr.matches("\\d{2}:\\d{2}(:\\d{2})?")) {
+                    String[] parts = timeStr.split(":");
+                    int hours = Integer.parseInt(parts[0]);
+                    int minutes = Integer.parseInt(parts[1]);
+                    
+                    System.out.println("DEBUG - Parsed time: " + hours + ":" + minutes);
+                    
+                    // Convert from UTC to target timezone using TimezoneUtils
+                    try {
+                        java.time.LocalTime utcTime = java.time.LocalTime.of(hours, minutes);
+                        java.time.LocalTime targetTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
+                        
+                        String convertedTime = String.format("%02d:%02d", targetTime.getHour(), targetTime.getMinute());
+                        System.out.println("DEBUG - Converted UTC to " + timezoneUtils.getTimezoneDisplayName() + ": " + timeStr + " -> " + convertedTime);
+                        
+                        row.put("Visit_Time", convertedTime);
+                        System.out.println("DEBUG - Set Visit_Time field to: " + convertedTime);
+                        
+                    } catch (Exception timezoneException) {
+                        System.out.println("ERROR - Timezone conversion failed, using original time: " + timezoneException.getMessage());
+                        // Fallback to original time if timezone conversion fails
+                        String fallbackTime = String.format("%02d:%02d", hours, minutes);
+                        row.put("Visit_Time", fallbackTime);
+                    }
+                } else {
+                    System.out.println("DEBUG - Time format doesn't match expected pattern: " + timeStr);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("ERROR - Timezone conversion failed: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     public record AddToVisitRequest(
@@ -26,41 +84,122 @@ public class VisitController {
             @NotBlank String clinicId,
             @NotBlank String visitDate,
             @NotBlank String shiftId,
-            String visitType,
-            String priority,
-            String notes
+            String visitTime,
+            Boolean reportsAsked,
+            Boolean reportsReceived,
+            String userId
     ) {}
 
-    public record VisitDetailsRequest(
-            @NotBlank String visitId,
+    public record ComprehensiveVisitDataRequest(
+            // Composite Key Fields
             @NotBlank String patientId,
             @NotBlank String doctorId,
+            @NotBlank String clinicId,
+            @NotBlank String shiftId,
+            @NotBlank String visitDate,
+            @NotBlank String patientVisitNo,
+            
+            // Referral Information
+            String referBy,
+            String referralName,
+            String referralContact,
+            String referralEmail,
+            String referralAddress,
+            
+            // Patient Vitals
+            Integer pulse,
+            BigDecimal heightInCms,
+            BigDecimal weightInKgs,
+            String bloodPressure,
+            String sugar,
+            String tft,
+            
+            // Medical History
+            String pastSurgicalHistory,
+            String previousVisitPlan,
             String chiefComplaint,
-            String historyOfPresentIllness,
-            String physicalExamination,
-            String vitalSigns,
-            String assessment,
-            String plan,
-            String notes,
-            String followUpDate,
-            String followUpNotes
+            String visitComments,
+            String currentMedicines,
+            
+            // Medical Conditions
+            Boolean hypertension,
+            Boolean diabetes,
+            Boolean cholestrol,
+            Boolean ihd,
+            Boolean th,
+            Boolean asthama,
+            Boolean smoking,
+            Boolean tobaco,
+            Boolean alchohol,
+            
+            // Additional Fields
+            String habitDetails,
+            String allergyDetails,
+            String observation,
+            Boolean inPerson,
+            String symptomComment,
+            String reason,
+            String impression,
+            String attendedBy,
+            Integer paymentById,
+            String paymentRemark,
+            Integer attendedById,
+            String followUp,
+            Boolean followUpFlag,
+            String currentComplaint,
+            String visitCommentsField,
+            
+            // Clinical Fields
+            String tpr,
+            String importantFindings,
+            String additionalComments,
+            String systemic,
+            String odeama,
+            String pallor,
+            String gc,
+            
+            // Gynecological Fields
+            String fmp,
+            String prmc,
+            String pamc,
+            String lmp,
+            String obstetricHistory,
+            String surgicalHistory,
+            String menstrualAddComments,
+            String followUpComment,
+            LocalDateTime followUpDate,
+            Boolean pregnant,
+            LocalDateTime edd,
+            String followUpType,
+            
+            // Financial Fields
+            BigDecimal feesToCollect,
+            BigDecimal feesPaid,
+            BigDecimal discount,
+            BigDecimal originalDiscount,
+            
+            // Status and User
+            Short statusId,
+            String userId,
+            Boolean isSubmitPatientVisitDetails
     ) {}
 
     @PostMapping
     public ResponseEntity<?> addToVisit(@RequestBody AddToVisitRequest req) {
         try {
             SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_Save_PatientAddToVisitList");
+                    .withProcedureName("USP_Insert_PatientToVisitQueue");
 
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("PatientId", req.patientId());
-            parameters.put("DoctorId", req.doctorId());
-            parameters.put("ClinicId", req.clinicId());
-            parameters.put("VisitDate", req.visitDate());
-            parameters.put("ShiftId", req.shiftId());
-            parameters.put("VisitType", req.visitType());
-            parameters.put("Priority", req.priority());
-            parameters.put("Notes", req.notes());
+            parameters.put("p_date_Visit_Date", LocalDateTime.parse(req.visitDate()));
+            parameters.put("p_int_Shift_ID", Short.parseShort(req.shiftId()));
+            parameters.put("p_nvar_Clinic_ID", req.clinicId());
+            parameters.put("p_nvar_Doctor_ID", req.doctorId());
+            parameters.put("p_nvar_Patient_ID", req.patientId());
+            parameters.put("p_time_Visit_Time", req.visitTime() != null ? java.sql.Time.valueOf(req.visitTime()) : null);
+            parameters.put("p_bit_ReportAsked", req.reportsAsked());
+            parameters.put("p_bit_ReportReceived", req.reportsReceived());
+            parameters.put("p_var_User_Id", req.userId());
 
             Map<String, Object> result = jdbcCall.execute(parameters);
             return ResponseEntity.ok(result);
@@ -96,14 +235,27 @@ public class VisitController {
         }
     }
 
-    @DeleteMapping("/{visitId}")
-    public ResponseEntity<?> deleteVisit(@PathVariable String visitId) {
+    /**
+     * Delete visit using composite key parameters
+     */
+    @DeleteMapping
+    public ResponseEntity<?> deleteVisit(
+            @RequestParam String patientId,
+            @RequestParam String doctorId,
+            @RequestParam String clinicId,
+            @RequestParam String shiftId,
+            @RequestParam String visitDate,
+            @RequestParam String patientVisitNo) {
         try {
+            // Use the existing appointment deletion logic
             SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_DeleteTodaysVisitRecord");
+                    .withProcedureName("USP_Delete_PatientAppointment");
 
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("VisitId", visitId);
+            parameters.put("PatientId", patientId);
+            parameters.put("DoctorId", doctorId);
+            parameters.put("VisitDate", visitDate);
+            parameters.put("UserId", "system");
 
             Map<String, Object> result = jdbcCall.execute(parameters);
             return ResponseEntity.ok(result);
@@ -114,143 +266,145 @@ public class VisitController {
         }
     }
 
-    @PostMapping("/{visitId}/save")
-    public ResponseEntity<?> saveVisitDetails(@PathVariable String visitId, @RequestBody VisitDetailsRequest req) {
+    /**
+     * Comprehensive API to save all patient visit data matching the form fields from screenshot
+     * This API handles all the fields shown in the patient visit details form
+     */
+    @PostMapping("/comprehensive-save")
+    public ResponseEntity<?> saveComprehensiveVisitData(@RequestBody ComprehensiveVisitDataRequest req) {
         try {
             SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_TodaysVisit_Details_Save");
+                    .withProcedureName("USP_Insert_PatientVisitData");
 
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("VisitId", visitId);
-            parameters.put("PatientId", req.patientId());
-            parameters.put("DoctorId", req.doctorId());
-            parameters.put("ChiefComplaint", req.chiefComplaint());
-            parameters.put("HistoryOfPresentIllness", req.historyOfPresentIllness());
-            parameters.put("PhysicalExamination", req.physicalExamination());
-            parameters.put("VitalSigns", req.vitalSigns());
-            parameters.put("Assessment", req.assessment());
-            parameters.put("Plan", req.plan());
-            parameters.put("Notes", req.notes());
-            parameters.put("FollowUpDate", req.followUpDate());
-            parameters.put("FollowUpNotes", req.followUpNotes());
+            
+            // Composite Key Fields
+            parameters.put("p_var_Patient_ID", req.patientId());
+            parameters.put("p_var_Doctor_ID", req.doctorId());
+            parameters.put("p_var_Clinic_ID", req.clinicId());
+            parameters.put("p_var_Shift_ID", Short.parseShort(req.shiftId()));
+            parameters.put("p_var_Visit_Date", LocalDateTime.parse(req.visitDate()));
+            parameters.put("p_var_Patient_Visit_No", Integer.parseInt(req.patientVisitNo()));
+            
+            // Patient Vitals (from form screenshot)
+            parameters.put("p_var_Pulse", req.pulse());
+            parameters.put("p_var_Height_In_CMS", req.heightInCms());
+            parameters.put("p_var_Weight_IN_KGS", req.weightInKgs());
+            parameters.put("p_var_Blood_Pressure", req.bloodPressure());
+            parameters.put("p_var_sugar", req.sugar());
+            parameters.put("p_var_THtext", req.tft());
+            
+            // Medical History (from form screenshot)
+            parameters.put("p_var_SurgicalHistory", req.pastSurgicalHistory());
+            parameters.put("p_var_previous_visit_plan", req.previousVisitPlan());
+            parameters.put("p_var_current_complaint", req.chiefComplaint());
+            parameters.put("p_var_visit_comments", req.visitComments());
+            parameters.put("p_var_current_medicines", req.currentMedicines());
+            
+            // Medical Conditions
+            parameters.put("p_var_Hypertension", req.hypertension());
+            parameters.put("p_var_Diabetes", req.diabetes());
+            parameters.put("p_var_Cholestrol", req.cholestrol());
+            parameters.put("p_var_IHD", req.ihd());
+            parameters.put("p_var_TH", req.th());
+            parameters.put("p_var_Asthama", req.asthama());
+            parameters.put("p_var_Smoking", req.smoking());
+            parameters.put("p_var_Tobaco", req.tobaco());
+            parameters.put("p_var_Alchohol", req.alchohol());
+            
+            // Additional Fields
+            parameters.put("p_var_Habit_Details", req.habitDetails());
+            parameters.put("p_var_Allergy_Details", req.allergyDetails());
+            parameters.put("p_var_Observation", req.observation());
+            parameters.put("p_bit_In_Person", req.inPerson());
+            parameters.put("p_var_Symptom_Comment", req.symptomComment());
+            parameters.put("p_var_Reason", req.reason());
+            parameters.put("p_var_Impression", req.impression());
+            parameters.put("p_var_Attended_By", req.attendedBy());
+            parameters.put("p_var_PaymentBy_ID", req.paymentById());
+            parameters.put("p_var_Payment_Remark", req.paymentRemark());
+            parameters.put("p_var_AttendedBy_ID", req.attendedById());
+            parameters.put("p_var_Follow_Up", req.followUp());
+            parameters.put("p_bit_follow_up", req.followUpFlag());
+            parameters.put("p_var_current_complaint", req.currentComplaint());
+            parameters.put("p_var_visit_comments", req.visitCommentsField());
+            
+            // Clinical Fields
+            parameters.put("p_var_TPR", req.tpr());
+            parameters.put("p_var_Important_Findings", req.importantFindings());
+            parameters.put("p_var_Additional_Comments", req.additionalComments());
+            parameters.put("p_var_Systemic", req.systemic());
+            parameters.put("p_var_Odeama", req.odeama());
+            parameters.put("p_var_Pallor", req.pallor());
+            parameters.put("p_var_GC", req.gc());
+            
+            // Gynecological Fields
+            parameters.put("p_var_FMP", req.fmp());
+            parameters.put("p_var_PRMC", req.prmc());
+            parameters.put("p_var_PAMC", req.pamc());
+            parameters.put("p_var_LMP", req.lmp());
+            parameters.put("p_var_ObstetricHistory", req.obstetricHistory());
+            parameters.put("p_var_SurgicalHistory", req.surgicalHistory());
+            parameters.put("p_var_Menstrual_Add_Comments", req.menstrualAddComments());
+            parameters.put("p_var_FollowUp_comment", req.followUpComment());
+            parameters.put("p_var_FollowUp_Date", req.followUpDate());
+            parameters.put("p_var_Pregnant", req.pregnant());
+            parameters.put("p_var_EDD", req.edd());
+            parameters.put("p_var_Follow_up_Type", req.followUpType());
+            
+            // Financial Fields
+            parameters.put("p_var_Fees_To_Collect", req.feesToCollect());
+            parameters.put("p_var_Fees_Paid", req.feesPaid());
+            parameters.put("p_var_Discount", req.discount());
+            parameters.put("p_var_Original_Discount", req.originalDiscount());
+            
+            // Status and User
+            parameters.put("p_var_Status_ID", req.statusId());
+            parameters.put("p_var_User_Id", req.userId());
+            parameters.put("Is_Submit_Patient_Visit_Details", req.isSubmitPatientVisitDetails());
+            
+            // Empty UDT parameters (these would need to be populated with actual data)
+            parameters.put("p_var_Insert_PatientComplaintData", null);
+            parameters.put("p_var_Insert_PatientDiagnosisData", null);
+            parameters.put("p_var_Insert_PatientDressingData", null);
+            parameters.put("p_var_Insert_PatientMedicineData", null);
+            parameters.put("p_var_Insert_PatientPrescriptionData", null);
+            parameters.put("p_var_Insert_PatientProcedureData", null);
+            parameters.put("p_var_Insert_PatientInstructionData", null);
+            parameters.put("p_var_Insert_AbdominalData", null);
+            
+            // Additional required fields with defaults
+            parameters.put("p_var_Instructions", "");
+            parameters.put("p_var_offline_reason", "");
+            parameters.put("p_bit_offlineflag", false);
 
             Map<String, Object> result = jdbcCall.execute(parameters);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
-            error.put("error", "Failed to save visit details: " + e.getMessage());
+            error.put("error", "Failed to save comprehensive visit data: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }
 
-    @GetMapping("/{visitId}/details")
-    public ResponseEntity<?> getVisitDetails(@PathVariable String visitId) {
+    /**
+     * Get visit details using composite key parameters
+     */
+    @GetMapping("/details")
+    public ResponseEntity<?> getVisitDetails(
+            @RequestParam String patientId,
+            @RequestParam String doctorId,
+            @RequestParam String clinicId,
+            @RequestParam String shiftId,
+            @RequestParam String visitDate,
+            @RequestParam String patientVisitNo) {
         try {
-            SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_GetPreviousPatientVisitData");
-
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put("VisitId", visitId);
-
-            Map<String, Object> result = jdbcCall.execute(parameters);
-            return ResponseEntity.ok(result);
+            // Use the existing appointment details API
+            return getPatientAppointmentDetails(patientId, Short.parseShort(shiftId), clinicId, 
+                    doctorId, Integer.parseInt(patientVisitNo), 1);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get visit details: " + e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        }
-    }
-
-    @GetMapping("/{visitId}/labs")
-    public ResponseEntity<?> getVisitLabResults(@PathVariable String visitId) {
-        try {
-            SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_GetPreviousPatientVisitLabResult");
-
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put("VisitId", visitId);
-
-            Map<String, Object> result = jdbcCall.execute(parameters);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", "Failed to get visit lab results: " + e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        }
-    }
-
-    @PostMapping("/{visitId}/profile")
-    public ResponseEntity<?> insertPatientProfile(@PathVariable String visitId, @RequestBody Map<String, Object> profileData) {
-        try {
-            SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_InsertPatientProfile");
-
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put("VisitId", visitId);
-            parameters.putAll(profileData);
-
-            Map<String, Object> result = jdbcCall.execute(parameters);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", "Failed to insert patient profile: " + e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        }
-    }
-
-    @PostMapping("/{visitId}/complaints")
-    public ResponseEntity<?> insertComplaints(@PathVariable String visitId, @RequestBody Map<String, Object> complaintsData) {
-        try {
-            SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_InsertComplaintsGrid");
-
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put("VisitId", visitId);
-            parameters.putAll(complaintsData);
-
-            Map<String, Object> result = jdbcCall.execute(parameters);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", "Failed to insert complaints: " + e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        }
-    }
-
-    @PostMapping("/{visitId}/diagnoses")
-    public ResponseEntity<?> insertDiagnoses(@PathVariable String visitId, @RequestBody Map<String, Object> diagnosesData) {
-        try {
-            SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_InsertDignosisGrid");
-
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put("VisitId", visitId);
-            parameters.putAll(diagnosesData);
-
-            Map<String, Object> result = jdbcCall.execute(parameters);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", "Failed to insert diagnoses: " + e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        }
-    }
-
-    @PostMapping("/{visitId}/dressings")
-    public ResponseEntity<?> insertDressings(@PathVariable String visitId, @RequestBody Map<String, Object> dressingsData) {
-        try {
-            SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_InsertDressingGrid");
-
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put("VisitId", visitId);
-            parameters.putAll(dressingsData);
-
-            Map<String, Object> result = jdbcCall.execute(parameters);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", "Failed to insert dressings: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }
@@ -582,12 +736,64 @@ public class VisitController {
             @RequestParam String futureDate,
             @RequestParam(defaultValue = "1") Integer languageId) {
         try {
+            System.out.println("DEBUG - API called with parameters:");
+            System.out.println("  doctorId: " + doctorId);
+            System.out.println("  clinicId: " + clinicId);
+            System.out.println("  futureDate: " + futureDate);
+            System.out.println("  languageId: " + languageId);
+            System.out.println("  Target timezone: " + timezoneUtils.getTimezoneDisplayName());
+            
             // Parse the future date
-            java.sql.Date queryDate = java.sql.Date.valueOf(futureDate);
+            java.sql.Date queryDate;
+            try {
+                // Handle both date and datetime formats
+                String dateString = futureDate;
+                if (futureDate.contains(" ")) {
+                    // If it's a datetime string, extract just the date part
+                    dateString = futureDate.split(" ")[0];
+                    System.out.println("DEBUG - Extracted date from datetime: " + futureDate + " -> " + dateString);
+                }
+                queryDate = java.sql.Date.valueOf(dateString);
+                System.out.println("DEBUG - Parsed date: " + queryDate);
+            } catch (Exception dateParseException) {
+                System.out.println("ERROR - Date parsing failed: " + dateParseException.getMessage());
+                Map<String, Object> error = new HashMap<>();
+                error.put("ErrorNumber", -1);
+                error.put("ErrorMessage", "Invalid date format: " + futureDate + ". Expected format: YYYY-MM-DD");
+                return ResponseEntity.badRequest().body(error);
+            }
             
             // First, let's test basic data availability
             List<Map<String, Object>> testData = testBasicDataAvailability(doctorId, clinicId, queryDate);
             System.out.println("DEBUG - Test data count: " + testData.size());
+            
+            // Let's also check what times are actually in the database
+            String timeCheckQuery = "SELECT DISTINCT visit_time, visit_date, TO_CHAR(visit_time::time, 'HH24:MI') as time_part FROM patient_visits WHERE doctor_id = ? AND visit_date::date = ? LIMIT 5";
+            List<Map<String, Object>> timeCheck = jdbcTemplate.queryForList(timeCheckQuery, doctorId, queryDate);
+            System.out.println("DEBUG - Sample visit times in database:");
+            for (Map<String, Object> timeRow : timeCheck) {
+                System.out.println("  Raw visit_time: " + timeRow.get("visit_time"));
+                System.out.println("  Raw visit_date: " + timeRow.get("visit_date"));
+                System.out.println("  Time part: " + timeRow.get("time_part"));
+                
+                // Test timezone conversion on this raw data
+                if (timeRow.get("time_part") != null) {
+                    String timeStr = timeRow.get("time_part").toString();
+                    System.out.println("  Testing timezone conversion for: " + timeStr);
+                    try {
+                        String[] parts = timeStr.split(":");
+                        if (parts.length >= 2) {
+                            int hours = Integer.parseInt(parts[0]);
+                            int minutes = Integer.parseInt(parts[1]);
+                            java.time.LocalTime utcTime = java.time.LocalTime.of(hours, minutes);
+                            java.time.LocalTime targetTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
+                            System.out.println("    UTC " + utcTime + " -> " + timezoneUtils.getTimezoneDisplayName() + " " + targetTime);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("    Timezone conversion test failed: " + e.getMessage());
+                    }
+                }
+            }
             
             // Execute 4 different queries matching the stored procedure logic
             List<Map<String, Object>> resultSet1 = getSpecificDateAppointments(doctorId, clinicId, queryDate, languageId);
@@ -609,6 +815,8 @@ public class VisitController {
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
+            System.out.println("ERROR - Exception in getTodaysAppointmentsForGivenDate: " + e.getMessage());
+            e.printStackTrace();
             Map<String, Object> error = new HashMap<>();
             error.put("ErrorNumber", -1);
             error.put("ErrorMessage", "Failed to get appointments for date: " + e.getMessage());
@@ -619,15 +827,18 @@ public class VisitController {
     private List<Map<String, Object>> getSpecificDateAppointments(String doctorId, String clinicId, 
             java.sql.Date futureDate, Integer languageId) {
         
-        // Debug logging
-        System.out.println("DEBUG - getSpecificDateAppointments called with:");
-        System.out.println("  doctorId: " + doctorId);
-        System.out.println("  clinicId: " + clinicId);
-        System.out.println("  futureDate: " + futureDate);
-        System.out.println("  languageId: " + languageId);
+        try {
+            // Debug logging
+            System.out.println("DEBUG - getSpecificDateAppointments called with:");
+            System.out.println("  doctorId: " + doctorId);
+            System.out.println("  clinicId: " + clinicId);
+            System.out.println("  futureDate: " + futureDate);
+            System.out.println("  languageId: " + languageId);
         
         String query = "SELECT " +
-                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS Visit_Time, " +
+                "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS Visit_Time, " +
+                "PV.visit_time AS Raw_Visit_Time, " +
+                "PV.visit_date AS Full_DateTime, " +
                 "PM.first_name || ' ' || PM.last_name AS Name, " +
                 "PV.doctor_id, " +
                 "DM.prefix || ' ' || DM.first_name || ' - ' || DM.speciality AS Doctor_Name, " +
@@ -637,12 +848,12 @@ public class VisitController {
                 "PM.age_given, " +
                 "COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, PM.date_of_birth)), PM.age_given, 0) AS AgeYearsIntRound, " +
                 "GT.gender_description, " +
-                "TO_CHAR(CURRENT_DATE, 'DD-MM-YYYY') AS Visit_Date, " +
-                "CURRENT_TIMESTAMP AS VTime, " +
+                "TO_CHAR(PV.visit_date, 'DD-MM-YYYY') AS Visit_Date, " +
+                "PV.visit_time::time AS VTime, " +
                 "PV.patient_visit_no, " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
-                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS From_time, " +
+                "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
                 "CASE WHEN CURRENT_TIMESTAMP IS NOT NULL THEN " +
@@ -663,16 +874,47 @@ public class VisitController {
         
         System.out.println("DEBUG - Query: " + query);
         
-        List<Map<String, Object>> result = jdbcTemplate.queryForList(query, doctorId, futureDate, languageId);
-        System.out.println("DEBUG - Result count: " + result.size());
-        
-        return result;
+            List<Map<String, Object>> result = jdbcTemplate.queryForList(query, doctorId, futureDate, languageId);
+            System.out.println("DEBUG - Result count: " + result.size());
+            
+            // Debug the time values being returned and convert timezone
+            for (int i = 0; i < Math.min(result.size(), 3); i++) {
+                Map<String, Object> row = result.get(i);
+                System.out.println("DEBUG - Row " + i + " BEFORE conversion:");
+                System.out.println("  Visit_Time: " + row.get("Visit_Time"));
+                System.out.println("  Raw_Visit_Time: " + row.get("Raw_Visit_Time"));
+                System.out.println("  Full_DateTime: " + row.get("Full_DateTime"));
+                System.out.println("  VTime: " + row.get("VTime"));
+                System.out.println("  From_time: " + row.get("From_time"));
+                System.out.println("  full_time: " + row.get("full_time"));
+                
+                // Convert timezone in Java if needed
+                convertTimezoneInRow(row);
+                
+                System.out.println("DEBUG - Row " + i + " AFTER conversion:");
+                System.out.println("  Visit_Time: " + row.get("Visit_Time"));
+            }
+            
+            // Convert timezone for all remaining rows
+            for (int i = 3; i < result.size(); i++) {
+                Map<String, Object> row = result.get(i);
+                convertTimezoneInRow(row);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            System.out.println("ERROR - getSpecificDateAppointments failed: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
+        }
     }
 
     private List<Map<String, Object>> getFutureAppointments(String clinicId, Integer languageId) {
-        
-        String query = "SELECT " +
-                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS Visit_Time, " +
+        try {
+            String query = "SELECT " +
+                "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS Visit_Time, " +
+                "PV.visit_time AS Raw_Visit_Time, " +
+                "PV.visit_date AS Full_DateTime, " +
                 "PM.first_name || ' ' || PM.last_name AS Name, " +
                 "PV.doctor_id, " +
                 "DM.prefix || ' ' || DM.first_name AS Doctor_Name, " +
@@ -682,12 +924,12 @@ public class VisitController {
                 "PM.age_given, " +
                 "COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, PM.date_of_birth)), PM.age_given, 0) AS AgeYearsIntRound, " +
                 "GT.gender_description, " +
-                "CURRENT_DATE as visit_date, " +
-                "CURRENT_TIMESTAMP AS VTime, " +
+                "TO_CHAR(PV.visit_date, 'DD-MM-YYYY') as visit_date, " +
+                "PV.visit_time::time AS VTime, " +
                 "PV.patient_visit_no, " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
-                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS From_time, " +
+                "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest " +
                 "FROM patient_visits PV " +
@@ -702,13 +944,27 @@ public class VisitController {
                 "AND GT.language_id = ? " +
                 "ORDER BY PV.visit_time ASC";
         
-        return jdbcTemplate.queryForList(query, languageId);
+            List<Map<String, Object>> result = jdbcTemplate.queryForList(query, languageId);
+            
+            // Convert timezone for all rows
+            for (Map<String, Object> row : result) {
+                convertTimezoneInRow(row);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            System.out.println("ERROR - getFutureAppointments failed: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
+        }
     }
 
     private List<Map<String, Object>> getTodayAndFutureAppointments(String doctorId, String clinicId, Integer languageId) {
-        
-        String query = "SELECT " +
-                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS Visit_Time, " +
+        try {
+            String query = "SELECT " +
+                "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS Visit_Time, " +
+                "PV.visit_time AS Raw_Visit_Time, " +
+                "PV.visit_date AS Full_DateTime, " +
                 "PM.first_name || ' ' || PM.last_name AS Name, " +
                 "PV.doctor_id, " +
                 "DM.prefix || ' ' || DM.first_name || ' - ' || DM.speciality AS Doctor_Name, " +
@@ -718,14 +974,14 @@ public class VisitController {
                 "PM.age_given, " +
                 "COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, PM.date_of_birth)), PM.age_given, 0) AS AgeYearsIntRound, " +
                 "GT.gender_description, " +
-                "TO_CHAR(CURRENT_DATE, 'DD-MM-YYYY') AS Visit_Date, " +
-                "CURRENT_TIMESTAMP AS VTime, " +
+                "TO_CHAR(PV.visit_date, 'DD-MM-YYYY') AS Visit_Date, " +
+                "PV.visit_time::time AS VTime, " +
                 "PV.patient_visit_no, " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
-                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS From_time, " +
-                "CURRENT_DATE as fulldate, " +
-                "CURRENT_TIMESTAMP as full_time, " +
+                "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
+                "PV.visit_date as fulldate, " +
+                "PV.visit_time::time as full_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
                 "CASE WHEN CURRENT_TIMESTAMP IS NOT NULL THEN " +
@@ -744,14 +1000,28 @@ public class VisitController {
                 "AND GT.language_id = ? " +
                 "ORDER BY PV.visit_date ASC, PV.visit_time ASC";
         
-        return jdbcTemplate.queryForList(query, doctorId, languageId);
+            List<Map<String, Object>> result = jdbcTemplate.queryForList(query, doctorId, languageId);
+            
+            // Convert timezone for all rows
+            for (Map<String, Object> row : result) {
+                convertTimezoneInRow(row);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            System.out.println("ERROR - getTodayAndFutureAppointments failed: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
+        }
     }
 
     private List<Map<String, Object>> getSpecificDateAppointmentsNoDoctor(String clinicId, 
             java.sql.Date futureDate, Integer languageId) {
-        
-        String query = "SELECT " +
-                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS Visit_Time, " +
+        try {
+            String query = "SELECT " +
+                "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS Visit_Time, " +
+                "PV.visit_time AS Raw_Visit_Time, " +
+                "PV.visit_date AS Full_DateTime, " +
                 "PM.first_name || ' ' || PM.last_name AS Name, " +
                 "PV.doctor_id, " +
                 "DM.prefix || ' ' || DM.first_name || ' - ' || DM.speciality AS Doctor_Name, " +
@@ -761,14 +1031,14 @@ public class VisitController {
                 "PM.age_given, " +
                 "COALESCE(EXTRACT(YEAR FROM AGE(CURRENT_DATE, PM.date_of_birth)), PM.age_given, 0) AS AgeYearsIntRound, " +
                 "GT.gender_description, " +
-                "TO_CHAR(CURRENT_DATE, 'DD-MM-YYYY') AS Visit_Date, " +
-                "CURRENT_TIMESTAMP AS VTime, " +
+                "TO_CHAR(PV.visit_date, 'DD-MM-YYYY') AS Visit_Date, " +
+                "PV.visit_time::time AS VTime, " +
                 "PV.patient_visit_no, " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
-                "TO_CHAR(CURRENT_TIMESTAMP, 'HH24:MI') AS From_time, " +
-                "CURRENT_DATE as fulldate, " +
-                "CURRENT_TIMESTAMP as full_time, " +
+                "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
+                "PV.visit_date as fulldate, " +
+                "PV.visit_time::time as full_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
                 "CASE WHEN CURRENT_TIMESTAMP IS NOT NULL THEN " +
@@ -786,7 +1056,19 @@ public class VisitController {
                 "AND GT.language_id = ? " +
                 "ORDER BY PV.visit_date ASC, PV.visit_time ASC";
         
-        return jdbcTemplate.queryForList(query, futureDate, languageId);
+            List<Map<String, Object>> result = jdbcTemplate.queryForList(query, futureDate, languageId);
+            
+            // Convert timezone for all rows
+            for (Map<String, Object> row : result) {
+                convertTimezoneInRow(row);
+            }
+            
+            return result;
+        } catch (Exception e) {
+            System.out.println("ERROR - getSpecificDateAppointmentsNoDoctor failed: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
+        }
     }
 
     private List<Map<String, Object>> testBasicDataAvailability(String doctorId, String clinicId, java.sql.Date queryDate) {
@@ -812,17 +1094,25 @@ public class VisitController {
         System.out.println("DEBUG - Test query: " + testQuery);
         System.out.println("DEBUG - Test parameters: doctorId=" + doctorId + ", queryDate=" + queryDate);
         
-        List<Map<String, Object>> result = jdbcTemplate.queryForList(testQuery, doctorId, queryDate);
-        
-        // Debug each result
-        for (Map<String, Object> row : result) {
-            System.out.println("DEBUG - Row data:");
-            System.out.println("  patient_id: " + row.get("patient_id"));
-            System.out.println("  date_of_birth: " + row.get("date_of_birth"));
-            System.out.println("  age_given: " + row.get("age_given"));
-            System.out.println("  calculated_age: " + row.get("calculated_age"));
+        try {
+            List<Map<String, Object>> result = jdbcTemplate.queryForList(testQuery, doctorId, queryDate);
+            
+            System.out.println("DEBUG - Test query result count: " + result.size());
+            
+            // Debug each result
+            for (Map<String, Object> row : result) {
+                System.out.println("DEBUG - Row data:");
+                System.out.println("  patient_id: " + row.get("patient_id"));
+                System.out.println("  date_of_birth: " + row.get("date_of_birth"));
+                System.out.println("  age_given: " + row.get("age_given"));
+                System.out.println("  calculated_age: " + row.get("calculated_age"));
+            }
+            
+            return result;
+        } catch (Exception e) {
+            System.out.println("ERROR - testBasicDataAvailability failed: " + e.getMessage());
+            e.printStackTrace();
+            return new java.util.ArrayList<>();
         }
-        
-        return result;
     }
 }

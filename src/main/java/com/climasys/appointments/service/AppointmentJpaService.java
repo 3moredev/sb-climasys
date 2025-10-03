@@ -2,6 +2,7 @@ package com.climasys.appointments.service;
 
 import com.climasys.entity.*;
 import com.climasys.repository.*;
+import com.climasys.utils.TimezoneUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +28,9 @@ public class AppointmentJpaService {
 
     @Autowired
     private AppointmentRepository appointmentRepository;
+    
+    @Autowired
+    private TimezoneUtils timezoneUtils;
     
     @Autowired
     private DoctorMasterRepository doctorMasterRepository;
@@ -149,8 +153,19 @@ public class AppointmentJpaService {
             result.put("appointmentId", savedAppointment.getPatientVisitNo());
             result.put("patientId", patientId);
             result.put("doctorId", doctorId);
-            result.put("visitDate", LocalDateTime.now()); // Use system time instead of stored visitDate
-            result.put("visitTime", LocalTime.now()); // Use system time instead of stored visitTime
+            result.put("visitDate", savedAppointment.getVisitDate()); // Use actual stored visitDate
+            
+            // Convert stored UTC time back to target timezone for response
+            java.sql.Time storedTime = savedAppointment.getVisitTime();
+            if (storedTime != null) {
+                LocalTime utcTime = storedTime.toLocalTime();
+                // Convert UTC to target timezone for display
+                LocalTime targetTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
+                result.put("visitTime", targetTime);
+                logger.info("Response time conversion: UTC {} -> {} {}", utcTime, timezoneUtils.getTimezoneDisplayName(), targetTime);
+            } else {
+                result.put("visitTime", null);
+            }
             result.put("status", "Waiting");
             
             auditLogger.info("APPOINTMENT_CREATED - Patient: {}, Doctor: {}, Date: {}, Time: {}", 
@@ -397,21 +412,41 @@ public class AppointmentJpaService {
             appointmentMap.put("patientId", appointment.getPatientId());
             appointmentMap.put("doctorId", appointment.getDoctorId());
             appointmentMap.put("clinicId", appointment.getClinicId());
-            appointmentMap.put("visitDate", LocalDateTime.now()); // Use system time instead of stored visitDate
-            appointmentMap.put("visitTime", LocalTime.now()); // Use system time instead of stored visitTime
+            appointmentMap.put("visitDate", appointment.getVisitDate()); // Use actual stored visitDate
             appointmentMap.put("statusId", appointment.getStatusId());
             appointmentMap.put("shiftId", appointment.getShiftId());
             appointmentMap.put("folderNo", appointment.getFolderNo());
             appointmentMap.put("instructions", appointment.getInstructions());
             appointmentMap.put("inPerson", appointment.getInPerson());
             appointmentMap.put("reportsReceived", appointment.getReportsReceived());
-            appointmentMap.put("onlineAppointmentTime", LocalTime.now()); // Use system time instead of stored onlineAppointmentTime
             
-            // Format visit time for display using system time
-            appointmentMap.put("visitTimeFormatted", LocalTime.now().toString());
+            // Convert stored UTC times to target timezone for display
+            if (appointment.getVisitTime() != null) {
+                LocalTime utcTime = appointment.getVisitTime().toLocalTime();
+                LocalTime targetTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
+                appointmentMap.put("visitTime", targetTime);
+                appointmentMap.put("visitTimeFormatted", targetTime.toString());
+                logger.debug("Converted visit time: UTC {} -> {} {}", utcTime, timezoneUtils.getTimezoneDisplayName(), targetTime);
+            } else {
+                appointmentMap.put("visitTime", null);
+                appointmentMap.put("visitTimeFormatted", null);
+            }
             
-            // Format visit date for display using system time
-            appointmentMap.put("visitDateFormatted", LocalDate.now().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")));
+            if (appointment.getOnlineAppointmentTime() != null) {
+                LocalTime utcOnlineTime = appointment.getOnlineAppointmentTime().toLocalTime();
+                LocalTime targetOnlineTime = timezoneUtils.convertUtcToTargetTimezone(utcOnlineTime);
+                appointmentMap.put("onlineAppointmentTime", targetOnlineTime);
+                logger.debug("Converted online appointment time: UTC {} -> {} {}", utcOnlineTime, timezoneUtils.getTimezoneDisplayName(), targetOnlineTime);
+            } else {
+                appointmentMap.put("onlineAppointmentTime", null);
+            }
+            
+            // Format visit date for display
+            if (appointment.getVisitDate() != null) {
+                appointmentMap.put("visitDateFormatted", appointment.getVisitDate().toLocalDate().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")));
+            } else {
+                appointmentMap.put("visitDateFormatted", null);
+            }
             
             return appointmentMap;
         }).collect(Collectors.toList());

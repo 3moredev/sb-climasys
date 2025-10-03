@@ -23,7 +23,6 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
-@CrossOrigin(origins = "*")
 @Tag(name = "Appointments", description = "Appointment management endpoints for booking, updating, and deleting appointments")
 public class AppointmentController {
 

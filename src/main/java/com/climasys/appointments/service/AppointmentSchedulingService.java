@@ -6,6 +6,7 @@ import com.climasys.entity.User;
 import com.climasys.repository.AppointmentRepository;
 import com.climasys.auth.repository.UserMasterRepository;
 import com.climasys.config.DatabaseTableConfig;
+import com.climasys.utils.TimezoneUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +44,9 @@ public class AppointmentSchedulingService {
     
     @Autowired
     private AppointmentJpaService appointmentJpaService;
+    
+    @Autowired
+    private TimezoneUtils timezoneUtils;
 
     /**
      * Get all future appointments for a doctor
@@ -84,7 +88,15 @@ public class AppointmentSchedulingService {
                 appointmentMap.put("patientId", appointment.getPatientId());
                 appointmentMap.put("patientName", "Patient " + appointment.getPatientId()); // Simplified for now
                 appointmentMap.put("appointmentDate", appointment.getVisitDate());
-                appointmentMap.put("appointmentTime", appointment.getVisitTime());
+                // Convert UTC time to target timezone
+                if (appointment.getVisitTime() != null) {
+                    LocalTime utcTime = appointment.getVisitTime().toLocalTime();
+                    LocalTime targetTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
+                    appointmentMap.put("appointmentTime", targetTime);
+                    logger.debug("Converted appointment time: UTC {} -> {} {}", utcTime, timezoneUtils.getTimezoneDisplayName(), targetTime);
+                } else {
+                    appointmentMap.put("appointmentTime", null);
+                }
                 appointmentMap.put("status", appointment.getStatusId() != null ? "STATUS_" + appointment.getStatusId() : "SCHEDULED");
                 appointmentMap.put("appointmentType", "General Consultation");
                 appointmentMap.put("notes", appointment.getInstructions());
@@ -145,7 +157,15 @@ public class AppointmentSchedulingService {
                 appointmentMap.put("patientId", appointment.getPatientId());
                 appointmentMap.put("patientName", "Patient " + appointment.getPatientId()); // Simplified for now
                 appointmentMap.put("appointmentDate", appointment.getVisitDate());
-                appointmentMap.put("appointmentTime", appointment.getVisitTime());
+                // Convert UTC time to target timezone
+                if (appointment.getVisitTime() != null) {
+                    LocalTime utcTime = appointment.getVisitTime().toLocalTime();
+                    LocalTime targetTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
+                    appointmentMap.put("appointmentTime", targetTime);
+                    logger.debug("Converted appointment time: UTC {} -> {} {}", utcTime, timezoneUtils.getTimezoneDisplayName(), targetTime);
+                } else {
+                    appointmentMap.put("appointmentTime", null);
+                }
                 appointmentMap.put("status", appointment.getStatusId() != null ? "STATUS_" + appointment.getStatusId() : "SCHEDULED");
                 appointmentMap.put("appointmentType", "General Consultation");
                 appointmentMap.put("notes", appointment.getInstructions());
@@ -320,7 +340,11 @@ public class AppointmentSchedulingService {
         try {
             LocalDate date = LocalDate.parse(visitDate);
             LocalTime time = LocalTime.parse(visitTime);
+            
+            // Store time as-is - let database handle timezone conversion automatically
             LocalDateTime dateTime = date.atTime(time);
+            
+            logger.info("Storing appointment time as-is: {} (database will handle timezone conversion)", time);
             
             return appointmentJpaService.insertPatientAppointmentByDoctor(
                 dateTime, shiftId, clinicId, doctorId, patientId, time, 

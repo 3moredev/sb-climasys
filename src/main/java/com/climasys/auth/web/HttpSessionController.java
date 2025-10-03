@@ -20,7 +20,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/auth/session")
-@CrossOrigin(origins = "*")
 @Tag(name = "Session Management", description = "Endpoints for managing HTTP sessions")
 public class HttpSessionController {
 

@@ -1,69 +1,13 @@
-# Development Environment Configuration
-spring:
-  application:
-    name: climasys-backend
-  datasource:
-    url: jdbc:postgresql://localhost:5432/climasys_dev_new
-    username: postgres
-    password: ${DB_PASSWORD:root}
-    driver-class-name: org.postgresql.Driver
-    hikari:
-      maximum-pool-size: 10
-      minimum-idle: 2
-      connection-timeout: 30000
-      idle-timeout: 600000
-      max-lifetime: 1800000
-      auto-commit: false
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        format_sql: true
-        connection:
-          provider_disables_autocommit: true
-        jdbc:
-          time_zone: UTC
-        order_inserts: true
-        order_updates: true
-        batch_size: 25
-        hbm2ddl:
-          auto: update
-  sql:
-    init:
-      mode: never
+# Development environment CORS configuration
+climasys:
+  cors:
+    allowed-origins: http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000,http://localhost:8080
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: "*"
+    allow-credentials: true
 
-server:
-  port: 8080
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-
+# Development logging
 logging:
   level:
-    org.springframework.jdbc: DEBUG
-    com.zaxxer.hikari: INFO
-    org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
     com.climasys: DEBUG
-
-# Development-specific settings
-climasys:
-  encryption:
-    key: ${CLIMASYS_ENCRYPTION_KEY:PA1ANDE61INI6}
-  database:
-    tables:
-      patient_master: patient_master
-      doctor_master: doctor_master
-      clinic_master: clinic_master
-      appointment_master: appointment_master
-      patient_queue: patient_queue
-      patient_visits: patient_visits
+    org.springframework.web.cors: DEBUG

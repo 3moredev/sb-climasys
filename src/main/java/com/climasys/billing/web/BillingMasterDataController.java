@@ -13,7 +13,6 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/billing/master-data")
-@CrossOrigin(origins = "*")
 public class BillingMasterDataController {
 
     @Autowired

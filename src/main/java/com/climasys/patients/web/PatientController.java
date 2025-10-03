@@ -475,21 +475,28 @@ public class PatientController {
     @GetMapping("/{id}/visits/dates")
     public ResponseEntity<?> getPreviousVisitDates(@PathVariable String id) {
         try {
-            // Use direct SQL query instead of stored procedure for PostgreSQL compatibility
+            System.out.println("DEBUG - getPreviousVisitDates called with patient ID: " + id);
+            
+            // Use direct SQL query with correct field names for PostgreSQL compatibility
             String sql = "SELECT " +
                     "pv.visit_date, " +
                     "pv.visit_time, " +
-                    "pv.visit_number, " +
-                    "pv.visit_id, " +
+                    "pv.patient_visit_no, " +
                     "pv.doctor_id, " +
                     "pv.clinic_id, " +
-                    "pv.visit_status, " +
-                    "pv.visit_type " +
+                    "pv.status_id, " +
+                    "pv.shift_id " +
                     "FROM patient_visits pv " +
                     "WHERE pv.patient_id = (SELECT id FROM patient_master WHERE id = ? OR folder_no = ?) " +
+                    "AND pv.delete_flag = false " +
                     "ORDER BY pv.visit_date DESC, pv.visit_time DESC";
 
+            System.out.println("DEBUG - Query: " + sql);
+            System.out.println("DEBUG - Parameters: patient_id=" + id + ", folder_no=" + id);
+
             List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id, id);
+            
+            System.out.println("DEBUG - Found " + result.size() + " visits for patient " + id);
             
             if (result.isEmpty()) {
                 Map<String, Object> response = new HashMap<>();
@@ -506,6 +513,8 @@ public class PatientController {
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
+            System.out.println("ERROR - getPreviousVisitDates failed: " + e.getMessage());
+            e.printStackTrace();
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get previous visit dates: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
