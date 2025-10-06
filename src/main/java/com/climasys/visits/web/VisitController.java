@@ -959,6 +959,136 @@ public class VisitController {
      * @param languageId Language ID for translations
      * @return Comprehensive appointment data with 4 result sets
      */
+    @GetMapping("/last-visit/{patientId}")
+    public ResponseEntity<?> getLastVisitDetails(@PathVariable String patientId) {
+        try {
+            logger.info("Getting last visit details for patient: {}", patientId);
+            
+            Map<String, Object> result = visitJpaService.getLastVisitDetails(patientId);
+            
+            if (result.get("success") != null && (Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error getting last visit details for patient {}: {}", patientId, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get last visit details: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    @GetMapping("/all-visits/{patientId}")
+    public ResponseEntity<?> getAllVisitsForPatient(@PathVariable String patientId) {
+        try {
+            logger.info("Getting all visits for patient: {}", patientId);
+            
+            Map<String, Object> result = visitJpaService.getAllVisitsForPatient(patientId);
+            
+            if (result.get("success") != null && (Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error getting all visits for patient {}: {}", patientId, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get all visits: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    @GetMapping("/previous-visits/{patientId}")
+    public ResponseEntity<?> getPatientPreviousVisits(
+            @PathVariable String patientId,
+            @RequestParam(required = false) String doctorId,
+            @RequestParam(required = false) String clinicId,
+            @RequestParam(required = false) String todaysVisitDate) {
+        try {
+            logger.info("Getting previous visits for patient: {}, doctor: {}, clinic: {}, today: {}", 
+                patientId, doctorId, clinicId, todaysVisitDate);
+            
+            // Parse today's visit date, default to current date if not provided
+            LocalDate todayDate;
+            if (todaysVisitDate != null && !todaysVisitDate.trim().isEmpty()) {
+                try {
+                    todayDate = LocalDate.parse(todaysVisitDate);
+                } catch (Exception e) {
+                    todayDate = LocalDate.now();
+                    logger.warn("Invalid date format provided: {}, using current date: {}", todaysVisitDate, todayDate);
+                }
+            } else {
+                todayDate = LocalDate.now();
+            }
+            
+            Map<String, Object> result = visitJpaService.getPatientPreviousVisits(
+                patientId, doctorId, clinicId, todayDate);
+            
+            if (result.get("success") != null && (Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error getting previous visits for patient {}: {}", patientId, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get previous visits: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
+    @GetMapping("/debug-visits/{patientId}")
+    public ResponseEntity<?> debugPatientVisits(@PathVariable String patientId) {
+        try {
+            logger.info("DEBUG: Getting all visits for patient: {}", patientId);
+            
+            Map<String, Object> result = visitJpaService.getAllVisitsForPatient(patientId);
+            
+            // Add additional debug information
+            if (result.get("success") != null && (Boolean) result.get("success")) {
+                List<Map<String, Object>> visits = (List<Map<String, Object>>) result.get("visits");
+                if (visits != null) {
+                    Map<String, Integer> statusCount = new HashMap<>();
+                    Map<String, Integer> dateCount = new HashMap<>();
+                    
+                    for (Map<String, Object> visit : visits) {
+                        // Count by status
+                        Object statusId = visit.get("statusId");
+                        String statusKey = statusId != null ? statusId.toString() : "null";
+                        statusCount.put(statusKey, statusCount.getOrDefault(statusKey, 0) + 1);
+                        
+                        // Count by date
+                        Object visitDate = visit.get("visitDate");
+                        String dateKey = visitDate != null ? visitDate.toString() : "null";
+                        dateCount.put(dateKey, dateCount.getOrDefault(dateKey, 0) + 1);
+                    }
+                    
+                    result.put("debug", Map.of(
+                        "statusBreakdown", statusCount,
+                        "dateBreakdown", dateCount,
+                        "totalVisits", visits.size()
+                    ));
+                }
+            }
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            logger.error("Error debugging visits for patient {}: {}", patientId, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to debug visits: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
+
     @GetMapping("/appointments-for-date")
     public ResponseEntity<?> getTodaysAppointmentsForGivenDate(
             @RequestParam String doctorId,
