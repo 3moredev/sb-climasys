@@ -118,10 +118,10 @@ public class AppointmentJpaService {
         logger.info("Booking appointment for patient: {} with doctor: {} on {}", patientId, doctorId, visitDate);
         
         try {
-            // Check for conflicts
-            Long conflictCount = appointmentRepository.countConflictingAppointments(doctorId, visitDate, visitTime);
+            // Check for conflicts - same patient, same doctor, same date, specific statuses
+            Long conflictCount = appointmentRepository.countConflictingAppointments(doctorId, visitDate, patientId);
             if (conflictCount > 0) {
-                throw new RuntimeException("Appointment time conflict detected");
+                throw new RuntimeException("Patient already has an appointment with this doctor on this date");
             }
             
             // Get next patient visit number

@@ -1,7 +1,6 @@
 package com.climasys.repository;
 
 import com.climasys.entity.PatientVisit;
-import com.climasys.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.Modifying;
@@ -9,9 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -99,11 +96,11 @@ public interface AppointmentRepository extends JpaRepository<PatientVisit, Long>
                                                          @Param("startDate") LocalDateTime startDate,
                                                          @Param("endDate") LocalDateTime endDate);
     
-    // Check for appointment conflicts
-    @Query("SELECT COUNT(pv) FROM PatientVisit pv WHERE pv.doctorId = :doctorId AND pv.visitDate = :visitDate AND pv.visitTime = :visitTime AND pv.deleteFlag = false")
+    // Check for appointment conflicts - same patient, same doctor, same date/shift, specific statuses
+    @Query("SELECT COUNT(pv) FROM PatientVisit pv WHERE pv.doctorId = :doctorId AND pv.visitDate = :visitDate AND pv.patientId = :patientId AND pv.deleteFlag = false AND pv.statusId IN (1, 11)")
     Long countConflictingAppointments(@Param("doctorId") String doctorId,
                                       @Param("visitDate") LocalDateTime visitDate,
-                                      @Param("visitTime") LocalTime visitTime);
+                                      @Param("patientId") String patientId);
     
     // Get next patient visit number for a patient
     @Query("SELECT COALESCE(MAX(pv.patientVisitNo), 0) + 1 FROM PatientVisit pv WHERE pv.patientId = :patientId")

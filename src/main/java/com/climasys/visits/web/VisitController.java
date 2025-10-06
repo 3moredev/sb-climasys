@@ -9,8 +9,10 @@ import org.springframework.web.bind.annotation.*;
 
 import com.climasys.utils.TimezoneUtils;
 import com.climasys.utils.CorsUtils;
+import com.climasys.visits.service.VisitJpaService;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -27,9 +29,43 @@ public class VisitController {
     
     @Autowired
     private CorsUtils corsUtils;
+    
+    @Autowired
+    private VisitJpaService visitJpaService;
 
     public VisitController(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
+    }
+    
+    /**
+     * Helper method to parse date strings with flexible format handling
+     */
+    private LocalDateTime parseDateTime(String dateString) {
+        if (dateString == null || dateString.trim().isEmpty()) {
+            return null;
+        }
+        
+        try {
+            if (dateString.contains("T")) {
+                // ISO format: 2025-10-06T11:30:00
+                return LocalDateTime.parse(dateString);
+            } else if (dateString.contains(" ")) {
+                // Format: 2025-10-06 11:30:00
+                return LocalDateTime.parse(dateString, 
+                    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            } else {
+                // Date only: 2025-10-06 - assume start of day
+                return LocalDate.parse(dateString).atStartOfDay();
+            }
+        } catch (Exception e) {
+            // Fallback: try to parse as LocalDate and convert to LocalDateTime
+            try {
+                return LocalDate.parse(dateString).atStartOfDay();
+            } catch (Exception e2) {
+                throw new IllegalArgumentException("Invalid date format: " + dateString + 
+                    ". Expected formats: yyyy-MM-dd, yyyy-MM-dd HH:mm:ss, or yyyy-MM-ddTHH:mm:ss", e2);
+            }
+        }
     }
     
     
@@ -191,8 +227,14 @@ public class VisitController {
                     .withProcedureName("USP_Insert_PatientToVisitQueue");
 
             Map<String, Object> parameters = new HashMap<>();
-            parameters.put("p_date_Visit_Date", LocalDateTime.parse(req.visitDate()));
-            parameters.put("p_int_Shift_ID", Short.parseShort(req.shiftId()));
+            parameters.put("p_date_Visit_Date", parseDateTime(req.visitDate()));
+            
+            // Parse shift ID with null check
+            Short shiftId = null;
+            if (req.shiftId() != null && !req.shiftId().trim().isEmpty()) {
+                shiftId = Short.parseShort(req.shiftId());
+            }
+            parameters.put("p_int_Shift_ID", shiftId);
             parameters.put("p_nvar_Clinic_ID", req.clinicId());
             parameters.put("p_nvar_Doctor_ID", req.doctorId());
             parameters.put("p_nvar_Patient_ID", req.patientId());
@@ -282,9 +324,21 @@ public class VisitController {
             parameters.put("p_var_Patient_ID", req.patientId());
             parameters.put("p_var_Doctor_ID", req.doctorId());
             parameters.put("p_var_Clinic_ID", req.clinicId());
-            parameters.put("p_var_Shift_ID", Short.parseShort(req.shiftId()));
-            parameters.put("p_var_Visit_Date", LocalDateTime.parse(req.visitDate()));
-            parameters.put("p_var_Patient_Visit_No", Integer.parseInt(req.patientVisitNo()));
+            // Parse shift ID with null check
+            Short shiftId = null;
+            if (req.shiftId() != null && !req.shiftId().trim().isEmpty()) {
+                shiftId = Short.parseShort(req.shiftId());
+            }
+            parameters.put("p_var_Shift_ID", shiftId);
+            
+            parameters.put("p_var_Visit_Date", parseDateTime(req.visitDate()));
+            
+            // Parse patient visit number with null check
+            Integer patientVisitNo = null;
+            if (req.patientVisitNo() != null && !req.patientVisitNo().trim().isEmpty()) {
+                patientVisitNo = Integer.parseInt(req.patientVisitNo());
+            }
+            parameters.put("p_var_Patient_Visit_No", patientVisitNo);
             
             // Patient Vitals (from form screenshot)
             parameters.put("p_var_Pulse", req.pulse());
@@ -382,6 +436,145 @@ public class VisitController {
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to save comprehensive visit data: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * Comprehensive API to save all patient visit data using JPA (new implementation)
+     * This endpoint uses JPA instead of stored procedures for better maintainability
+     */
+    @PostMapping("/comprehensive-save-jpa")
+    public ResponseEntity<?> saveComprehensiveVisitDataJpa(@RequestBody ComprehensiveVisitDataRequest req) {
+        try {
+            // Parse required fields with null checks
+            Short shiftId = null;
+            if (req.shiftId() != null && !req.shiftId().trim().isEmpty()) {
+                shiftId = Short.parseShort(req.shiftId());
+            }
+            
+            Integer patientVisitNo = null;
+            if (req.patientVisitNo() != null && !req.patientVisitNo().trim().isEmpty()) {
+                patientVisitNo = Integer.parseInt(req.patientVisitNo());
+            }
+            
+            LocalDateTime visitDate = parseDateTime(req.visitDate());
+            
+            // Create service request
+            VisitJpaService.ComprehensiveVisitRequest serviceRequest = 
+                new VisitJpaService.ComprehensiveVisitRequest(
+                    // Composite Key Fields
+                    req.patientId(),
+                    req.doctorId(),
+                    req.clinicId(),
+                    shiftId,
+                    visitDate,
+                    patientVisitNo,
+                    
+                    // Patient Vitals
+                    req.pulse(),
+                    req.heightInCms(),
+                    req.weightInKgs(),
+                    req.bloodPressure(),
+                    req.sugar(),
+                    req.tft(),
+                    
+                    // Medical Conditions
+                    req.hypertension(),
+                    req.diabetes(),
+                    req.cholestrol(),
+                    req.ihd(),
+                    req.th(),
+                    req.asthama(),
+                    req.smoking(),
+                    req.tobaco(),
+                    req.alchohol(),
+                    
+                    // Additional Fields
+                    req.habitDetails(),
+                    req.allergyDetails(),
+                    req.observation(),
+                    req.inPerson(),
+                    req.symptomComment(),
+                    req.impression(),
+                    req.attendedBy(),
+                    req.paymentById(),
+                    req.paymentRemark(),
+                    req.attendedById(),
+                    req.followUp(),
+                    req.followUpFlag(),
+                    req.currentComplaint(),
+                    req.currentMedicines(),
+                    req.visitComments(),
+                    
+                    // Clinical Fields
+                    req.tpr(),
+                    req.importantFindings(),
+                    req.additionalComments(),
+                    req.systemic(),
+                    req.odeama(),
+                    req.pallor(),
+                    req.gc(),
+                    
+                    // Gynecological Fields
+                    req.fmp(),
+                    req.prmc(),
+                    req.pamc(),
+                    req.lmp(),
+                    req.obstetricHistory(),
+                    req.surgicalHistory(),
+                    req.menstrualAddComments(),
+                    req.followUpComment(),
+                    req.followUpDate(),
+                    req.pregnant(),
+                    req.edd(),
+                    req.followUpType() != null && !req.followUpType().trim().isEmpty() 
+                        ? Short.parseShort(req.followUpType()) : null,
+                    
+                    // Financial Fields
+                    req.feesToCollect(),
+                    req.discount(),
+                    req.originalDiscount(),
+                    
+                    // Status and User
+                    req.statusId(),
+                    req.userId(),
+                    req.isSubmitPatientVisitDetails(),
+                    
+                    // Treatment fields (not in current request, set to null)
+                    null, // treatmentComment
+                    null, // treatmentPlan
+                    null, // plan
+                    null, // notes
+                    null, // impressionFinding
+                    null, // additionalInstructions
+                    
+                    // Referral fields
+                    req.referBy(), // referId
+                    req.referralName(), // referDoctorName
+                    req.referralAddress(),
+                    req.referralContact(),
+                    req.referralEmail(),
+                    
+                    // Additional fields (not in current request, set to defaults)
+                    "", // instructions
+                    "", // offlineReason
+                    false // offlineFlag
+                );
+            
+            // Save using JPA service
+            Map<String, Object> result = visitJpaService.saveComprehensiveVisit(serviceRequest);
+            
+            if (result.get("success") != null && (Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
             error.put("error", "Failed to save comprehensive visit data: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }

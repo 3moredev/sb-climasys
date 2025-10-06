@@ -473,11 +473,93 @@ public class PatientController {
     }
 
     @GetMapping("/{id}/visits/dates")
-    public ResponseEntity<?> getPreviousVisitDates(@PathVariable String id) {
+    public ResponseEntity<?> getPreviousVisitDates(
+            @PathVariable String id,
+            @RequestParam(required = false) String doctorId,
+            @RequestParam(required = false) String clinicId) {
+        // This endpoint is specifically for the "Last Visit" column in the appointment screen
+        // It should only return completed visits (not waiting, in-progress, cancelled, etc.)
+        // It includes today's completed visits if the patient has completed a visit today
         try {
-            System.out.println("DEBUG - getPreviousVisitDates called with patient ID: " + id);
+            System.out.println("DEBUG - getPreviousVisitDates called with patient ID: " + id + 
+                ", doctorId: " + doctorId + ", clinicId: " + clinicId);
             
-            // Use direct SQL query with correct field names for PostgreSQL compatibility
+            // First, dynamically determine the correct status IDs based on doctor and clinic
+            String completedStatusId = null;
+            String excludedStatusIds = "4, 5, 11, 12"; // Default exclusions
+            
+            if (doctorId != null && clinicId != null) {
+                // Try to find the "Completed" status for this doctor and clinic
+                String statusQuery = "SELECT id FROM status_ref WHERE " +
+                        "status_description ILIKE '%complete%' " +
+                        "AND (doctor_id = ? OR doctor_id IS NULL) " +
+                        "AND (clinic_id = ? OR clinic_id IS NULL) " +
+                        "ORDER BY CASE WHEN doctor_id = ? THEN 1 ELSE 2 END, " +
+                        "CASE WHEN clinic_id = ? THEN 1 ELSE 2 END " +
+                        "LIMIT 1";
+                
+                try {
+                    List<Map<String, Object>> statusResult = jdbcTemplate.queryForList(statusQuery, doctorId, clinicId, doctorId, clinicId);
+                    if (!statusResult.isEmpty()) {
+                        completedStatusId = statusResult.get(0).get("id").toString();
+                        System.out.println("DEBUG - Found completed status ID: " + completedStatusId + " for doctor: " + doctorId + ", clinic: " + clinicId);
+                    }
+                } catch (Exception e) {
+                    System.out.println("DEBUG - Could not find completed status, using default filtering: " + e.getMessage());
+                }
+                
+                // Also get excluded status IDs (cancelled, no-show, etc.)
+                String excludedStatusQuery = "SELECT id FROM status_ref WHERE " +
+                        "(status_description ILIKE '%cancel%' OR status_description ILIKE '%no%show%' OR status_description ILIKE '%invalid%') " +
+                        "AND (doctor_id = ? OR doctor_id IS NULL) " +
+                        "AND (clinic_id = ? OR clinic_id IS NULL)";
+                
+                try {
+                    List<Map<String, Object>> excludedResult = jdbcTemplate.queryForList(excludedStatusQuery, doctorId, clinicId);
+                    if (!excludedResult.isEmpty()) {
+                        excludedStatusIds = excludedResult.stream()
+                            .map(row -> row.get("id").toString())
+                            .collect(java.util.stream.Collectors.joining(","));
+                        System.out.println("DEBUG - Found excluded status IDs: " + excludedStatusIds);
+                    }
+                } catch (Exception e) {
+                    System.out.println("DEBUG - Could not find excluded statuses, using default: " + e.getMessage());
+                }
+            }
+            
+            // Build the query with dynamic status filtering
+            // For "Last Visit" column, we ALWAYS want to show only completed visits
+            String statusFilter;
+            if (completedStatusId != null) {
+                // If we found a completed status, only show completed visits
+                statusFilter = "AND pv.status_id = " + completedStatusId;
+                System.out.println("DEBUG - Using completed status filter: status_id = " + completedStatusId);
+            } else {
+                // If no completed status found, try to find it with broader search
+                System.out.println("DEBUG - No completed status found, trying broader search...");
+                
+                // Try broader search for completed status
+                String broaderStatusQuery = "SELECT id FROM status_ref WHERE " +
+                        "(status_description ILIKE '%complete%' OR status_description ILIKE '%finish%' OR status_description ILIKE '%done%') " +
+                        "ORDER BY id LIMIT 1";
+                
+                try {
+                    List<Map<String, Object>> broaderResult = jdbcTemplate.queryForList(broaderStatusQuery);
+                    if (!broaderResult.isEmpty()) {
+                        completedStatusId = broaderResult.get(0).get("id").toString();
+                        statusFilter = "AND pv.status_id = " + completedStatusId;
+                        System.out.println("DEBUG - Found completed status with broader search: " + completedStatusId);
+                    } else {
+                        // Last resort: exclude only clearly non-completed statuses
+                        statusFilter = "AND pv.status_id NOT IN (" + excludedStatusIds + ")";
+                        System.out.println("DEBUG - No completed status found, using exclusion filter: " + excludedStatusIds);
+                    }
+                } catch (Exception e) {
+                    System.out.println("DEBUG - Broader search failed, using exclusion filter: " + e.getMessage());
+                    statusFilter = "AND pv.status_id NOT IN (" + excludedStatusIds + ")";
+                }
+            }
+            
             String sql = "SELECT " +
                     "pv.visit_date, " +
                     "pv.visit_time, " +
@@ -485,31 +567,49 @@ public class PatientController {
                     "pv.doctor_id, " +
                     "pv.clinic_id, " +
                     "pv.status_id, " +
-                    "pv.shift_id " +
+                    "pv.shift_id, " +
+                    "pv.patient_last_visit_no " +
                     "FROM patient_visits pv " +
                     "WHERE pv.patient_id = (SELECT id FROM patient_master WHERE id = ? OR folder_no = ?) " +
                     "AND pv.delete_flag = false " +
-                    "ORDER BY pv.visit_date DESC, pv.visit_time DESC";
+                    statusFilter + " " +
+                    "ORDER BY pv.visit_date DESC, pv.visit_time DESC " + // Sort newest first so first item is the latest completed visit
+                    "LIMIT 10"; // Get last 10 valid previous visits
 
-            System.out.println("DEBUG - Query: " + sql);
+            System.out.println("DEBUG - Simplified Query: " + sql);
             System.out.println("DEBUG - Parameters: patient_id=" + id + ", folder_no=" + id);
 
             List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id, id);
             
-            System.out.println("DEBUG - Found " + result.size() + " visits for patient " + id);
+            System.out.println("DEBUG - Found " + result.size() + " completed visits for patient " + id + " (including today's if completed)");
             
-            if (result.isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("visits", result);
-                response.put("total_visits", 0);
-                response.put("patient_id", id);
-                return ResponseEntity.ok(response);
+            // Debug: Print the actual results
+            for (int i = 0; i < Math.min(result.size(), 5); i++) {
+                Map<String, Object> row = result.get(i);
+                System.out.println("DEBUG - Visit " + i + ": " + 
+                    "Date=" + row.get("visit_date") + 
+                    ", Time=" + row.get("visit_time") + 
+                    ", VisitNo=" + row.get("patient_visit_no") + 
+                    ", Status=" + row.get("status_id") + 
+                    ", Doctor=" + row.get("doctor_id") +
+                    ", PatientId=" + id);
+            }
+            
+            // Additional debug: Check if all patients are getting the same date
+            if (!result.isEmpty()) {
+                Map<String, Object> firstVisit = result.get(0);
+                System.out.println("DEBUG - First visit date for patient " + id + ": " + firstVisit.get("visit_date"));
             }
             
             Map<String, Object> response = new HashMap<>();
             response.put("visits", result);
             response.put("total_visits", result.size());
             response.put("patient_id", id);
+            response.put("uses_direct_query", true);
+            response.put("completed_status_id", completedStatusId);
+            response.put("status_filter_used", statusFilter);
+            response.put("doctor_id", doctorId);
+            response.put("clinic_id", clinicId);
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -517,6 +617,134 @@ public class PatientController {
             e.printStackTrace();
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get previous visit dates: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @GetMapping("/{id}/visits/debug")
+    public ResponseEntity<?> debugPatientVisits(@PathVariable String id) {
+        try {
+            System.out.println("DEBUG - debugPatientVisits called with patient ID: " + id);
+            
+            // Get all visits for this patient (no filtering) to see what's actually in the DB
+            String sql = "SELECT " +
+                    "pv.visit_date, " +
+                    "pv.visit_time, " +
+                    "pv.patient_visit_no, " +
+                    "pv.doctor_id, " +
+                    "pv.clinic_id, " +
+                    "pv.status_id, " +
+                    "pv.shift_id, " +
+                    "pv.patient_last_visit_no, " +
+                    "pv.delete_flag " +
+                    "FROM patient_visits pv " +
+                    "WHERE pv.patient_id = (SELECT id FROM patient_master WHERE id = ? OR folder_no = ?) " +
+                    "ORDER BY pv.visit_date DESC, pv.visit_time DESC " +
+                    "LIMIT 20";
+
+            List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id, id);
+            
+            System.out.println("DEBUG - Found " + result.size() + " total visits for patient " + id);
+            
+            // Debug: Print all visits
+            for (int i = 0; i < result.size(); i++) {
+                Map<String, Object> row = result.get(i);
+                System.out.println("DEBUG - Visit " + i + ": " + 
+                    "Date=" + row.get("visit_date") + 
+                    ", Time=" + row.get("visit_time") + 
+                    ", VisitNo=" + row.get("patient_visit_no") + 
+                    ", Status=" + row.get("status_id") + 
+                    ", Doctor=" + row.get("doctor_id") +
+                    ", DeleteFlag=" + row.get("delete_flag") +
+                    ", LastVisitNo=" + row.get("patient_last_visit_no"));
+            }
+            
+            // Also get status breakdown
+            String statusSql = "SELECT " +
+                    "pv.status_id, " +
+                    "COUNT(*) as count " +
+                    "FROM patient_visits pv " +
+                    "WHERE pv.patient_id = (SELECT id FROM patient_master WHERE id = ? OR folder_no = ?) " +
+                    "AND pv.delete_flag = false " +
+                    "GROUP BY pv.status_id " +
+                    "ORDER BY pv.status_id";
+            
+            List<Map<String, Object>> statusResult = jdbcTemplate.queryForList(statusSql, id, id);
+            System.out.println("DEBUG - Status breakdown for patient " + id + ":");
+            for (Map<String, Object> statusRow : statusResult) {
+                System.out.println("DEBUG - Status " + statusRow.get("status_id") + ": " + statusRow.get("count") + " visits");
+            }
+            
+            // Also get status descriptions for the status IDs found
+            if (!statusResult.isEmpty()) {
+                String statusIds = statusResult.stream()
+                    .map(row -> row.get("status_id").toString())
+                    .collect(java.util.stream.Collectors.joining(","));
+                
+                String statusDescSql = "SELECT id, status_description FROM status_ref WHERE id IN (" + statusIds + ")";
+                List<Map<String, Object>> statusDescResult = jdbcTemplate.queryForList(statusDescSql);
+                System.out.println("DEBUG - Status descriptions for patient " + id + ":");
+                for (Map<String, Object> descRow : statusDescResult) {
+                    System.out.println("DEBUG - Status ID " + descRow.get("id") + ": " + descRow.get("status_description"));
+                }
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("all_visits", result);
+            response.put("status_breakdown", statusResult);
+            response.put("total_visits", result.size());
+            response.put("patient_id", id);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.out.println("ERROR - debugPatientVisits failed: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to debug patient visits: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @GetMapping("/status-ref")
+    public ResponseEntity<?> getStatusRefData() {
+        try {
+            System.out.println("DEBUG - Getting status_ref table data");
+            
+            // Get all status references to see what's actually in the database
+            String sql = "SELECT id, status_description, clinic_id, doctor_id FROM status_ref ORDER BY id";
+            
+            List<Map<String, Object>> result = jdbcTemplate.queryForList(sql);
+            
+            System.out.println("DEBUG - Found " + result.size() + " status references");
+            
+            // Debug: Print all status references
+            for (Map<String, Object> row : result) {
+                System.out.println("DEBUG - Status ID " + row.get("id") + ": " + 
+                    row.get("status_description") + 
+                    " (Clinic: " + row.get("clinic_id") + 
+                    ", Doctor: " + row.get("doctor_id") + ")");
+            }
+            
+            // Also get what status IDs are actually used in patient_visits
+            String visitsStatusSql = "SELECT status_id, COUNT(*) as count FROM patient_visits WHERE delete_flag = false GROUP BY status_id ORDER BY status_id";
+            List<Map<String, Object>> visitsStatusResult = jdbcTemplate.queryForList(visitsStatusSql);
+            
+            System.out.println("DEBUG - Status IDs actually used in patient_visits:");
+            for (Map<String, Object> row : visitsStatusResult) {
+                System.out.println("DEBUG - Status ID " + row.get("status_id") + ": " + row.get("count") + " visits");
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status_ref", result);
+            response.put("visits_status_usage", visitsStatusResult);
+            response.put("total_statuses", result.size());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            System.out.println("ERROR - getStatusRefData failed: " + e.getMessage());
+            e.printStackTrace();
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get status_ref data: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }
