@@ -21,4 +21,9 @@ public interface StatusRefRepository extends JpaRepository<StatusRef, StatusRefI
     
     @Query("SELECT s FROM StatusRef s WHERE s.statusDescription = :statusDescription AND s.clinicId = :clinicId")
     Optional<StatusRef> findByStatusCodeAndClinicIdAndActive(@Param("statusDescription") String statusDescription, @Param("clinicId") String clinicId);
+    
+    /**
+     * Check if a status exists for a specific clinic
+     */
+    boolean existsByIdAndClinicId(Short id, String clinicId);
 }

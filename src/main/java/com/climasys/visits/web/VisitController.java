@@ -1,6 +1,8 @@
 package com.climasys.visits.web;
 
 import jakarta.validation.constraints.NotBlank;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -22,6 +24,8 @@ import java.util.Map;
 @RequestMapping("/api/visits")
 public class VisitController {
 
+    private static final Logger logger = LoggerFactory.getLogger(VisitController.class);
+    
     private final JdbcTemplate jdbcTemplate;
     
     @Autowired
@@ -448,18 +452,41 @@ public class VisitController {
     @PostMapping("/comprehensive-save-jpa")
     public ResponseEntity<?> saveComprehensiveVisitDataJpa(@RequestBody ComprehensiveVisitDataRequest req) {
         try {
-            // Parse required fields with null checks
-            Short shiftId = null;
-            if (req.shiftId() != null && !req.shiftId().trim().isEmpty()) {
-                shiftId = Short.parseShort(req.shiftId());
+            // Validate and parse required fields
+            if (req.shiftId() == null || req.shiftId().trim().isEmpty()) {
+                throw new IllegalArgumentException("Shift ID is required");
             }
+            Short shiftId = Short.parseShort(req.shiftId());
             
-            Integer patientVisitNo = null;
-            if (req.patientVisitNo() != null && !req.patientVisitNo().trim().isEmpty()) {
-                patientVisitNo = Integer.parseInt(req.patientVisitNo());
+            if (req.patientVisitNo() == null || req.patientVisitNo().trim().isEmpty()) {
+                throw new IllegalArgumentException("Patient Visit Number is required");
             }
+            Integer patientVisitNo = Integer.parseInt(req.patientVisitNo());
             
+            if (req.visitDate() == null || req.visitDate().trim().isEmpty()) {
+                throw new IllegalArgumentException("Visit Date is required");
+            }
             LocalDateTime visitDate = parseDateTime(req.visitDate());
+            
+            // Validate other required fields
+            if (req.patientId() == null || req.patientId().trim().isEmpty()) {
+                throw new IllegalArgumentException("Patient ID is required");
+            }
+            if (req.doctorId() == null || req.doctorId().trim().isEmpty()) {
+                throw new IllegalArgumentException("Doctor ID is required");
+            }
+            if (req.clinicId() == null || req.clinicId().trim().isEmpty()) {
+                throw new IllegalArgumentException("Clinic ID is required");
+            }
+            if (req.statusId() == null) {
+                throw new IllegalArgumentException("Status ID is required");
+            }
+            if (req.userId() == null || req.userId().trim().isEmpty()) {
+                throw new IllegalArgumentException("User ID is required");
+            }
+            if (req.discount() == null) {
+                throw new IllegalArgumentException("Discount is required");
+            }
             
             // Create service request
             VisitJpaService.ComprehensiveVisitRequest serviceRequest = 
@@ -572,11 +599,21 @@ public class VisitController {
                 return ResponseEntity.badRequest().body(result);
             }
             
+        } catch (IllegalArgumentException e) {
+            // Validation errors - return 400 with detailed message
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Validation failed: " + e.getMessage());
+            error.put("errorType", "VALIDATION_ERROR");
+            return ResponseEntity.badRequest().body(error);
         } catch (Exception e) {
+            // Other errors - return 500 with generic message
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", "Failed to save comprehensive visit data: " + e.getMessage());
-            return ResponseEntity.badRequest().body(error);
+            error.put("errorType", "SYSTEM_ERROR");
+            logger.error("Unexpected error saving visit: {}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().body(error);
         }
     }
 

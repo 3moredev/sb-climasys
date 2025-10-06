@@ -2,7 +2,8 @@ package com.climasys.visits.service;
 
 import com.climasys.entity.PatientVisit;
 import com.climasys.repository.PatientVisitRepository;
-import com.climasys.utils.TimezoneUtils;
+import com.climasys.repository.DoctorClinicShiftRepository;
+import com.climasys.repository.StatusRefRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -24,7 +27,10 @@ public class VisitJpaService {
     private PatientVisitRepository patientVisitRepository;
     
     @Autowired
-    private TimezoneUtils timezoneUtils;
+    private DoctorClinicShiftRepository doctorClinicShiftRepository;
+    
+    @Autowired
+    private StatusRefRepository statusRefRepository;
     
     /**
      * Save or update a comprehensive patient visit using JPA
@@ -34,16 +40,41 @@ public class VisitJpaService {
         logger.info("Saving comprehensive visit for patient: {} using JPA", request.patientId());
         
         try {
-            // Check if visit already exists
-            Optional<PatientVisit> existingVisit = patientVisitRepository
-                .findByPatientIdAndDoctorIdAndClinicIdAndShiftIdAndPatientVisitNoAndVisitDate(
-                    request.patientId(),
-                    request.doctorId(),
-                    request.clinicId(),
-                    request.shiftId(),
-                    request.patientVisitNo(),
-                    request.visitDate()
-                );
+            // Log the search parameters for debugging
+            logger.info("Searching for existing visit with parameters:");
+            logger.info("  PatientId: {}", request.patientId());
+            logger.info("  DoctorId: {}", request.doctorId());
+            logger.info("  ClinicId: {}", request.clinicId());
+            logger.info("  ShiftId: {}", request.shiftId());
+            logger.info("  PatientVisitNo: {}", request.patientVisitNo());
+            logger.info("  VisitDate: {}", request.visitDate());
+            
+            // For lookup, we need to find visits on the same date (ignoring time)
+            // Normalize the visit date to start of day for comparison
+            LocalDateTime normalizedVisitDate = request.visitDate().toLocalDate().atStartOfDay();
+            logger.info("  Normalized VisitDate for lookup: {}", normalizedVisitDate);
+            
+            // Check if visit already exists using a custom query that compares only the date part
+            Optional<PatientVisit> existingVisit = findExistingVisitByDate(
+                request.patientId(),
+                request.doctorId(),
+                request.clinicId(),
+                request.shiftId(),
+                request.patientVisitNo(),
+                request.visitDate().toLocalDate()
+            );
+            
+            logger.info("Existing visit found: {}", existingVisit.isPresent());
+            
+            // Debug: Check what visits exist for this patient
+            List<PatientVisit> allPatientVisits = patientVisitRepository.findByPatientIdAndDeleteFlagOrderByVisitDateDesc(
+                request.patientId(), false);
+            logger.info("Total visits found for patient {}: {}", request.patientId(), allPatientVisits.size());
+            for (PatientVisit pv : allPatientVisits) {
+                logger.info("  Existing visit: PatientId={}, DoctorId={}, ClinicId={}, ShiftId={}, PatientVisitNo={}, VisitDate={}", 
+                    pv.getPatientId(), pv.getDoctorId(), pv.getClinicId(), pv.getShiftId(), 
+                    pv.getPatientVisitNo(), pv.getVisitDate());
+            }
             
             PatientVisit visit;
             boolean isUpdate = false;
@@ -68,6 +99,13 @@ public class VisitJpaService {
             
             // Map all fields from request to entity
             mapRequestToEntity(request, visit);
+            
+            // Validate required fields before saving
+            validateRequiredFields(visit);
+            
+            // Log key fields for debugging
+            logger.info("Mapped visit - PatientId: {}, DoctorId: {}, StatusId: {}, IsSubmit: {}", 
+                visit.getPatientId(), visit.getDoctorId(), visit.getStatusId(), visit.getIsSubmitPatientVisitDetails());
             
             // Set audit fields
             LocalDateTime now = LocalDateTime.now();
@@ -102,6 +140,23 @@ public class VisitJpaService {
             error.put("error", "Failed to save visit: " + e.getMessage());
             return error;
         }
+    }
+    
+    /**
+     * Find existing visit by composite key and date (ignoring time)
+     */
+    private Optional<PatientVisit> findExistingVisitByDate(
+            String patientId,
+            String doctorId,
+            String clinicId,
+            Short shiftId,
+            Integer patientVisitNo,
+            java.time.LocalDate visitDate) {
+        
+        logger.info("Searching for existing visit by date: {}", visitDate);
+        
+        return patientVisitRepository.findByCompositeKeyAndDate(
+            patientId, doctorId, clinicId, shiftId, patientVisitNo, visitDate);
     }
     
     /**
@@ -196,8 +251,68 @@ public class VisitJpaService {
         visit.setOfflineReason(req.offlineReason() != null ? req.offlineReason() : "");
         visit.setOfflineFlag(req.offlineFlag() != null ? req.offlineFlag() : false);
         
-        // Default values
+        // Default values for required fields
         visit.setDeleteFlag(false);
+    }
+    
+    /**
+     * Validate required fields before saving
+     */
+    private void validateRequiredFields(PatientVisit visit) {
+        StringBuilder errors = new StringBuilder();
+        
+        // Check composite key fields
+        if (visit.getPatientId() == null || visit.getPatientId().trim().isEmpty()) {
+            errors.append("Patient ID is required. ");
+        }
+        if (visit.getDoctorId() == null || visit.getDoctorId().trim().isEmpty()) {
+            errors.append("Doctor ID is required. ");
+        }
+        if (visit.getClinicId() == null || visit.getClinicId().trim().isEmpty()) {
+            errors.append("Clinic ID is required. ");
+        }
+        if (visit.getShiftId() == null) {
+            errors.append("Shift ID is required. ");
+        }
+        if (visit.getPatientVisitNo() == null) {
+            errors.append("Patient Visit Number is required. ");
+        }
+        if (visit.getVisitDate() == null) {
+            errors.append("Visit Date is required. ");
+        }
+        
+        // Check other required fields
+        if (visit.getStatusId() == null) {
+            errors.append("Status ID is required. ");
+        } else {
+            // Validate status_id exists in status_ref table
+            boolean statusExists = statusRefRepository.existsByIdAndClinicId(visit.getStatusId(), visit.getClinicId());
+            if (!statusExists) {
+                errors.append("Status ID ").append(visit.getStatusId())
+                      .append(" is not valid for clinic ").append(visit.getClinicId()).append(". ");
+            }
+        }
+        if (visit.getDiscount() == null) {
+            errors.append("Discount is required. ");
+        }
+        
+        // Validate doctor-clinic-shift relationship
+        if (visit.getDoctorId() != null && visit.getClinicId() != null && visit.getShiftId() != null) {
+            boolean doctorShiftExists = doctorClinicShiftRepository.existsByIdDoctorIdAndIdClinicIdAndIdShiftId(
+                visit.getDoctorId(), visit.getClinicId(), visit.getShiftId());
+            if (!doctorShiftExists) {
+                errors.append("Doctor ").append(visit.getDoctorId())
+                      .append(" is not assigned to clinic ").append(visit.getClinicId())
+                      .append(" for shift ").append(visit.getShiftId()).append(". ");
+            }
+        }
+        
+        // If there are validation errors, throw exception
+        if (errors.length() > 0) {
+            String errorMessage = "Validation failed: " + errors.toString().trim();
+            logger.error("Validation failed for visit: {}", errorMessage);
+            throw new IllegalArgumentException(errorMessage);
+        }
     }
     
     /**

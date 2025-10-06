@@ -21,4 +21,9 @@ public interface DoctorClinicShiftRepository extends JpaRepository<DoctorClinicS
     @Query("SELECT dcs FROM DoctorClinicShift dcs WHERE dcs.id.clinicId = :clinicId AND dcs.id.doctorId = :doctorId AND dcs.id.shiftId IN " +
            "(SELECT s.shiftId FROM Shift s WHERE s.shiftDay = :day)")
     List<DoctorClinicShift> findByClinicIdAndDoctorIdAndDay(@Param("clinicId") String clinicId, @Param("doctorId") String doctorId, @Param("day") String day);
+    
+    /**
+     * Check if a doctor is assigned to a clinic for a specific shift
+     */
+    boolean existsByIdDoctorIdAndIdClinicIdAndIdShiftId(String doctorId, String clinicId, Short shiftId);
 }

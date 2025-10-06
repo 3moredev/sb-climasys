@@ -35,6 +35,14 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
     );
     
     /**
+     * Find the last visit for a patient (most recent)
+     */
+    Optional<PatientVisit> findFirstByPatientIdAndDeleteFlagOrderByVisitDateDesc(
+        String patientId, 
+        Boolean deleteFlag
+    );
+    
+    /**
      * Find visits by doctor and date
      */
     @Query("SELECT pv FROM PatientVisit pv WHERE pv.doctorId = :doctorId " +
@@ -58,6 +66,25 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
         Short shiftId,
         Integer patientVisitNo,
         LocalDateTime visitDate
+    );
+    
+    /**
+     * Find a visit by composite key fields, comparing only the date part (ignoring time)
+     */
+    @Query("SELECT pv FROM PatientVisit pv WHERE pv.patientId = :patientId " +
+           "AND pv.doctorId = :doctorId " +
+           "AND pv.clinicId = :clinicId " +
+           "AND pv.shiftId = :shiftId " +
+           "AND pv.patientVisitNo = :patientVisitNo " +
+           "AND CAST(pv.visitDate AS date) = :visitDate " +
+           "AND pv.deleteFlag = false")
+    Optional<PatientVisit> findByCompositeKeyAndDate(
+        @Param("patientId") String patientId,
+        @Param("doctorId") String doctorId,
+        @Param("clinicId") String clinicId,
+        @Param("shiftId") Short shiftId,
+        @Param("patientVisitNo") Integer patientVisitNo,
+        @Param("visitDate") java.time.LocalDate visitDate
     );
 }
 
