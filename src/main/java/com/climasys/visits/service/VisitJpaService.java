@@ -436,6 +436,12 @@ public class VisitJpaService {
         visitMap.put("Refer_ID", visitData.get("refer_id"));
         visitMap.put("Refer_Doctor_Details", visitData.get("refer_doctor_details"));
         
+        // Plan and treatment information
+        visitMap.put("Plan", visitData.get("plan") != null ? visitData.get("plan").toString() : "");
+        visitMap.put("Notes", visitData.get("notes") != null ? visitData.get("notes").toString() : "");
+        visitMap.put("Treatment_Plan", visitData.get("treatment_plan") != null ? visitData.get("treatment_plan").toString() : "");
+        visitMap.put("Treatment_Comment", visitData.get("treatment_comment") != null ? visitData.get("treatment_comment").toString() : "");
+        
         // Audit fields
         visitMap.put("Created_On", visitData.get("created_on"));
         visitMap.put("Created_By", visitData.get("createdby_name"));
@@ -620,6 +626,12 @@ public class VisitJpaService {
         visitMap.put("referralAddress", visit.getReferDoctorDetails());
         visitMap.put("referralContact", visit.getReferDoctorDetails());
         visitMap.put("referralEmail", visit.getReferDoctorDetails());
+        
+        // Plan and treatment information
+        visitMap.put("plan", visit.getPlan());
+        visitMap.put("notes", visit.getNotes());
+        visitMap.put("treatmentPlan", visit.getTreatmentPlan());
+        visitMap.put("treatmentComment", visit.getTreatmentComment());
         
         // Audit fields
         visitMap.put("createdOn", visit.getCreatedOn());
