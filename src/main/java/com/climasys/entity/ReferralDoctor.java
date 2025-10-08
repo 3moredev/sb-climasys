@@ -37,4 +37,7 @@ public class ReferralDoctor {
     
     @Column(name = "remarks", length = 500)
     private String remarks;
+    
+    @Column(name = "delete_flag")
+    private Boolean deleteFlag = false;
 }

@@ -62,7 +62,22 @@ public class ReferralService {
     }
     
     public ReferralDoctor saveReferralDoctor(ReferralDoctor referralDoctor) {
-        return referralDoctorRepository.save(referralDoctor);
+        try {
+            return referralDoctorRepository.save(referralDoctor);
+        } catch (Exception e) {
+            // If there's a sequence sync issue, try to fix it and retry
+            if (e.getMessage().contains("duplicate key value violates unique constraint")) {
+                try {
+                    // Reset sequence to correct value
+                    referralDoctorRepository.resetSequence();
+                    // Retry the save operation
+                    return referralDoctorRepository.save(referralDoctor);
+                } catch (Exception retryException) {
+                    throw new RuntimeException("Failed to save referral doctor after sequence reset: " + retryException.getMessage(), retryException);
+                }
+            }
+            throw e;
+        }
     }
     
     public Map<String, Object> getReferralDoctorDetailsForMobile(String mobile) {

@@ -126,6 +126,24 @@ public class ReferralController {
     @PostMapping
     public ResponseEntity<?> saveReferralDoctor(@RequestBody ReferralDoctor referralDoctor) {
         try {
+            // Validate required fields
+            if (referralDoctor.getDoctorName() == null || referralDoctor.getDoctorName().trim().isEmpty()) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("error", "Doctor name is required");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            if (referralDoctor.getReferId() == null || referralDoctor.getReferId().trim().isEmpty()) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("error", "Refer ID is required");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Set default values
+            if (referralDoctor.getDeleteFlag() == null) {
+                referralDoctor.setDeleteFlag(false);
+            }
+            
             ReferralDoctor result = referralService.saveReferralDoctor(referralDoctor);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
