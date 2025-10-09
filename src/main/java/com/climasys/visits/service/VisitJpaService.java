@@ -7,6 +7,7 @@ import com.climasys.repository.StatusRefRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +33,9 @@ public class VisitJpaService {
     
     @Autowired
     private StatusRefRepository statusRefRepository;
+    
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
     
     /**
      * Save or update a comprehensive patient visit using JPA
@@ -175,11 +179,14 @@ public class VisitJpaService {
             if (lastVisit.isPresent()) {
                 PatientVisit visit = lastVisit.get();
                 
+                // Calculate PLR indicators for this visit
+                String plrIndicators = calculatePlrIndicators(visit);
+                
                 response.put("success", true);
                 response.put("found", true);
-                response.put("visit", mapVisitToResponse(visit));
+                response.put("visit", mapVisitToResponseWithPlr(visit, plrIndicators));
                 
-                logger.info("Found last visit for patient {}: {}", patientId, visit.getVisitDate());
+                logger.info("Found last visit for patient {}: {} with PLR: {}", patientId, visit.getVisitDate(), plrIndicators);
             } else {
                 response.put("success", true);
                 response.put("found", false);
@@ -213,7 +220,9 @@ public class VisitJpaService {
                 List<Map<String, Object>> visitList = new ArrayList<>();
                 
                 for (PatientVisit visit : allVisits) {
-                    visitList.add(mapVisitToResponse(visit));
+                    // Calculate PLR indicators for each visit
+                    String plrIndicators = calculatePlrIndicators(visit);
+                    visitList.add(mapVisitToResponseWithPlr(visit, plrIndicators));
                 }
                 
                 response.put("success", true);
@@ -221,7 +230,7 @@ public class VisitJpaService {
                 response.put("totalVisits", allVisits.size());
                 response.put("visits", visitList);
                 
-                logger.info("Found {} visits for patient {}", allVisits.size(), patientId);
+                logger.info("Found {} visits for patient {} with PLR indicators", allVisits.size(), patientId);
             } else {
                 response.put("success", true);
                 response.put("found", false);
@@ -638,6 +647,82 @@ public class VisitJpaService {
         visitMap.put("createdBy", visit.getCreatedbyName());
         visitMap.put("modifiedOn", visit.getModifiedOn());
         visitMap.put("modifiedBy", visit.getModifiedbyName());
+        
+        return visitMap;
+    }
+    
+    /**
+     * Calculate PLR indicators for a visit
+     */
+    private String calculatePlrIndicators(PatientVisit visit) {
+        try {
+            String patientId = visit.getPatientId();
+            LocalDateTime visitDate = visit.getVisitDate();
+            Integer patientVisitNo = visit.getPatientVisitNo();
+            String doctorId = visit.getDoctorId();
+            String clinicId = visit.getClinicId();
+            
+            StringBuilder plr = new StringBuilder();
+            
+            // Check for Prescription (P)
+            String prescriptionQuery = """
+                SELECT COUNT(*) FROM visit_prescription_overwrite vpo
+                WHERE vpo.patient_id = ? AND vpo.visit_date = ? AND vpo.patient_visit_no = ?
+                  AND vpo.doctor_id = ? AND vpo.clinic_id = ? AND vpo.delete_indicator = false
+                """;
+            
+            Integer prescriptionCount = jdbcTemplate.queryForObject(
+                prescriptionQuery, Integer.class, patientId, visitDate, patientVisitNo, doctorId, clinicId);
+            
+            if (prescriptionCount != null && prescriptionCount > 0) {
+                plr.append("P");
+            }
+            
+            // Check for Lab (L)
+            String labQuery = """
+                SELECT COUNT(*) FROM patient_visit_labtestasked pvla
+                WHERE pvla.patient_id = ? AND pvla.visit_date = ? AND pvla.patient_visit_no = ?
+                  AND pvla.doctor_id = ? AND pvla.clinic_id = ? AND pvla.delete_flag = false
+                """;
+            
+            Integer labCount = jdbcTemplate.queryForObject(
+                labQuery, Integer.class, patientId, visitDate, patientVisitNo, doctorId, clinicId);
+            
+            if (labCount != null && labCount > 0) {
+                plr.append("L");
+            }
+            
+            // Check for Radiology (R)
+            String radiologyQuery = """
+                SELECT COUNT(*) FROM visit_procedure_findings vpf
+                WHERE vpf.patient_id = ? AND vpf.visit_date = ? AND vpf.patient_visit_no = ?
+                  AND vpf.doctor_id = ? AND vpf.clinic_id = ? AND vpf.delete_flag = false
+                """;
+            
+            Integer radiologyCount = jdbcTemplate.queryForObject(
+                radiologyQuery, Integer.class, patientId, visitDate, patientVisitNo, doctorId, clinicId);
+            
+            if (radiologyCount != null && radiologyCount > 0) {
+                plr.append("R");
+            }
+            
+            return plr.toString();
+            
+        } catch (Exception e) {
+            logger.error("Error calculating PLR indicators for visit: {}", e.getMessage(), e);
+            return ""; // Return empty string if calculation fails
+        }
+    }
+    
+    /**
+     * Map PatientVisit entity to response map with PLR indicators
+     */
+    private Map<String, Object> mapVisitToResponseWithPlr(PatientVisit visit, String plrIndicators) {
+        Map<String, Object> visitMap = mapVisitToResponse(visit);
+        
+        // Add PLR indicators
+        visitMap.put("plr", plrIndicators);
+        visitMap.put("PLR", plrIndicators); // Also add uppercase version for consistency
         
         return visitMap;
     }
