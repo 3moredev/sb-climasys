@@ -133,6 +133,30 @@ public class TimezoneUtils {
     }
     
     /**
+     * Convert target timezone datetime to UTC
+     * @param targetDateTime DateTime in target timezone to convert
+     * @return LocalDateTime in UTC
+     */
+    public LocalDateTime convertTargetTimezoneToUtc(LocalDateTime targetDateTime) {
+        try {
+            System.out.println("DEBUG - Converting datetime from " + getTargetTimezone().getId() + " to UTC: " + targetDateTime);
+            
+            // Convert from target timezone to UTC
+            ZonedDateTime targetZoned = targetDateTime.atZone(getTargetTimezone());
+            ZonedDateTime utcZoned = targetZoned.withZoneSameInstant(ZoneId.of("UTC"));
+            
+            LocalDateTime result = utcZoned.toLocalDateTime();
+            System.out.println("DEBUG - Converted " + targetDateTime + " " + getTargetTimezone().getId() + " to " + result + " UTC");
+            return result;
+        } catch (Exception e) {
+            System.out.println("ERROR - Datetime timezone conversion failed: " + e.getMessage());
+            e.printStackTrace();
+            // Fallback to original datetime if timezone conversion fails
+            return targetDateTime;
+        }
+    }
+    
+    /**
      * Get timezone display name
      * @return String representation of the timezone
      */
