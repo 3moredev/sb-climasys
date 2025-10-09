@@ -235,5 +235,43 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
         @Param("patientId") String patientId,
         @Param("todaysDate") java.time.LocalDate todaysDate
     );
+
+    /**
+     * Find detailed prescription data for a specific visit
+     * Returns all prescription fields including dose, instructions, etc.
+     */
+    @Query(value = """
+        SELECT 
+            vpo.medicine_name,
+            vpo.brand_name,
+            vpo.catsub_description,
+            vpo.cat_short_name,
+            vpo.marketed_by,
+            vpo.morning,
+            vpo.afternoon,
+            vpo.night,
+            vpo.no_of_days,
+            vpo.instruction,
+            vpo.sequence_id,
+            vpo.created_on,
+            vpo.createdby_name,
+            vpo.modified_on,
+            vpo.modifiedby_name
+        FROM visit_prescription_overwrite vpo
+        WHERE vpo.patient_id = :patientId
+          AND vpo.visit_date = :visitDate
+          AND vpo.patient_visit_no = :patientVisitNo
+          AND vpo.doctor_id = :doctorId
+          AND vpo.clinic_id = :clinicId
+          AND vpo.delete_indicator = false
+        ORDER BY vpo.sequence_id ASC, vpo.medicine_name ASC
+        """, nativeQuery = true)
+    List<Map<String, Object>> findDetailedPrescriptionsForVisit(
+        @Param("patientId") String patientId,
+        @Param("visitDate") java.time.LocalDateTime visitDate,
+        @Param("patientVisitNo") Integer patientVisitNo,
+        @Param("doctorId") String doctorId,
+        @Param("clinicId") String clinicId
+    );
 }
 

@@ -320,6 +320,99 @@ public class VisitJpaService {
     }
     
     /**
+     * Fetch detailed prescription data for a specific visit
+     */
+    private List<Map<String, Object>> getDetailedPrescriptionsForVisit(Map<String, Object> visitData) {
+        try {
+            String patientId = (String) visitData.get("patient_id");
+            Object visitDateObj = visitData.get("visit_date");
+            Integer patientVisitNo = (Integer) visitData.get("patient_visit_no");
+            String doctorId = (String) visitData.get("doctor_id");
+            String clinicId = (String) visitData.get("clinic_id");
+            
+            if (patientId == null || visitDateObj == null || patientVisitNo == null || 
+                doctorId == null || clinicId == null) {
+                logger.warn("Missing required fields for prescription lookup: patientId={}, visitDate={}, visitNo={}, doctorId={}, clinicId={}", 
+                    patientId, visitDateObj, patientVisitNo, doctorId, clinicId);
+                return new ArrayList<>();
+            }
+            
+            // Convert visit date to LocalDateTime
+            java.time.LocalDateTime visitDate;
+            if (visitDateObj instanceof java.sql.Timestamp) {
+                visitDate = ((java.sql.Timestamp) visitDateObj).toLocalDateTime();
+            } else if (visitDateObj instanceof java.sql.Date) {
+                visitDate = ((java.sql.Date) visitDateObj).toLocalDate().atStartOfDay();
+            } else {
+                logger.warn("Unsupported visit date type: {}", visitDateObj.getClass());
+                return new ArrayList<>();
+            }
+            
+            List<Map<String, Object>> prescriptions = patientVisitRepository
+                .findDetailedPrescriptionsForVisit(patientId, visitDate, patientVisitNo, doctorId, clinicId);
+            
+            // Format prescription data for better readability
+            List<Map<String, Object>> formattedPrescriptions = new ArrayList<>();
+            for (Map<String, Object> prescription : prescriptions) {
+                Map<String, Object> formattedPrescription = new HashMap<>();
+                
+                // Basic medicine information
+                formattedPrescription.put("medicineName", prescription.get("medicine_name"));
+                formattedPrescription.put("brandName", prescription.get("brand_name"));
+                formattedPrescription.put("categoryDescription", prescription.get("catsub_description"));
+                formattedPrescription.put("categoryShortName", prescription.get("cat_short_name"));
+                formattedPrescription.put("marketedBy", prescription.get("marketed_by"));
+                
+                // Dosage information
+                formattedPrescription.put("morningDose", prescription.get("morning"));
+                formattedPrescription.put("afternoonDose", prescription.get("afternoon"));
+                formattedPrescription.put("nightDose", prescription.get("night"));
+                formattedPrescription.put("noOfDays", prescription.get("no_of_days"));
+                
+                // Instructions
+                formattedPrescription.put("instruction", prescription.get("instruction"));
+                
+                // Sequence and audit information
+                formattedPrescription.put("sequenceId", prescription.get("sequence_id"));
+                formattedPrescription.put("createdOn", prescription.get("created_on"));
+                formattedPrescription.put("createdBy", prescription.get("createdby_name"));
+                formattedPrescription.put("modifiedOn", prescription.get("modified_on"));
+                formattedPrescription.put("modifiedBy", prescription.get("modifiedby_name"));
+                
+                // Create a summary string for backward compatibility
+                StringBuilder doseSummary = new StringBuilder();
+                if (prescription.get("morning") != null) {
+                    doseSummary.append("M:").append(prescription.get("morning"));
+                }
+                if (prescription.get("afternoon") != null) {
+                    if (doseSummary.length() > 0) doseSummary.append(", ");
+                    doseSummary.append("A:").append(prescription.get("afternoon"));
+                }
+                if (prescription.get("night") != null) {
+                    if (doseSummary.length() > 0) doseSummary.append(", ");
+                    doseSummary.append("N:").append(prescription.get("night"));
+                }
+                if (prescription.get("no_of_days") != null) {
+                    if (doseSummary.length() > 0) doseSummary.append(" ");
+                    doseSummary.append("for ").append(prescription.get("no_of_days")).append(" days");
+                }
+                formattedPrescription.put("doseSummary", doseSummary.toString());
+                
+                formattedPrescriptions.add(formattedPrescription);
+            }
+            
+            logger.debug("Found {} detailed prescriptions for visit: patientId={}, visitDate={}, visitNo={}", 
+                formattedPrescriptions.size(), patientId, visitDate, patientVisitNo);
+            
+            return formattedPrescriptions;
+            
+        } catch (Exception e) {
+            logger.error("Error fetching detailed prescriptions for visit: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
      * Format comprehensive visit data from database query result
      */
     private Map<String, Object> formatComprehensiveVisitData(Map<String, Object> visitData) {
@@ -357,6 +450,10 @@ public class VisitJpaService {
         // Medical information with actual data from joins
         visitMap.put("Medicine_Name", visitData.get("medicine_names") != null ? visitData.get("medicine_names").toString() : "");
         visitMap.put("Instructions", visitData.get("instructions") != null ? visitData.get("instructions").toString() : "");
+        
+        // Fetch detailed prescription data as nested object
+        List<Map<String, Object>> detailedPrescriptions = getDetailedPrescriptionsForVisit(visitData);
+        visitMap.put("Prescriptions", detailedPrescriptions);
         visitMap.put("Weight_IN_KGS", visitData.get("weight_in_kgs") != null ? visitData.get("weight_in_kgs") : 0);
         visitMap.put("Visit_Comments", visitData.get("visit_comments") != null ? visitData.get("visit_comments").toString() : "");
         visitMap.put("Observation", visitData.get("observation") != null ? visitData.get("observation").toString() : "");
@@ -984,5 +1081,6 @@ public class VisitJpaService {
         String offlineReason,
         Boolean offlineFlag
     ) {}
+    
 }
 
