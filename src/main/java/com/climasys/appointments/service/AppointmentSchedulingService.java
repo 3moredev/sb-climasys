@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -394,20 +396,27 @@ public class AppointmentSchedulingService {
      * Delete appointment using JPA
      */
     public Map<String, Object> deleteAppointment(String patientId, String visitDate, String doctorId, String userId) {
-        logger.info("Deleting appointment using JPA for patient: {}", patientId);
+        logger.info("Deleting appointment using JPA for patient: {}, visitDate: {} (using today's date with visit time)", patientId, visitDate);
         
         try {
             LocalDateTime dateTime;
             // Handle both date (YYYY-MM-DD) and datetime (YYYY-MM-DD HH:mm:ss) formats
             if (visitDate.contains(" ")) {
-                // Contains time component - parse as LocalDateTime
-                dateTime = LocalDateTime.parse(visitDate.replace(" ", "T"));
+                // Contains time component - parse as LocalDateTime with multiple format support
+                dateTime = parseDateTimeString(visitDate);
             } else {
-                // Only date - parse as LocalDate and convert to start of day
-                LocalDate date = LocalDate.parse(visitDate);
+                // Only date - handle multiple date formats
+                LocalDate date = parseDateString(visitDate);
                 dateTime = date.atStartOfDay();
             }
-            return appointmentJpaService.deletePatientAppointment(patientId, dateTime, doctorId, userId);
+            
+            // Convert from target timezone (IST) to UTC for database comparison
+            // Database stores both date and time in UTC
+            LocalDateTime utcDateTime = timezoneUtils.convertTargetTimezoneToUtc(dateTime);
+            logger.info("Original: {} (IST), Converted to UTC: {} for database comparison", 
+                       dateTime, utcDateTime);
+            
+            return appointmentJpaService.deletePatientAppointment(patientId, utcDateTime, doctorId, userId);
         } catch (Exception e) {
             logger.error("Error deleting appointment: {}", e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
@@ -421,20 +430,27 @@ public class AppointmentSchedulingService {
      * Update appointment status using JPA
      */
     public Map<String, Object> updateAppointmentStatus(String patientId, String visitDate, String doctorId, Short statusId, String userId) {
-        logger.info("Updating appointment status using JPA for patient: {}", patientId);
+        logger.info("Updating appointment status using JPA for patient: {}, visitDate: {}", patientId, visitDate);
         
         try {
             LocalDateTime dateTime;
             // Handle both date (YYYY-MM-DD) and datetime (YYYY-MM-DD HH:mm:ss) formats
             if (visitDate.contains(" ")) {
-                // Contains time component - parse as LocalDateTime
-                dateTime = LocalDateTime.parse(visitDate.replace(" ", "T"));
+                // Contains time component - parse as LocalDateTime with multiple format support
+                dateTime = parseDateTimeString(visitDate);
             } else {
-                // Only date - parse as LocalDate and convert to start of day
-                LocalDate date = LocalDate.parse(visitDate);
+                // Only date - handle multiple date formats
+                LocalDate date = parseDateString(visitDate);
                 dateTime = date.atStartOfDay();
             }
-            return appointmentJpaService.updateAppointmentStatus(patientId, dateTime, doctorId, statusId, userId);
+            
+            // Convert from target timezone (IST) to UTC for database comparison
+            // Database stores both date and time in UTC
+            LocalDateTime utcDateTime = timezoneUtils.convertTargetTimezoneToUtc(dateTime);
+            logger.info("Original: {} (IST), Converted to UTC: {} for database comparison", 
+                       dateTime, utcDateTime);
+            
+            return appointmentJpaService.updateAppointmentStatus(patientId, utcDateTime, doctorId, statusId, userId);
         } catch (Exception e) {
             logger.error("Error updating appointment status: {}", e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
@@ -506,6 +522,105 @@ public class AppointmentSchedulingService {
         } catch (Exception e) {
             logger.error("Error getting gender options: {}", e.getMessage(), e);
             return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * Parse date string in various formats to LocalDate
+     * Supports: YYYY-MM-DD, DD-MM-YYYY, MM/DD/YYYY, DD/MM/YYYY
+     */
+    private LocalDate parseDateString(String dateString) {
+        if (dateString == null || dateString.trim().isEmpty()) {
+            throw new IllegalArgumentException("Date string cannot be null or empty");
+        }
+        
+        String trimmedDate = dateString.trim();
+        logger.debug("Parsing date string: {}", trimmedDate);
+        
+        // Try different date formats
+        DateTimeFormatter[] formatters = {
+            DateTimeFormatter.ofPattern("yyyy-MM-dd"),      // ISO format
+            DateTimeFormatter.ofPattern("dd-MM-yyyy"),      // DD-MM-YYYY
+            DateTimeFormatter.ofPattern("MM/dd/yyyy"),      // MM/DD/YYYY
+            DateTimeFormatter.ofPattern("dd/MM/yyyy"),      // DD/MM/YYYY
+            DateTimeFormatter.ofPattern("yyyy/MM/dd"),      // YYYY/MM/DD
+            DateTimeFormatter.ofPattern("dd.MM.yyyy"),      // DD.MM.YYYY
+            DateTimeFormatter.ofPattern("MM.dd.yyyy")       // MM.DD.YYYY
+        };
+        
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                LocalDate parsedDate = LocalDate.parse(trimmedDate, formatter);
+                logger.debug("Successfully parsed date {} using formatter {}", trimmedDate, formatter.toString());
+                return parsedDate;
+            } catch (DateTimeParseException e) {
+                // Continue to next formatter
+                logger.debug("Failed to parse {} with formatter {}: {}", trimmedDate, formatter.toString(), e.getMessage());
+            }
+        }
+        
+        // If none of the formatters work, try the default ISO format as last resort
+        try {
+            LocalDate parsedDate = LocalDate.parse(trimmedDate);
+            logger.debug("Successfully parsed date {} using default ISO formatter", trimmedDate);
+            return parsedDate;
+        } catch (DateTimeParseException e) {
+            logger.error("Unable to parse date string: {}", dateString);
+            throw new IllegalArgumentException("Unable to parse date string: " + dateString + 
+                ". Supported formats: YYYY-MM-DD, DD-MM-YYYY, MM/DD/YYYY, DD/MM/YYYY, YYYY/MM/DD, DD.MM.YYYY, MM.DD.YYYY");
+        }
+    }
+    
+    /**
+     * Parse datetime string in various formats to LocalDateTime
+     * Supports: YYYY-MM-DD HH:mm:ss, YYYY-MM-DD HH:mm, DD-MM-YYYY HH:mm:ss, etc.
+     */
+    private LocalDateTime parseDateTimeString(String dateTimeString) {
+        if (dateTimeString == null || dateTimeString.trim().isEmpty()) {
+            throw new IllegalArgumentException("DateTime string cannot be null or empty");
+        }
+        
+        String trimmedDateTime = dateTimeString.trim();
+        logger.debug("Parsing datetime string: {}", trimmedDateTime);
+        
+        // Try different datetime formats
+        DateTimeFormatter[] formatters = {
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),    // ISO format with seconds
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),       // ISO format without seconds
+            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm:ss"),    // DD-MM-YYYY with seconds
+            DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm"),       // DD-MM-YYYY without seconds
+            DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm:ss"),    // MM/DD/YYYY with seconds
+            DateTimeFormatter.ofPattern("MM/dd/yyyy HH:mm"),       // MM/DD/YYYY without seconds
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss"),    // DD/MM/YYYY with seconds
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"),       // DD/MM/YYYY without seconds
+            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss"),    // YYYY/MM/DD with seconds
+            DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm"),       // YYYY/MM/DD without seconds
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss"),    // DD.MM.YYYY with seconds
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"),       // DD.MM.YYYY without seconds
+            DateTimeFormatter.ofPattern("MM.dd.yyyy HH:mm:ss"),    // MM.DD.YYYY with seconds
+            DateTimeFormatter.ofPattern("MM.dd.yyyy HH:mm")        // MM.DD.YYYY without seconds
+        };
+        
+        for (DateTimeFormatter formatter : formatters) {
+            try {
+                LocalDateTime parsedDateTime = LocalDateTime.parse(trimmedDateTime, formatter);
+                logger.debug("Successfully parsed datetime {} using formatter {}", trimmedDateTime, formatter.toString());
+                return parsedDateTime;
+            } catch (DateTimeParseException e) {
+                // Continue to next formatter
+                logger.debug("Failed to parse {} with formatter {}: {}", trimmedDateTime, formatter.toString(), e.getMessage());
+            }
+        }
+        
+        // If none of the formatters work, try the default ISO format as last resort
+        try {
+            LocalDateTime parsedDateTime = LocalDateTime.parse(trimmedDateTime);
+            logger.debug("Successfully parsed datetime {} using default ISO formatter", trimmedDateTime);
+            return parsedDateTime;
+        } catch (DateTimeParseException e) {
+            logger.error("Unable to parse datetime string: {}", dateTimeString);
+            throw new IllegalArgumentException("Unable to parse datetime string: " + dateTimeString + 
+                ". Supported formats: YYYY-MM-DD HH:mm:ss, YYYY-MM-DD HH:mm, DD-MM-YYYY HH:mm:ss, etc.");
         }
     }
 }

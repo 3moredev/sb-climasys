@@ -191,11 +191,43 @@ public class AppointmentJpaService {
      */
     @Transactional
     public Map<String, Object> deletePatientAppointment(String patientId, LocalDateTime visitDate, String doctorId, String userId) {
-        logger.info("Deleting appointment for patient: {} on {}", patientId, visitDate);
+        logger.info("Deleting today's appointment for patient: {} at time {} with doctor: {}", patientId, visitDate.toLocalTime(), doctorId);
         
         try {
+            logger.info("Looking for appointment with exact datetime: {} (UTC)", visitDate);
+            
+            // First, let's check what appointments exist for this patient and doctor with this exact datetime
+            List<PatientVisit> existingAppointments = appointmentRepository.findAppointmentsByPatientDoctorAndExactDateTime(
+                patientId, doctorId, visitDate);
+            
+            logger.info("Found {} existing appointments for patient {} with doctor {} at exact datetime {} (UTC)", 
+                       existingAppointments.size(), patientId, doctorId, visitDate);
+            
+            for (PatientVisit appointment : existingAppointments) {
+                logger.info("Existing appointment: ID={}, VisitDate={}, VisitTime={}, Status={}, DeleteFlag={}", 
+                           appointment.getPatientVisitNo(), appointment.getVisitDate(), 
+                           appointment.getVisitTime(), appointment.getStatusId(), appointment.getDeleteFlag());
+            }
+            
+            // Try exact datetime match (since DB stores both date and time in UTC)
             int deletedCount = appointmentRepository.softDeleteAppointment(
                 patientId, visitDate, doctorId, LocalDateTime.now(), userId);
+            
+            logger.info("Exact datetime match deleted {} records", deletedCount);
+            
+            // If no exact match, try date-only match as fallback
+            if (deletedCount == 0) {
+                logger.info("No exact datetime match found, trying date-only match as fallback");
+                List<PatientVisit> dateOnlyAppointments = appointmentRepository.findAppointmentsByPatientDoctorAndDate(
+                    patientId, doctorId, visitDate);
+                logger.info("Found {} appointments for date-only search", dateOnlyAppointments.size());
+                
+                if (!dateOnlyAppointments.isEmpty()) {
+                    deletedCount = appointmentRepository.softDeleteAppointmentByDate(
+                        patientId, visitDate, doctorId, LocalDateTime.now(), userId);
+                    logger.info("Date-only match deleted {} records", deletedCount);
+                }
+            }
             
             Map<String, Object> result = new HashMap<>();
             if (deletedCount > 0) {
@@ -205,7 +237,7 @@ public class AppointmentJpaService {
                                patientId, doctorId, visitDate);
             } else {
                 result.put("success", false);
-                result.put("message", "No appointment found to delete");
+                result.put("message", "No appointment found to delete. Found " + existingAppointments.size() + " appointments but none matched the criteria.");
             }
             
             return result;
