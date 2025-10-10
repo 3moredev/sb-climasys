@@ -44,6 +44,16 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
     );
     
     /**
+     * Find the last completed visit for a patient (most recent with status 5)
+     * This matches the stored procedure logic that only returns completed visits
+     */
+    Optional<PatientVisit> findFirstByPatientIdAndDeleteFlagAndStatusIdOrderByVisitDateDesc(
+        String patientId, 
+        Boolean deleteFlag,
+        Short statusId
+    );
+    
+    /**
      * Find visits by doctor and date
      */
     @Query("SELECT pv FROM PatientVisit pv WHERE pv.doctorId = :doctorId " +
@@ -267,6 +277,34 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
         ORDER BY vpo.sequence_id ASC, vpo.medicine_name ASC
         """, nativeQuery = true)
     List<Map<String, Object>> findDetailedPrescriptionsForVisit(
+        @Param("patientId") String patientId,
+        @Param("visitDate") java.time.LocalDateTime visitDate,
+        @Param("patientVisitNo") Integer patientVisitNo,
+        @Param("doctorId") String doctorId,
+        @Param("clinicId") String clinicId
+    );
+
+    /**
+     * Find complaints for a specific visit from visit_complaints table
+     * This matches the stored procedure logic that fetches from visit_complaints
+     */
+    @Query(value = """
+        SELECT 
+            vc.complaint_description,
+            vc.created_on,
+            vc.createdby_name,
+            vc.modified_on,
+            vc.modifiedby_name
+        FROM visit_complaints vc
+        WHERE vc.patient_id = :patientId
+          AND vc.visit_date = :visitDate
+          AND vc.patient_visit_no = :patientVisitNo
+          AND vc.doctor_id = :doctorId
+          AND vc.clinic_id = :clinicId
+          AND vc.delete_flag = false
+        ORDER BY vc.complaint_description ASC
+        """, nativeQuery = true)
+    List<Map<String, Object>> findComplaintsForVisit(
         @Param("patientId") String patientId,
         @Param("visitDate") java.time.LocalDateTime visitDate,
         @Param("patientVisitNo") Integer patientVisitNo,

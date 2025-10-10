@@ -165,16 +165,19 @@ public class VisitJpaService {
     }
     
     /**
-     * Get the last visit details for a patient
+     * Get the last visit details for a patient (only completed visits with status 5)
+     * This matches the stored procedure logic that only returns completed visits
      */
     public Map<String, Object> getLastVisitDetails(String patientId) {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            logger.info("Getting last visit details for patient: {}", patientId);
+            logger.info("Getting last completed visit details for patient: {}", patientId);
             
+            // Use the new method that filters for status 5 (completed visits)
+            // This matches the stored procedure logic: AND Status_ID = 5
             Optional<PatientVisit> lastVisit = patientVisitRepository
-                .findFirstByPatientIdAndDeleteFlagOrderByVisitDateDesc(patientId, false);
+                .findFirstByPatientIdAndDeleteFlagAndStatusIdOrderByVisitDateDesc(patientId, false, (short) 5);
             
             if (lastVisit.isPresent()) {
                 PatientVisit visit = lastVisit.get();
@@ -186,13 +189,13 @@ public class VisitJpaService {
                 response.put("found", true);
                 response.put("visit", mapVisitToResponseWithPlr(visit, plrIndicators));
                 
-                logger.info("Found last visit for patient {}: {} with PLR: {}", patientId, visit.getVisitDate(), plrIndicators);
+                logger.info("Found last completed visit for patient {}: {} with PLR: {}", patientId, visit.getVisitDate(), plrIndicators);
             } else {
                 response.put("success", true);
                 response.put("found", false);
-                response.put("message", "No visits found for patient");
+                response.put("message", "No completed visits found for patient");
                 
-                logger.info("No visits found for patient: {}", patientId);
+                logger.info("No completed visits found for patient: {}", patientId);
             }
             
         } catch (Exception e) {
@@ -235,9 +238,9 @@ public class VisitJpaService {
                 response.put("success", true);
                 response.put("found", false);
                 response.put("totalVisits", 0);
-                response.put("message", "No visits found for patient");
+                response.put("message", "No completed visits found for patient");
                 
-                logger.info("No visits found for patient: {}", patientId);
+                logger.info("No completed visits found for patient: {}", patientId);
             }
             
         } catch (Exception e) {
@@ -690,7 +693,9 @@ public class VisitJpaService {
         visitMap.put("attendedById", visit.getAttendedById());
         visitMap.put("followUp", visit.getFollowUp());
         visitMap.put("followUpFlag", visit.getIsFollowUp());
-        visitMap.put("currentComplaint", visit.getCurrentComplaints());
+        // Fetch complaints from visit_complaints table (matching stored procedure logic)
+        String complaintsFromTable = getComplaintsFromVisitComplaintsTable(visit);
+        visitMap.put("currentComplaint", complaintsFromTable);
         visitMap.put("currentMedicines", visit.getCurrentMedicines());
         visitMap.put("visitComments", visit.getVisitComments());
         
@@ -811,6 +816,52 @@ public class VisitJpaService {
         }
     }
     
+    /**
+     * Get complaints from visit_complaints table for a specific visit
+     * This matches the stored procedure logic exactly - no fallback mechanism
+     * Returns empty string if no complaints found or on error (same as SP)
+     */
+    private String getComplaintsFromVisitComplaintsTable(PatientVisit visit) {
+        try {
+            List<Map<String, Object>> complaints = patientVisitRepository.findComplaintsForVisit(
+                visit.getPatientId(),
+                visit.getVisitDate(),
+                visit.getPatientVisitNo(),
+                visit.getDoctorId(),
+                visit.getClinicId()
+            );
+            
+            if (complaints.isEmpty()) {
+                logger.info("No complaints found in visit_complaints table for visit: patientId={}, visitNo={}, doctorId={}, clinicId={}", 
+                    visit.getPatientId(), visit.getPatientVisitNo(), visit.getDoctorId(), visit.getClinicId());
+                return "";
+            }
+            
+            // Join complaint descriptions with comma and space (matching stored procedure format)
+            String result = complaints.stream()
+                .map(complaint -> (String) complaint.get("complaint_description"))
+                .filter(description -> description != null && !description.trim().isEmpty())
+                .collect(java.util.stream.Collectors.joining(", "));
+                
+            logger.info("Found {} complaints in visit_complaints table for visit: patientId={}, visitNo={}, result='{}'", 
+                complaints.size(), visit.getPatientId(), visit.getPatientVisitNo(), result);
+            return result;
+                
+        } catch (Exception e) {
+            logger.error("Error fetching complaints from visit_complaints table for visit: {}", e.getMessage(), e);
+            // Return empty string like stored procedure - no fallback
+            return "";
+        }
+    }
+
+    /**
+     * Public method to test complaints fetching from visit_complaints table
+     */
+    public List<Map<String, Object>> getComplaintsForVisitFromTable(
+            String patientId, LocalDateTime visitDate, Integer visitNo, String doctorId, String clinicId) {
+        return patientVisitRepository.findComplaintsForVisit(patientId, visitDate, visitNo, doctorId, clinicId);
+    }
+
     /**
      * Map PatientVisit entity to response map with PLR indicators
      */
