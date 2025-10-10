@@ -292,7 +292,8 @@ public class VisitJpaService {
                     "includesPrescriptions", true,
                     "includesComplaints", true,
                     "includesDiagnosis", true,
-                    "includesDoctorInfo", true
+                    "includesDoctorInfo", true,
+                    "includesLabTestDescriptions", true
                 ));
                 
                 logger.info("Found {} previous visits with comprehensive data for patient {}", visitList.size(), patientId);
@@ -307,7 +308,8 @@ public class VisitJpaService {
                     "includesPrescriptions", true,
                     "includesComplaints", true,
                     "includesDiagnosis", true,
-                    "includesDoctorInfo", true
+                    "includesDoctorInfo", true,
+                    "includesLabTestDescriptions", true
                 ));
                 
                 logger.info("No previous visits found for patient: {}", patientId);
@@ -464,8 +466,10 @@ public class VisitJpaService {
         // Visit type and additional info with actual data
         visitMap.put("Visit_Type", "Patient_Visit");
         visitMap.put("Complaints", visitData.get("complaints") != null ? visitData.get("complaints").toString() : "");
+        visitMap.put("complaint_comments", visitData.get("complaint_comments") != null ? visitData.get("complaint_comments").toString() : "");
         visitMap.put("Diagnosis", visitData.get("diagnosis") != null ? visitData.get("diagnosis").toString() : "");
         visitMap.put("FollowUp_Description", visitData.get("followup_description") != null ? visitData.get("followup_description").toString() : "");
+        visitMap.put("Lab_Test_Descriptions", visitData.get("lab_test_descriptions") != null ? visitData.get("lab_test_descriptions").toString() : "");
         
         // Financial information
         visitMap.put("Fees_To_Collect", visitData.get("fees_to_collect") != null ? visitData.get("fees_to_collect") : 0);
@@ -820,6 +824,7 @@ public class VisitJpaService {
      * Get complaints from visit_complaints table for a specific visit
      * This matches the stored procedure logic exactly - no fallback mechanism
      * Returns empty string if no complaints found or on error (same as SP)
+     * Now includes both complaint_description and complaint_comment fields
      */
     private String getComplaintsFromVisitComplaintsTable(PatientVisit visit) {
         try {
@@ -837,10 +842,25 @@ public class VisitJpaService {
                 return "";
             }
             
-            // Join complaint descriptions with comma and space (matching stored procedure format)
+            // Join complaint descriptions and comments with comma and space (matching stored procedure format)
             String result = complaints.stream()
-                .map(complaint -> (String) complaint.get("complaint_description"))
-                .filter(description -> description != null && !description.trim().isEmpty())
+                .map(complaint -> {
+                    String description = (String) complaint.get("complaint_description");
+                    String comment = (String) complaint.get("complaint_comment");
+                    
+                    // Combine description and comment if both exist
+                    if (description != null && !description.trim().isEmpty()) {
+                        if (comment != null && !comment.trim().isEmpty()) {
+                            return description + " (" + comment + ")";
+                        } else {
+                            return description;
+                        }
+                    } else if (comment != null && !comment.trim().isEmpty()) {
+                        return comment;
+                    }
+                    return null;
+                })
+                .filter(combined -> combined != null && !combined.trim().isEmpty())
                 .collect(java.util.stream.Collectors.joining(", "));
                 
             logger.info("Found {} complaints in visit_complaints table for visit: patientId={}, visitNo={}, result='{}'", 

@@ -178,7 +178,7 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
                   AND vpo.clinic_id = pv.clinic_id
                   AND vpo.delete_indicator = false
             ), '') AS medicine_names,
-            -- Complaints from complaints table
+            -- Complaints from complaints table (description only)
             COALESCE((
                 SELECT STRING_AGG(vc.complaint_description, ', ')
                 FROM visit_complaints vc
@@ -188,7 +188,22 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
                   AND vc.doctor_id = pv.doctor_id
                   AND vc.clinic_id = pv.clinic_id
                   AND vc.delete_flag = false
+                  AND vc.complaint_description IS NOT NULL 
+                  AND vc.complaint_description != ''
             ), '') AS complaints,
+            -- Complaint comments separately
+            COALESCE((
+                SELECT STRING_AGG(vc.complaint_comment, ', ')
+                FROM visit_complaints vc
+                WHERE vc.patient_id = pv.patient_id
+                  AND vc.visit_date = pv.visit_date
+                  AND vc.patient_visit_no = pv.patient_visit_no
+                  AND vc.doctor_id = pv.doctor_id
+                  AND vc.clinic_id = pv.clinic_id
+                  AND vc.delete_flag = false
+                  AND vc.complaint_comment IS NOT NULL 
+                  AND vc.complaint_comment != ''
+            ), '') AS complaint_comments,
             -- Diagnosis from diagnosis table
             COALESCE((
                 SELECT STRING_AGG(vd.desease_description, ', ')
@@ -204,6 +219,17 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
             COALESCE(dm.prefix || ' ' || dm.first_name, '') AS doctor_name,
             -- Follow-up description
             COALESCE(fut.followup_description, '') AS followup_description,
+            -- Lab test descriptions from lab test table
+            COALESCE((
+                SELECT STRING_AGG(pvla.lab_test_description, ', ')
+                FROM patient_visit_labtestasked pvla
+                WHERE pvla.patient_id = pv.patient_id
+                  AND pvla.visit_date = pv.visit_date
+                  AND pvla.patient_visit_no = pv.patient_visit_no
+                  AND pvla.doctor_id = pv.doctor_id
+                  AND pvla.clinic_id = pv.clinic_id
+                  AND pvla.delete_flag = false
+            ), '') AS lab_test_descriptions,
             -- PLR indicators (Prescription, Lab, Radiology)
             CASE WHEN EXISTS (
                 SELECT 1 FROM visit_prescription_overwrite vpo2
@@ -291,6 +317,7 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
     @Query(value = """
         SELECT 
             vc.complaint_description,
+            vc.complaint_comment,
             vc.created_on,
             vc.createdby_name,
             vc.modified_on,

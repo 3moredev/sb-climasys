@@ -1089,6 +1089,7 @@ public class VisitController {
         }
     }
 
+
     @GetMapping("/appointments-for-date")
     public ResponseEntity<?> getTodaysAppointmentsForGivenDate(
             @RequestParam String doctorId,
