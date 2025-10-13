@@ -54,6 +54,16 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
     );
     
     /**
+     * Find a specific visit by patient ID, clinic ID, and visit number
+     */
+    Optional<PatientVisit> findFirstByPatientIdAndClinicIdAndPatientVisitNoAndDeleteFlag(
+        String patientId,
+        String clinicId,
+        Integer patientVisitNo,
+        Boolean deleteFlag
+    );
+    
+    /**
      * Find visits by doctor and date
      */
     @Query("SELECT pv FROM PatientVisit pv WHERE pv.doctorId = :doctorId " +

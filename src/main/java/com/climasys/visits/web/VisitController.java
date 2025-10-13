@@ -640,12 +640,13 @@ public class VisitController {
     }
 
     /**
-     * Get comprehensive patient appointment details matching USP_Get_PatientAppointmentDetailsNew stored procedure
+     * Get comprehensive patient appointment details using JPA
+     * This replaces the JDBC-based USP_Get_PatientAppointmentDetailsNew implementation
      * 
      * @param patientId Patient ID
-     * @param shiftId Shift ID
+     * @param shiftId Shift ID (not currently used in JPA version)
      * @param clinicId Clinic ID
-     * @param doctorId Doctor ID
+     * @param doctorId Doctor ID (not currently used in JPA version)
      * @param patientVisitNo Patient visit number
      * @param languageId Language ID for translations
      * @return Comprehensive patient appointment details
@@ -659,37 +660,24 @@ public class VisitController {
             @RequestParam Integer patientVisitNo,
             @RequestParam(defaultValue = "1") Integer languageId) {
         try {
-            // Check if patient visit exists with comprehensive data
-            String existsCheckSql = buildExistsCheckQuery();
+            logger.info("Getting appointment details using JPA for patient: {}, clinic: {}, visitNo: {}", 
+                patientId, clinicId, patientVisitNo);
             
-            List<Map<String, Object>> existsResult = jdbcTemplate.queryForList(existsCheckSql,
-                    patientId, clinicId, patientVisitNo, languageId);
+            // Use JPA service to get appointment details
+            Map<String, Object> result = visitJpaService.getPatientAppointmentDetails(
+                patientId, clinicId, patientVisitNo, languageId);
             
-            List<Map<String, Object>> mainResult;
-            List<Map<String, Object>> additionalResult;
-            
-            if (!existsResult.isEmpty()) {
-                // Patient visit exists - get comprehensive data with Payment_type_Master join
-                mainResult = getComprehensiveVisitData(patientId, clinicId, patientVisitNo, languageId, true);
-                additionalResult = getAdditionalVisitData(patientId, clinicId, shiftId, patientVisitNo);
+            if (result.get("success") != null && (Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
             } else {
-                // Patient visit doesn't exist - get basic data without Payment_type_Master join
-                mainResult = getComprehensiveVisitData(patientId, clinicId, patientVisitNo, languageId, false);
-                additionalResult = getAdditionalVisitData(patientId, clinicId, shiftId, patientVisitNo);
+                Map<String, Object> error = new HashMap<>();
+                error.put("ErrorNumber", -1);
+                error.put("ErrorMessage", result.get("error") != null ? result.get("error") : result.get("message"));
+                return ResponseEntity.badRequest().body(error);
             }
             
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("mainData", mainResult);
-            response.put("additionalData", additionalResult);
-            response.put("patientId", patientId);
-            response.put("clinicId", clinicId);
-            response.put("visitNo", patientVisitNo);
-            response.put("languageId", languageId);
-            
-            return ResponseEntity.ok(response);
-            
         } catch (Exception e) {
+            logger.error("Error getting appointment details: {}", e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
             error.put("ErrorNumber", -1);
             error.put("ErrorMessage", "Failed to get patient appointment details: " + e.getMessage());
@@ -698,20 +686,13 @@ public class VisitController {
     }
 
     private String buildExistsCheckQuery() {
-        return "SELECT 1 FROM Patient_Visits PV " +
-                "INNER JOIN Patient_Master PM ON pv.Patient_ID = PM.ID " +
-                "INNER JOIN Gender_Translations GT ON PM.Gender_ID = GT.Gender_ID " +
-                "LEFT JOIN Follow_Up_type FUT ON PV.follow_up_type = FUT.ID " +
-                "LEFT JOIN Refer_By_Translations RT ON PM.Refer_ID = RT.Refer_ID " +
-                "LEFT JOIN Doctor_Master DMS ON DMS.Doctor_ID = PV.Doctor_ID " +
-                "LEFT JOIN Followup_After_Master FAM ON FAM.ID = PV.Followup_After " +
-                "INNER JOIN Payment_type_Master PTM ON PTM.ID = PV.payment_by_ID " +
-                "LEFT JOIN Patient_Receipts rs ON pv.Receipt_Number = rs.Receipt_Number " +
-                "WHERE PV.Patient_ID = ? " +
-                "AND PV.Clinic_ID = ? " +
-                "AND PV.Patient_Visit_No = ? " +
-                "AND PV.Delete_Flag = 0 " +
-                "AND GT.Language_Id = ?";
+        // Simplified query to test basic join structure
+        return "SELECT 1 FROM patient_visits PV " +
+                "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
+                "WHERE PV.patient_id = ? " +
+                "AND PV.clinic_id = ? " +
+                "AND PV.patient_visit_no = ? " +
+                "AND PV.delete_flag = false";
     }
 
     private List<Map<String, Object>> getComprehensiveVisitData(String patientId, String clinicId, 
@@ -719,235 +700,258 @@ public class VisitController {
         
         String mainQuery = buildMainQuery(includePaymentMaster);
         
-        return jdbcTemplate.queryForList(mainQuery, patientId, clinicId, patientVisitNo, languageId);
+        // SIMPLIFIED: Parameters: language_id (for GT join), patient_id, clinic_id, patient_visit_no
+        return jdbcTemplate.queryForList(mainQuery, languageId, patientId, clinicId, patientVisitNo);
     }
 
     private String buildMainQuery(boolean includePaymentMaster) {
         StringBuilder query = new StringBuilder();
         
+        // Simplified query for testing
         query.append("SELECT ")
-                .append("PM.First_Name || ' ' || COALESCE(PM.Middle_Name, '') || ' ' || PM.Last_Name as Name, ")
-                .append("PM.First_Name || ' ' || PM.Last_Name as Partial_Name, ")
-                .append("PM.Age_Given, ")
-                .append("PM.Date_Of_Birth, ")
-                .append("PV.Folder_No, ")
-                .append("PV.Visit_Date, ")
-                .append("PV.Weight_IN_KGS, ")
-                .append("PV.Height_In_CMS, ")
-                .append("PV.Pulse, ")
-                .append("PV.Blood_Pressure, ")
-                .append("COALESCE(PV.Diabetes, false) AS Diabetes, ")
-                .append("COALESCE(PV.Cholestrol, false) AS Cholestrol, ")
-                .append("PV.Fees_To_Collect, ")
-                .append("PV.Instructions, ")
-                .append("PV.Folder_No, ")
-                .append("PV.Financial_Year, ")
-                .append("PV.Patient_Visit_No, ")
-                .append("PV.Status_ID, ")
-                .append("PV.Instructions, ")
-                .append("PV.Observation, ")
-                .append("PV.Fees_Collected, ")
-                .append("PV.discount, ")
-                .append("PV.Original_discount, ")
-                .append("PV.Comment, ")
-                .append("PM.First_Name || ' ' || PM.Last_Name as FirstLastName, ")
-                .append("PV.Sugar, ")
-                .append("PV.THtext, ")
-                .append("COALESCE(PV.In_Person, false) AS In_Person, ")
-                .append("COALESCE(PV.On_Call_Status, false) AS On_Call_Status, ")
-                .append("PV.Impression, ")
-                .append("PM.Gender_ID, ")
-                .append("GT.Gender_Description, ")
-                .append("EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - PM.Date_Of_Birth)) / 31557600.0 AS AgeYearsDecimal, ")
-                .append("ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - PM.Date_Of_Birth)) / 31557600.0)::INT AS AgeYearsIntRound, ")
-                .append("FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - PM.Date_Of_Birth)) / 31557600.0)::INT AS AgeYearsIntTrunc, ")
-                .append("PM.Mobile_1, ")
-                .append("PV.Weight_IN_KGS, ")
-                .append("CASE WHEN POSITION(':' IN PV.Refer_Doctor_Details) > 0 THEN ")
-                .append("SUBSTRING(PV.Refer_Doctor_Details FROM POSITION(':' IN PV.Refer_Doctor_Details) + 1) ")
-                .append("ELSE PV.Refer_Doctor_Details END AS Refer_Doctor_Details, ")
-                .append("PV.Refer_ID, ")
-                .append("RT.Refer_By_Description, ")
-                .append("RT.Refer_By_Description || ' -- ' || ")
-                .append("CASE WHEN POSITION(':' IN PV.Refer_Doctor_Details) > 0 THEN ")
-                .append("SUBSTRING(PV.Refer_Doctor_Details FROM POSITION(':' IN PV.Refer_Doctor_Details) + 1) ")
-                .append("ELSE PV.Refer_Doctor_Details END AS REFERDETAILS, ")
-                .append("PV.Payment_By_ID, ")
-                .append("PV.Payment_Remark, ")
-                .append("COALESCE(PV.follow_up, '') AS follow_up, ")
-                .append("COALESCE(PV.Current_Medicines, '') AS Current_Medicines, ")
-                .append("COALESCE(PV.Visit_Comments, '') AS Visit_Comments, ")
-                .append("COALESCE(PV.Current_Complaints, '') AS Current_Complaints, ")
-                .append("COALESCE(PV.Is_follow_Up, false) AS Is_follow_Up, ")
-                .append("COALESCE(PV.Is_Submit_Patient_Visit_Details, false) AS Is_Submit_Patient_Visit_Details, ")
-                .append("COALESCE(PV.TPR, '') AS TPR, ")
-                .append("PV.Important_Findings, ")
-                .append("PV.Additional_Comments, ")
-                .append("PV.Systemic, ")
-                .append("PV.Odeama, ")
-                .append("PV.Pallor, ")
-                .append("COALESCE(PV.IS_Submit_Gynec_Details, false) AS IS_Submit_Gynec_Details, ")
-                .append("COALESCE(PV.GC, '') AS GC, ")
-                .append("COALESCE(PV.FMP, '') AS FMP, ")
-                .append("COALESCE(PV.PRMC, '') AS PRMC, ")
-                .append("COALESCE(PV.PAMC, '') AS PAMC, ")
-                .append("COALESCE(PV.LMP, '') AS LMP, ")
-                .append("COALESCE(PV.Obstetrics_History, '') AS Obstetrics_History, ")
-                .append("COALESCE(PV.Surgical_History_Past_History, '') AS Surgical_History_Past_History, ")
-                .append("COALESCE(PV.Gynec_Additional_Comments, '') AS Gynec_Additional_Comments, ")
-                .append("COALESCE(PV.follow_up_type, 0) AS follow_up_type, ")
-                .append("FUT.FollowUp_Description AS FollowUp_Description, ")
-                .append("CASE WHEN PV.Follow_Up_Date IS NULL THEN '' ")
-                .append("ELSE REPLACE(TO_CHAR(PV.Follow_Up_Date, 'DD Mon YYYY'), ' ', '-') END AS Follow_Up_Date, ")
-                .append("CASE WHEN PV.EDD IS NULL THEN 'NULL' ")
-                .append("ELSE REPLACE(TO_CHAR(PV.EDD, 'DD Mon YYYY'), ' ', '-') END AS EDD, ")
-                .append("PV.plan, ")
-                .append("PV.Notes, ")
-                .append("PV.follow_up_Comment, ")
-                .append("PV.Treatment_comment, ")
-                .append("PV.Treatment_plan, ")
-                .append("PV.In_Person as Person, ")
-                .append("PV.Doctor_ID, ")
-                .append("DMS.Prefix || DMS.First_Name || ' - ' || DMS.Speciality AS DOCTOR_NAME, ")
-                .append("COALESCE(FUT.FollowUp_Description, '0') || ' - ' || ")
-                .append("CASE WHEN PV.Follow_Up_Date IS NULL THEN '' ")
-                .append("ELSE REPLACE(TO_CHAR(PV.Follow_Up_Date, 'DD Mon YYYY'), ' ', '-') END AS Folloupdateprint, ")
-                .append("COALESCE(FAM.Followup_After, 0) AS Followup_After, ")
-                .append("COALESCE(PV.Schedule, 0) AS Schedule, ")
-                .append("PV.Additional_Instructions, ")
-                .append("FAM.Days as followuP_after_Days, ")
-                .append("PV.Followup_After as followupafter_Id, ")
-                .append("PV.Visit_Date, ")
-                .append("PV.Treatment_comment, ")
-                .append("PV.Treatment_plan, ")
-                .append("PV.Impression_Finding, ")
-                .append("PV.follow_up, ")
-                .append("PV.Complaints_by_Patient_per_visit, ")
-                .append("PV.Receipt_Number, ")
-                .append("rs.Receipt_Date, ")
-                .append("rs.Receipt_Amount, ")
-                .append("CASE WHEN TO_CHAR(PV.Online_Appointment_Time, 'HH24:MI') = '00:00' THEN NULL ")
-                .append("ELSE TO_CHAR(PV.Online_Appointment_Time, 'HH24:MI') END AS Online_Appointment_Time, ")
-                .append("PV.Doctor_Address, ")
-                .append("PV.Doctor_Mobile, ")
-                .append("PV.Doctor_Email ");
-        
-        if (includePaymentMaster) {
-            query.append(", PTM.Payment_Description ");
-        }
-        
-        query.append("FROM Patient_Visits PV ")
-                .append("INNER JOIN Patient_Master PM ON pv.Patient_ID = PM.ID ")
-                .append("INNER JOIN Gender_Translations GT ON PM.Gender_ID = GT.Gender_ID ")
-                .append("LEFT JOIN Follow_Up_type FUT ON PV.follow_up_type = FUT.ID ")
-                .append("LEFT JOIN Refer_By_Translations RT ON PM.Refer_ID = RT.Refer_ID ")
-                .append("LEFT JOIN Doctor_Master DMS ON DMS.Doctor_ID = PV.Doctor_ID ")
-                .append("LEFT JOIN Followup_After_Master FAM ON FAM.ID = PV.Followup_After ");
-        
-        if (includePaymentMaster) {
-            query.append("INNER JOIN Payment_type_Master PTM ON PTM.ID = PV.payment_by_ID ");
-        }
-        
-        query.append("LEFT JOIN Patient_Receipts rs ON pv.Receipt_Number = rs.Receipt_Number ")
-                .append("WHERE PV.Patient_ID = ? ")
-                .append("AND PV.Clinic_ID = ? ")
-                .append("AND PV.Patient_Visit_No = ? ")
-                .append("AND PV.Delete_Flag = 0 ")
-                .append("AND GT.Language_Id = ?");
+                .append("PM.first_name, ")
+                .append("PM.last_name, ")
+                .append("PV.patient_id, ")
+                .append("PV.visit_date, ")
+                .append("PV.patient_visit_no, ")
+                .append("GT.gender_description, ")
+                .append("DMS.prefix, ")
+                .append("DMS.speciality ")
+                .append("FROM patient_visits PV ")
+                .append("INNER JOIN patient_master PM ON PV.patient_id = PM.id ")
+                .append("INNER JOIN gender_translations GT ON PM.gender_id = GT.gender_id AND GT.language_id = ? ")
+                .append("LEFT JOIN doctor_master DMS ON DMS.doctor_id = PV.doctor_id ")
+                .append("WHERE PV.patient_id = ? ")
+                .append("AND PV.clinic_id = ? ")
+                .append("AND PV.patient_visit_no = ? ")
+                .append("AND PV.delete_flag = false");
         
         return query.toString();
+        
+        /* ORIGINAL COMPLEX QUERY - TO BE RESTORED AFTER TESTING
+        query.append("SELECT ")
+                .append("PM.first_name || ' ' || COALESCE(PM.middle_name, '') || ' ' || PM.last_name as Name, ")
+                .append("PM.first_name || ' ' || PM.last_name as Partial_Name, ")
+                .append("PM.age_given, ")
+                .append("PM.date_of_birth, ")
+                .append("PV.folder_no, ")
+                .append("PV.visit_date, ")
+                .append("PV.weight_in_kgs, ")
+                .append("PV.height_in_cms, ")
+                .append("PV.pulse, ")
+                .append("PV.blood_pressure, ")
+                .append("COALESCE(PV.diabetes, false) AS Diabetes, ")
+                .append("COALESCE(PV.cholestrol, false) AS Cholestrol, ")
+                .append("PV.fees_to_collect, ")
+                .append("PV.instructions, ")
+                .append("PV.folder_no, ")
+                .append("PV.financial_year, ")
+                .append("PV.patient_visit_no, ")
+                .append("PV.status_id, ")
+                .append("PV.instructions, ")
+                .append("PV.observation, ")
+                .append("PV.fees_collected, ")
+                .append("PV.discount, ")
+                .append("PV.original_discount, ")
+                .append("PV.comment, ")
+                .append("PM.first_name || ' ' || PM.last_name as FirstLastName, ")
+                .append("PV.sugar, ")
+                .append("PV.thtext, ")
+                .append("COALESCE(PV.in_person, false) AS In_Person, ")
+                .append("COALESCE(PV.on_call_status, false) AS On_Call_Status, ")
+                .append("PV.impression, ")
+                .append("PM.gender_id, ")
+                .append("GT.gender_description, ")
+                .append("EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - PM.date_of_birth)) / 31557600.0 AS AgeYearsDecimal, ")
+                .append("ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - PM.date_of_birth)) / 31557600.0)::INT AS AgeYearsIntRound, ")
+                .append("FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - PM.date_of_birth)) / 31557600.0)::INT AS AgeYearsIntTrunc, ")
+                .append("PM.mobile_1, ")
+                .append("PV.weight_in_kgs, ")
+                .append("CASE WHEN POSITION(':' IN PV.refer_doctor_details) > 0 THEN ")
+                .append("SUBSTRING(PV.refer_doctor_details FROM POSITION(':' IN PV.refer_doctor_details) + 1) ")
+                .append("ELSE PV.refer_doctor_details END AS Refer_Doctor_Details, ")
+                .append("PV.refer_id, ")
+                .append("RT.refer_by_description, ")
+                .append("RT.refer_by_description || ' -- ' || ")
+                .append("CASE WHEN POSITION(':' IN PV.refer_doctor_details) > 0 THEN ")
+                .append("SUBSTRING(PV.refer_doctor_details FROM POSITION(':' IN PV.refer_doctor_details) + 1) ")
+                .append("ELSE PV.refer_doctor_details END AS REFERDETAILS, ")
+                .append("PV.payment_by_id, ")
+                .append("PV.payment_remark, ")
+                .append("COALESCE(PV.follow_up, '') AS follow_up, ")
+                .append("COALESCE(PV.current_medicines, '') AS Current_Medicines, ")
+                .append("COALESCE(PV.visit_comments, '') AS Visit_Comments, ")
+                .append("COALESCE(PV.current_complaints, '') AS Current_Complaints, ")
+                .append("COALESCE(PV.is_follow_up, false) AS Is_follow_Up, ")
+                .append("COALESCE(PV.is_submit_patient_visit_details, false) AS Is_Submit_Patient_Visit_Details, ")
+                .append("COALESCE(PV.tpr, '') AS TPR, ")
+                .append("PV.important_findings, ")
+                .append("PV.additional_comments, ")
+                .append("PV.systemic, ")
+                .append("PV.odeama, ")
+                .append("PV.pallor, ")
+                .append("COALESCE(PV.is_submit_gynec_details, false) AS IS_Submit_Gynec_Details, ")
+                .append("COALESCE(PV.gc, '') AS GC, ")
+                .append("COALESCE(PV.fmp, '') AS FMP, ")
+                .append("COALESCE(PV.prmc, '') AS PRMC, ")
+                .append("COALESCE(PV.pamc, '') AS PAMC, ")
+                .append("COALESCE(PV.lmp, '') AS LMP, ")
+                .append("COALESCE(PV.obstetrics_history, '') AS Obstetrics_History, ")
+                .append("COALESCE(PV.surgical_history_past_history, '') AS Surgical_History_Past_History, ")
+                .append("COALESCE(PV.gynec_additional_comments, '') AS Gynec_Additional_Comments, ")
+                .append("COALESCE(PV.follow_up_type, 0) AS follow_up_type, ")
+                .append("FUT.followup_description AS FollowUp_Description, ")
+                .append("CASE WHEN PV.follow_up_date IS NULL THEN '' ")
+                .append("ELSE REPLACE(TO_CHAR(PV.follow_up_date, 'DD Mon YYYY'), ' ', '-') END AS Follow_Up_Date, ")
+                .append("CASE WHEN PV.edd IS NULL THEN 'NULL' ")
+                .append("ELSE REPLACE(TO_CHAR(PV.edd, 'DD Mon YYYY'), ' ', '-') END AS EDD, ")
+                .append("PV.plan, ")
+                .append("PV.notes, ")
+                .append("PV.follow_up_comment, ")
+                .append("PV.treatment_comment, ")
+                .append("PV.treatment_plan, ")
+                .append("PV.in_person as Person, ")
+                .append("PV.doctor_id, ")
+                .append("DMS.prefix || DMS.first_name || ' - ' || DMS.speciality AS DOCTOR_NAME, ")
+                .append("COALESCE(FUT.followup_description, '0') || ' - ' || ")
+                .append("CASE WHEN PV.follow_up_date IS NULL THEN '' ")
+                .append("ELSE REPLACE(TO_CHAR(PV.follow_up_date, 'DD Mon YYYY'), ' ', '-') END AS Folloupdateprint, ")
+                .append("COALESCE(FAM.followup_after, 0) AS Followup_After, ")
+                .append("COALESCE(PV.schedule, 0) AS Schedule, ")
+                .append("PV.additional_instructions, ")
+                .append("FAM.days as followuP_after_Days, ")
+                .append("PV.followup_after as followupafter_Id, ")
+                .append("PV.visit_date, ")
+                .append("PV.treatment_comment, ")
+                .append("PV.treatment_plan, ")
+                .append("PV.impression_finding, ")
+                .append("PV.follow_up, ")
+                .append("PV.complaints_by_patient_per_visit, ")
+                .append("PV.receipt_number, ")
+                .append("rs.receipt_date, ")
+                .append("rs.receipt_amount, ")
+                .append("CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL ")
+                .append("ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS Online_Appointment_Time, ")
+                .append("PV.doctor_address, ")
+                .append("PV.doctor_mobile, ")
+                .append("PV.doctor_email ");
+        
+        if (includePaymentMaster) {
+            query.append(", PTM.payment_description ");
+        }
+        
+        query.append("FROM patient_visits PV ")
+                .append("INNER JOIN patient_master PM ON PV.patient_id = PM.id ")
+                .append("INNER JOIN gender_translations GT ON PM.gender_id = GT.gender_id AND GT.language_id = ? ")
+                .append("LEFT JOIN follow_up_type FUT ON PV.follow_up_type = FUT.id ")
+                .append("LEFT JOIN refer_by_translations RT ON PM.refer_id = RT.refer_id AND RT.language_id = ? ")
+                .append("LEFT JOIN doctor_master DMS ON DMS.doctor_id = PV.doctor_id ")
+                .append("LEFT JOIN followup_after_master FAM ON FAM.id = PV.followup_after ");
+        
+        if (includePaymentMaster) {
+            query.append("INNER JOIN payment_type_master PTM ON PTM.id = PV.payment_by_id ");
+        }
+        
+        query.append("LEFT JOIN patient_receipts rs ON PV.receipt_number = rs.receipt_number ")
+                .append("WHERE PV.patient_id = ? ")
+                .append("AND PV.clinic_id = ? ")
+                .append("AND PV.patient_visit_no = ? ")
+                .append("AND PV.delete_flag = false");
+        
+        return query.toString();
+        */
     }
 
     private List<Map<String, Object>> getAdditionalVisitData(String patientId, String clinicId, 
-            Short shiftId, Integer patientVisitNo) {
+            String doctorId, Short shiftId, Integer patientVisitNo) {
         
         String additionalQuery = "SELECT " +
-                "PV.Weight_IN_KGS, " +
-                "PV.Height_In_CMS, " +
-                "PV.Pulse, " +
-                "PV.Blood_Pressure, " +
-                "COALESCE(PV.Asthama, false) AS Asthama, " +
-                "COALESCE(PV.Hypertension, false) AS Hypertension, " +
-                "COALESCE(PV.Diabetes, false) AS Diabetes, " +
-                "COALESCE(PV.Cholestrol, false) AS Cholestrol, " +
-                "COALESCE(PV.IHD, false) AS IHD, " +
-                "COALESCE(PV.TH, false) AS TH, " +
-                "PV.Instructions, " +
-                "PV.Fees_To_Collect, " +
-                "PV.Instructions, " +
-                "PV.Patient_Visit_No, " +
-                "PV.Status_ID, " +
-                "COALESCE(PV.Smoking, false) AS Smoking, " +
-                "COALESCE(PV.Tobaco, false) AS Tobaco, " +
-                "COALESCE(PV.Alchohol, false) AS Alchohol, " +
-                "COALESCE(PV.Pregnant, false) AS Pregnant, " +
-                "COALESCE(PV.Discount, 0) AS Discount, " +
-                "PV.Habits_Comments, " +
-                "PV.Allergy_dtls, " +
-                "PV.Instructions, " +
-                "PV.Observation, " +
-                "PV.Original_Billed_Amount, " +
-                "PV.Symptom_Comment, " +
-                "PV.On_Call_Status, " +
-                "PV.Fees_Collected, " +
-                "PV.Comment, " +
+                "PV.weight_in_kgs, " +
+                "PV.height_in_cms, " +
+                "PV.pulse, " +
+                "PV.blood_pressure, " +
+                "COALESCE(PV.asthama, false) AS Asthama, " +
+                "COALESCE(PV.hypertension, false) AS Hypertension, " +
+                "COALESCE(PV.diabetes, false) AS Diabetes, " +
+                "COALESCE(PV.cholestrol, false) AS Cholestrol, " +
+                "COALESCE(PV.ihd, false) AS IHD, " +
+                "COALESCE(PV.th, false) AS TH, " +
+                "PV.instructions, " +
+                "PV.fees_to_collect, " +
+                "PV.instructions, " +
+                "PV.patient_visit_no, " +
+                "PV.status_id, " +
+                "COALESCE(PV.smoking, false) AS Smoking, " +
+                "COALESCE(PV.tobaco, false) AS Tobaco, " +
+                "COALESCE(PV.alchohol, false) AS Alchohol, " +
+                "COALESCE(PV.pregnant, false) AS Pregnant, " +
+                "COALESCE(PV.discount, 0) AS Discount, " +
+                "PV.habits_comments, " +
+                "PV.allergy_dtls, " +
+                "PV.instructions, " +
+                "PV.observation, " +
+                "PV.original_billed_amount, " +
+                "PV.symptom_comment, " +
+                "PV.on_call_status, " +
+                "PV.fees_collected, " +
+                "PV.comment, " +
                 "PV.discount, " +
-                "PV.Original_discount, " +
-                "COALESCE(PV.Impression, '') AS Impression, " +
-                "COALESCE(PV.Payment_By_ID, 0) AS Payment_By_ID, " +
-                "PV.Payment_Remark, " +
-                "PTM.Payment_Description, " +
+                "PV.original_discount, " +
+                "COALESCE(PV.impression, '') AS Impression, " +
+                "COALESCE(PV.payment_by_id, 0) AS Payment_By_ID, " +
+                "PV.payment_remark, " +
+                "PTM.payment_description, " +
                 "COALESCE(PV.follow_up, '') AS follow_up, " +
                 "COALESCE(PV.follow_up_type, 0) AS follow_up_type, " +
-                "FUT.FollowUp_Description AS FollowUp_Description, " +
-                "CASE WHEN PV.Follow_Up_Date IS NULL THEN '' " +
-                "ELSE REPLACE(TO_CHAR(PV.Follow_Up_Date, 'DD Mon YYYY'), ' ', '-') END AS Follow_Up_Date, " +
+                "FUT.followup_description AS FollowUp_Description, " +
+                "CASE WHEN PV.follow_up_date IS NULL THEN '' " +
+                "ELSE REPLACE(TO_CHAR(PV.follow_up_date, 'DD Mon YYYY'), ' ', '-') END AS Follow_Up_Date, " +
                 "PV.plan, " +
-                "PV.Notes, " +
-                "PV.follow_up_Comment, " +
-                "PV.Treatment_comment, " +
-                "PV.Treatment_plan, " +
-                "PV.In_Person as Person, " +
-                "COALESCE(FUT.FollowUp_Description, '0') || ' - ' || " +
-                "CASE WHEN PV.Follow_Up_Date IS NULL THEN '' " +
-                "ELSE REPLACE(TO_CHAR(PV.Follow_Up_Date, 'DD Mon YYYY'), ' ', '-') END AS Folloupdateprint, " +
-                "COALESCE(FAM.Followup_After, 0) AS Followup_After, " +
-                "COALESCE(PV.Schedule, 0) AS Schedule, " +
-                "PV.Additional_Instructions, " +
-                "FAM.Days as followuP_after_Days, " +
-                "PV.Visit_Date, " +
-                "PV.Followup_After as followupafter_Id, " +
-                "PV.Treatment_comment, " +
-                "PV.Treatment_plan, " +
-                "PV.Impression_Finding, " +
+                "PV.notes, " +
+                "PV.follow_up_comment, " +
+                "PV.treatment_comment, " +
+                "PV.treatment_plan, " +
+                "PV.in_person as Person, " +
+                "COALESCE(FUT.followup_description, '0') || ' - ' || " +
+                "CASE WHEN PV.follow_up_date IS NULL THEN '' " +
+                "ELSE REPLACE(TO_CHAR(PV.follow_up_date, 'DD Mon YYYY'), ' ', '-') END AS Folloupdateprint, " +
+                "COALESCE(FAM.followup_after, 0) AS Followup_After, " +
+                "COALESCE(PV.schedule, 0) AS Schedule, " +
+                "PV.additional_instructions, " +
+                "FAM.days as followuP_after_Days, " +
+                "PV.visit_date, " +
+                "PV.followup_after as followupafter_Id, " +
+                "PV.treatment_comment, " +
+                "PV.treatment_plan, " +
+                "PV.impression_finding, " +
                 "PV.follow_up, " +
-                "PV.Receipt_Number, " +
-                "rs.Receipt_Date, " +
-                "rs.Receipt_Amount, " +
-                "CASE WHEN TO_CHAR(PV.Online_Appointment_Time, 'HH24:MI') = '00:00' THEN NULL " +
-                "ELSE TO_CHAR(PV.Online_Appointment_Time, 'HH24:MI') END AS Online_Appointment_Time, " +
-                "PV.Refer_ID, " +
-                "CASE WHEN POSITION(':' IN PV.Refer_Doctor_Details) > 0 THEN " +
-                "SUBSTRING(PV.Refer_Doctor_Details FROM POSITION(':' IN PV.Refer_Doctor_Details) + 1) " +
-                "ELSE PV.Refer_Doctor_Details END AS Refer_Doctor_Details, " +
-                "PV.Doctor_Address, " +
-                "PV.Doctor_Mobile, " +
-                "PV.Doctor_Email " +
-                "FROM Patient_Visits PV " +
-                "INNER JOIN Patient_Master PM ON pv.Patient_ID = PM.ID " +
-                "LEFT JOIN Payment_type_Master PTM ON pv.Payment_By_ID = PTM.ID " +
-                "LEFT JOIN Follow_Up_type FUT ON pv.follow_up_type = FUT.ID " +
-                "LEFT JOIN Followup_After_Master FAM ON FAM.ID = PV.Followup_After " +
-                "LEFT JOIN Patient_Receipts rs ON pv.Receipt_Number = rs.Receipt_Number " +
-                "WHERE PV.Patient_ID = ? " +
-                "AND PV.Clinic_ID = ? " +
-                "AND PV.Doctor_ID = ? " +
-                "AND PV.Shift_Id = ? " +
-                "AND PV.Patient_Visit_No = ? " +
-                "AND PV.Delete_Flag = 0";
+                "PV.receipt_number, " +
+                "rs.receipt_date, " +
+                "rs.receipt_amount, " +
+                "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
+                "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS Online_Appointment_Time, " +
+                "PV.refer_id, " +
+                "CASE WHEN POSITION(':' IN PV.refer_doctor_details) > 0 THEN " +
+                "SUBSTRING(PV.refer_doctor_details FROM POSITION(':' IN PV.refer_doctor_details) + 1) " +
+                "ELSE PV.refer_doctor_details END AS Refer_Doctor_Details, " +
+                "PV.doctor_address, " +
+                "PV.doctor_mobile, " +
+                "PV.doctor_email " +
+                "FROM patient_visits PV " +
+                "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
+                "LEFT JOIN payment_type_master PTM ON PV.payment_by_id = PTM.id " +
+                "LEFT JOIN follow_up_type FUT ON PV.follow_up_type = FUT.id " +
+                "LEFT JOIN followup_after_master FAM ON FAM.id = PV.followup_after " +
+                "LEFT JOIN patient_receipts rs ON PV.receipt_number = rs.receipt_number " +
+                "WHERE PV.patient_id = ? " +
+                "AND PV.clinic_id = ? " +
+                "AND PV.doctor_id = ? " +
+                "AND PV.shift_id = ? " +
+                "AND PV.patient_visit_no = ? " +
+                "AND PV.delete_flag = false";
         
         return jdbcTemplate.queryForList(additionalQuery, patientId, clinicId, 
-                "DEFAULT_DOCTOR", shiftId, patientVisitNo);
+                doctorId, shiftId, patientVisitNo);
     }
 
     /**

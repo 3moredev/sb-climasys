@@ -208,6 +208,62 @@ public class VisitJpaService {
     }
     
     /**
+     * Get patient appointment details by patient ID, clinic ID, and visit number
+     * This replaces the JDBC-based USP_Get_PatientAppointmentDetailsNew implementation
+     */
+    public Map<String, Object> getPatientAppointmentDetails(String patientId, String clinicId, 
+            Integer patientVisitNo, Integer languageId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            logger.info("Getting appointment details for patient: {}, clinic: {}, visitNo: {}, languageId: {}", 
+                patientId, clinicId, patientVisitNo, languageId);
+            
+            // Find the visit using JPA repository
+            Optional<PatientVisit> visitOptional = patientVisitRepository
+                .findFirstByPatientIdAndClinicIdAndPatientVisitNoAndDeleteFlag(
+                    patientId, clinicId, patientVisitNo, false);
+            
+            if (visitOptional.isEmpty()) {
+                response.put("success", false);
+                response.put("found", false);
+                response.put("message", "Visit not found for patient: " + patientId + 
+                    ", clinic: " + clinicId + ", visitNo: " + patientVisitNo);
+                logger.warn("Visit not found for patient: {}, clinic: {}, visitNo: {}", 
+                    patientId, clinicId, patientVisitNo);
+                return response;
+            }
+            
+            PatientVisit visit = visitOptional.get();
+            
+            // Calculate PLR indicators
+            String plrIndicators = calculatePlrIndicators(visit);
+            
+            // Map visit to detailed response
+            Map<String, Object> visitData = mapVisitToResponseWithPlr(visit, plrIndicators);
+            
+            // Build response structure matching the stored procedure format
+            response.put("success", true);
+            response.put("found", true);
+            response.put("mainData", List.of(visitData));
+            response.put("additionalData", List.of(visitData)); // Same data for now
+            response.put("patientId", patientId);
+            response.put("clinicId", clinicId);
+            response.put("visitNo", patientVisitNo);
+            response.put("languageId", languageId);
+            
+            logger.info("Successfully retrieved appointment details for patient: {}", patientId);
+            
+        } catch (Exception e) {
+            logger.error("Error getting appointment details for patient {}: {}", patientId, e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to get appointment details: " + e.getMessage());
+        }
+        
+        return response;
+    }
+    
+    /**
      * Get all visits for a patient with complete details
      */
     public Map<String, Object> getAllVisitsForPatient(String patientId) {
