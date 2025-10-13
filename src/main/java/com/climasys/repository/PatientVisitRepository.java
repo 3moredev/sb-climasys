@@ -122,6 +122,7 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
             pv.blood_pressure,
             pv.height_in_cms,
             pv.sugar,
+            pv.thtext,
             pv.hypertension,
             pv.diabetes,
             pv.cholestrol,
@@ -167,6 +168,50 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
             pv.createdby_name,
             pv.modified_on,
             pv.modifiedby_name,
+            -- Additional fields for form requirements
+            pv.allergy_dtls,
+            pv.habits_comments,
+            pv.in_person,
+            pv.symptom_comment,
+            pv.impression,
+            pv.attended_by,
+            pv.payment_by_id,
+            pv.payment_remark,
+            pv.attended_by_id,
+            pv.tpr,
+            pv.comment,
+            pv.receipt_number,
+            pv.receipt_type,
+            pv.is_submit_patient_labtest,
+            pv.complaints_by_patient_per_visit,
+            pv.additional_instructions,
+            pv.impression_finding,
+            pv.followup_after,
+            pv.schedule,
+            pv.online_appointment_time,
+            pv.doctor_address,
+            pv.doctor_mobile,
+            pv.doctor_email,
+            pv.folder_no,
+            pv.financial_year,
+            pv.appointment_sr_no,
+            pv.patient_last_visit_no,
+            pv.on_call_status,
+            pv.original_billed_amount,
+            pv.offline_reason,
+            pv.offline_flag,
+            pv.doctor_notes,
+            pv.cat_id,
+            pv.from_time,
+            -- Patient master fields for patient information
+            pm.first_name,
+            pm.middle_name,
+            pm.last_name,
+            pm.age_given,
+            pm.date_of_birth,
+            pm.mobile_1,
+            pm.gender_id,
+            pm.refer_id as patient_refer_id,
             -- Medicine names from prescription table
             COALESCE((
                 SELECT STRING_AGG(vpo.medicine_name, ', ')
@@ -259,6 +304,7 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
                   AND vpf.delete_flag = false
             ) THEN 'R' ELSE '' END AS plr_indicators
         FROM patient_visits pv
+        LEFT JOIN patient_master pm ON pm.id = pv.patient_id
         LEFT JOIN doctor_master dm ON dm.doctor_id = pv.doctor_id
         LEFT JOIN follow_up_type fut ON fut.id = pv.follow_up_type
         WHERE pv.patient_id = :patientId
