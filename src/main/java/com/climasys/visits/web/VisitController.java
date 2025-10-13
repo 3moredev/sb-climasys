@@ -76,12 +76,13 @@ public class VisitController {
     // Convert timezone in Java for time fields
     private void convertTimezoneInRow(Map<String, Object> row) {
         try {
+            // Convert Visit_Time
             Object rawVisitTime = row.get("Raw_Visit_Time");
             System.out.println("DEBUG - Raw_Visit_Time: " + rawVisitTime + " (type: " + (rawVisitTime != null ? rawVisitTime.getClass().getSimpleName() : "null") + ")");
             
             if (rawVisitTime != null) {
                 String timeStr = rawVisitTime.toString();
-                System.out.println("DEBUG - Processing time string: " + timeStr);
+                System.out.println("DEBUG - Processing visit time string: " + timeStr);
                 
                 // Parse the time string (format: HH:MM:SS or HH:MM)
                 if (timeStr.matches("\\d{2}:\\d{2}(:\\d{2})?")) {
@@ -89,7 +90,7 @@ public class VisitController {
                     int hours = Integer.parseInt(parts[0]);
                     int minutes = Integer.parseInt(parts[1]);
                     
-                    System.out.println("DEBUG - Parsed time: " + hours + ":" + minutes);
+                    System.out.println("DEBUG - Parsed visit time: " + hours + ":" + minutes);
                     
                     // Convert from UTC to target timezone using TimezoneUtils
                     try {
@@ -109,7 +110,45 @@ public class VisitController {
                         row.put("Visit_Time", fallbackTime);
                     }
                 } else {
-                    System.out.println("DEBUG - Time format doesn't match expected pattern: " + timeStr);
+                    System.out.println("DEBUG - Visit time format doesn't match expected pattern: " + timeStr);
+                }
+            }
+            
+            // Convert Online_Appointment_Time
+            Object onlineTime = row.get("Online_Appointment_Time");
+            System.out.println("DEBUG - Online_Appointment_Time: " + onlineTime + " (type: " + (onlineTime != null ? onlineTime.getClass().getSimpleName() : "null") + ")");
+            
+            if (onlineTime != null) {
+                String onlineTimeStr = onlineTime.toString();
+                System.out.println("DEBUG - Processing online time string: " + onlineTimeStr);
+                
+                // Parse the time string (format: HH:MM:SS or HH:MM)
+                if (onlineTimeStr.matches("\\d{2}:\\d{2}(:\\d{2})?")) {
+                    String[] parts = onlineTimeStr.split(":");
+                    int hours = Integer.parseInt(parts[0]);
+                    int minutes = Integer.parseInt(parts[1]);
+                    
+                    System.out.println("DEBUG - Parsed online time: " + hours + ":" + minutes);
+                    
+                    // Convert from UTC to target timezone using TimezoneUtils
+                    try {
+                        java.time.LocalTime utcTime = java.time.LocalTime.of(hours, minutes);
+                        java.time.LocalTime targetTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
+                        
+                        String convertedOnlineTime = String.format("%02d:%02d", targetTime.getHour(), targetTime.getMinute());
+                        System.out.println("DEBUG - Converted online time UTC to " + timezoneUtils.getTimezoneDisplayName() + ": " + onlineTimeStr + " -> " + convertedOnlineTime);
+                        
+                        row.put("Online_Appointment_Time", convertedOnlineTime);
+                        System.out.println("DEBUG - Set Online_Appointment_Time field to: " + convertedOnlineTime);
+                        
+                    } catch (Exception timezoneException) {
+                        System.out.println("ERROR - Online time timezone conversion failed, using original time: " + timezoneException.getMessage());
+                        // Fallback to original time if timezone conversion fails
+                        String fallbackTime = String.format("%02d:%02d", hours, minutes);
+                        row.put("Online_Appointment_Time", fallbackTime);
+                    }
+                } else {
+                    System.out.println("DEBUG - Online time format doesn't match expected pattern: " + onlineTimeStr);
                 }
             }
         } catch (Exception e) {
@@ -929,7 +968,7 @@ public class VisitController {
                 "rs.receipt_date, " +
                 "rs.receipt_amount, " +
                 "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
-                "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS Online_Appointment_Time, " +
+                "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS \"Online_Appointment_Time\", " +
                 "PV.refer_id, " +
                 "CASE WHEN POSITION(':' IN PV.refer_doctor_details) > 0 THEN " +
                 "SUBSTRING(PV.refer_doctor_details FROM POSITION(':' IN PV.refer_doctor_details) + 1) " +
@@ -1216,6 +1255,10 @@ public class VisitController {
                 "TO_CHAR(PV.visit_date, 'DD-MM-YYYY') AS Visit_Date, " +
                 "PV.visit_time::time AS VTime, " +
                 "PV.patient_visit_no, " +
+                "PV.shift_id, " +
+                "PV.clinic_id, " +
+                "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
+                "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS \"Online_Appointment_Time\", " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
@@ -1252,12 +1295,15 @@ public class VisitController {
                 System.out.println("  VTime: " + row.get("VTime"));
                 System.out.println("  From_time: " + row.get("From_time"));
                 System.out.println("  full_time: " + row.get("full_time"));
+                System.out.println("  Online_Appointment_Time: " + row.get("Online_Appointment_Time"));
+                System.out.println("  online_appointment_time: " + row.get("online_appointment_time"));
                 
                 // Convert timezone in Java if needed
                 convertTimezoneInRow(row);
                 
                 System.out.println("DEBUG - Row " + i + " AFTER conversion:");
                 System.out.println("  Visit_Time: " + row.get("Visit_Time"));
+                System.out.println("  Online_Appointment_Time: " + row.get("Online_Appointment_Time"));
             }
             
             // Convert timezone for all remaining rows
@@ -1292,6 +1338,10 @@ public class VisitController {
                 "TO_CHAR(PV.visit_date, 'DD-MM-YYYY') as visit_date, " +
                 "PV.visit_time::time AS VTime, " +
                 "PV.patient_visit_no, " +
+                "PV.shift_id, " +
+                "PV.clinic_id, " +
+                "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
+                "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS \"Online_Appointment_Time\", " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
@@ -1342,6 +1392,10 @@ public class VisitController {
                 "TO_CHAR(PV.visit_date, 'DD-MM-YYYY') AS Visit_Date, " +
                 "PV.visit_time::time AS VTime, " +
                 "PV.patient_visit_no, " +
+                "PV.shift_id, " +
+                "PV.clinic_id, " +
+                "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
+                "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS \"Online_Appointment_Time\", " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
@@ -1399,6 +1453,10 @@ public class VisitController {
                 "TO_CHAR(PV.visit_date, 'DD-MM-YYYY') AS Visit_Date, " +
                 "PV.visit_time::time AS VTime, " +
                 "PV.patient_visit_no, " +
+                "PV.shift_id, " +
+                "PV.clinic_id, " +
+                "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
+                "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS \"Online_Appointment_Time\", " +
                 "SR.status_description, " +
                 "SR.id AS Status_ID, " +
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +

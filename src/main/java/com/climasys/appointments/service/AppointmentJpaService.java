@@ -324,15 +324,26 @@ public class AppointmentJpaService {
             if (onlineAppointmentTime != null && !onlineAppointmentTime.trim().isEmpty()) {
                 try {
                     onlineTime = java.sql.Time.valueOf(onlineAppointmentTime + ":00");
+                    logger.info("Converted online time '{}' to SQL Time: {}", onlineAppointmentTime, onlineTime);
                 } catch (Exception e) {
                     logger.warn("Invalid online appointment time format: {}, setting to null", onlineAppointmentTime);
                 }
+            } else {
+                logger.info("Online appointment time is null or empty: '{}'", onlineAppointmentTime);
             }
+            
+            // Log the exact parameters being used in the WHERE clause
+            logger.info("UPDATE WHERE clause parameters: patientId={}, visitNo={}, shiftId={}, clinicId={}", 
+                       patientId, patientVisitNo, shiftId, clinicId);
+            logger.info("UPDATE SET values: onlineTime={}, doctorId={}, statusId={}, referId={}", 
+                       onlineTime, doctorId, statusId, referId);
             
             // Update appointment
             int updatedCount = appointmentRepository.updateAppointmentOnlineTimeAndDoctor(
                 patientId, patientVisitNo, shiftId, clinicId, onlineTime, doctorId, 
                 statusId, LocalDateTime.now(), userId, referId);
+            
+            logger.info("UPDATE result: {} row(s) affected", updatedCount);
             
             Map<String, Object> result = new HashMap<>();
             if (updatedCount > 0) {
