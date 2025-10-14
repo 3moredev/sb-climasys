@@ -18,6 +18,12 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 50MB
+      max-request-size: 100MB
+      file-size-threshold: 2KB
   jpa:
     hibernate:
       ddl-auto: none
@@ -59,26 +65,58 @@ logging:
     com.climasys: INFO
 
 climasys:
+  # Encryption key - equivalent to KEY in Web.config
   encryption:
-    key: ${CLIMASYS_ENCRYPTION_KEY:PA1ANDE61INI6}
+    key: "PA1ANDE61INI6"
+  
+  # Amount key - equivalent to AMOUNTKEY in Web.config
+  amount-key: "200000"
+  
   # Timezone configuration - leave empty to use auto-detection
   # Auto-detection will use IST if system is in India, otherwise system default
-  timezone: ${CLIMASYS_TIMEZONE:}
+  timezone: ""
+  
   # CORS configuration - supports multiple origins for different environments
   # You can override these with environment variables if needed
   cors:
-    allowed-origins: http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000,https://yourdomain.com
-    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-origins: "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000,https://yourdomain.com"
+    allowed-methods: "GET,POST,PUT,DELETE,OPTIONS"
     allowed-headers: "*"
     allow-credentials: true
+  
   database:
     tables:
-      patient_master: patient_master
-      doctor_master: doctor_master
-      clinic_master: clinic_master
-      appointment_master: appointment_master
-      patient_queue: patient_queue
-      patient_visits: patient_visits
+      patient_master: "patient_master"
+      doctor_master: "doctor_master"
+      clinic_master: "clinic_master"
+      appointment_master: "appointment_master"
+      patient_queue: "patient_queue"
+      patient_visits: "patient_visits"
+  
+  # File upload configuration - mapped from Web.config appSettings
+  # .NET uses ~ for application root, Java uses ./ for relative paths
+  file-upload:
+    # UPLOADPATIENT - Main patient documents upload folder
+    upload-patient: "./PatientUploads"
+    
+    # UPLOADFOLDERPATH - Attached documents folder
+    upload-folder-path: "./Attached Documents"
+    
+    # UPLOADPROFILE - MR profile photos
+    upload-profile: "./MRProfile"
+    
+    # UPLOADREMINDERS - Reminder attachments
+    upload-reminders: "./AttachReminders"
+    
+    # UPLOADTREATMENTDETAILS - Treatment details documents
+    upload-treatment-details: "./Treatment_Details"
+    
+    # UPLOADKEYWORDINVESTIGATIONS - Keyword investigations
+    upload-keyword-investigations: "./KeywordInvestiations"
+    
+    # File upload limits
+    max-file-size: "4"
+    max-files-per-upload: 5
 
 # SpringDoc OpenAPI Configuration
 springdoc:

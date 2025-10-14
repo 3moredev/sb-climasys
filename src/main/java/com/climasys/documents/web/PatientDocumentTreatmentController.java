@@ -12,8 +12,13 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -237,6 +242,164 @@ public class PatientDocumentTreatmentController {
                 "success", false,
                 "error", "Failed to update document: " + e.getMessage()
             ));
+        }
+    }
+
+    /**
+     * Upload a single file for patient treatment
+     * Equivalent to .NET: UploadFileSubmit() method
+     */
+    @Operation(
+        summary = "Upload Patient Document",
+        description = "Uploads a single file for patient treatment and saves it to the file system. Equivalent to .NET UploadFileSubmit() method."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Document uploaded successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - Invalid file or parameters")
+    })
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadDocument(
+            @Parameter(description = "File to upload", required = true)
+            @RequestParam("file") MultipartFile file,
+            @Parameter(description = "Patient ID", required = true)
+            @RequestParam("patientId") String patientId,
+            @Parameter(description = "Doctor ID", required = true)
+            @RequestParam("doctorId") String doctorId,
+            @Parameter(description = "Clinic ID", required = true)
+            @RequestParam("clinicId") String clinicId,
+            @Parameter(description = "User who uploaded the file", required = true)
+            @RequestParam("createdByName") String createdByName,
+            @Parameter(description = "Patient visit number", required = true)
+            @RequestParam("patientVisitNo") Integer patientVisitNo,
+            @Parameter(description = "Visit date (optional, defaults to current date/time)")
+            @RequestParam(value = "visitDate", required = false) String visitDate) {
+        try {
+            // Parse visit date or use current date/time
+            LocalDateTime visitDateTime;
+            if (visitDate != null && !visitDate.trim().isEmpty()) {
+                visitDateTime = parseDateTime(visitDate);
+            } else {
+                visitDateTime = LocalDateTime.now();
+            }
+
+            Map<String, Object> result = service.uploadAndSaveDocument(
+                file,
+                patientId,
+                doctorId,
+                clinicId,
+                createdByName,
+                patientVisitNo,
+                visitDateTime
+            );
+
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", "Failed to upload document: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Upload multiple files for patient treatment
+     * Equivalent to .NET: UploadFileSubmit() with HttpFileCollection
+     */
+    @Operation(
+        summary = "Upload Multiple Patient Documents",
+        description = "Uploads multiple files for patient treatment. Equivalent to .NET file collection upload."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Documents uploaded successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - Invalid files or parameters")
+    })
+    @PostMapping(value = "/upload-multiple", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadMultipleDocuments(
+            @Parameter(description = "Files to upload (max 5)", required = true)
+            @RequestParam("files") MultipartFile[] files,
+            @Parameter(description = "Patient ID", required = true)
+            @RequestParam("patientId") String patientId,
+            @Parameter(description = "Doctor ID", required = true)
+            @RequestParam("doctorId") String doctorId,
+            @Parameter(description = "Clinic ID", required = true)
+            @RequestParam("clinicId") String clinicId,
+            @Parameter(description = "User who uploaded the files", required = true)
+            @RequestParam("createdByName") String createdByName,
+            @Parameter(description = "Patient visit number", required = true)
+            @RequestParam("patientVisitNo") Integer patientVisitNo,
+            @Parameter(description = "Visit date (optional, defaults to current date/time)")
+            @RequestParam(value = "visitDate", required = false) String visitDate) {
+        try {
+            // Parse visit date or use current date/time
+            LocalDateTime visitDateTime;
+            if (visitDate != null && !visitDate.trim().isEmpty()) {
+                visitDateTime = parseDateTime(visitDate);
+            } else {
+                visitDateTime = LocalDateTime.now();
+            }
+
+            Map<String, Object> result = service.uploadAndSaveMultipleDocuments(
+                files,
+                patientId,
+                doctorId,
+                clinicId,
+                createdByName,
+                patientVisitNo,
+                visitDateTime
+            );
+
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", "Failed to upload documents: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * Download a document file
+     * Equivalent to .NET: lnkDocumentName_Click with req.DownloadData
+     */
+    @Operation(
+        summary = "Download Patient Document",
+        description = "Downloads a patient document file. Equivalent to .NET document download with WebClient.DownloadData."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Document downloaded successfully"),
+        @ApiResponse(responseCode = "404", description = "Document not found")
+    })
+    @GetMapping("/download/{documentId}")
+    public ResponseEntity<Resource> downloadDocument(
+            @Parameter(description = "Document ID", required = true, example = "1")
+            @PathVariable Integer documentId) {
+        try {
+            Map<String, Object> result = service.getDocumentFile(documentId);
+
+            if ((Boolean) result.get("success")) {
+                byte[] fileBytes = (byte[]) result.get("fileBytes");
+                String filename = (String) result.get("filename");
+                String contentType = (String) result.get("contentType");
+
+                ByteArrayResource resource = new ByteArrayResource(fileBytes);
+
+                return ResponseEntity.ok()
+                    .contentType(MediaType.parseMediaType(contentType))
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                    .body(resource);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
         }
     }
 
