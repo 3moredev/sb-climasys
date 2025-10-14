@@ -917,51 +917,67 @@ public class VisitJpaService {
             String doctorId = visit.getDoctorId();
             String clinicId = visit.getClinicId();
             
+            logger.info("DEBUG PLR: Calculating for patientId={}, visitDate={}, visitNo={}, doctorId={}, clinicId={}", 
+                patientId, visitDate, patientVisitNo, doctorId, clinicId);
+            
             StringBuilder plr = new StringBuilder();
             
             // Check for Prescription (P)
+            // Use DATE() to compare only the date portion, ignoring time differences
             String prescriptionQuery = """
                 SELECT COUNT(*) FROM visit_prescription_overwrite vpo
-                WHERE vpo.patient_id = ? AND vpo.visit_date = ? AND vpo.patient_visit_no = ?
+                WHERE vpo.patient_id = ? AND DATE(vpo.visit_date) = DATE(?) AND vpo.patient_visit_no = ?
                   AND vpo.doctor_id = ? AND vpo.clinic_id = ? AND vpo.delete_indicator = false
                 """;
             
             Integer prescriptionCount = jdbcTemplate.queryForObject(
                 prescriptionQuery, Integer.class, patientId, visitDate, patientVisitNo, doctorId, clinicId);
             
+            logger.info("DEBUG PLR: Prescription count = {} (matching on DATE only)", prescriptionCount);
+            
             if (prescriptionCount != null && prescriptionCount > 0) {
                 plr.append("P");
             }
             
             // Check for Lab (L)
+            // Use DATE() to compare only the date portion, ignoring time differences
             String labQuery = """
                 SELECT COUNT(*) FROM patient_visit_labtestasked pvla
-                WHERE pvla.patient_id = ? AND pvla.visit_date = ? AND pvla.patient_visit_no = ?
+                WHERE pvla.patient_id = ? AND DATE(pvla.visit_date) = DATE(?) AND pvla.patient_visit_no = ?
                   AND pvla.doctor_id = ? AND pvla.clinic_id = ? AND pvla.delete_flag = false
                 """;
             
             Integer labCount = jdbcTemplate.queryForObject(
                 labQuery, Integer.class, patientId, visitDate, patientVisitNo, doctorId, clinicId);
             
+            logger.info("DEBUG PLR: Lab count = {} (matching on DATE only)", labCount);
+            
             if (labCount != null && labCount > 0) {
                 plr.append("L");
             }
             
             // Check for Radiology (R)
+            // Use DATE() to compare only the date portion, ignoring time differences
             String radiologyQuery = """
                 SELECT COUNT(*) FROM visit_procedure_findings vpf
-                WHERE vpf.patient_id = ? AND vpf.visit_date = ? AND vpf.patient_visit_no = ?
+                WHERE vpf.patient_id = ? AND DATE(vpf.visit_date) = DATE(?) AND vpf.patient_visit_no = ?
                   AND vpf.doctor_id = ? AND vpf.clinic_id = ? AND vpf.delete_flag = false
                 """;
             
             Integer radiologyCount = jdbcTemplate.queryForObject(
                 radiologyQuery, Integer.class, patientId, visitDate, patientVisitNo, doctorId, clinicId);
             
+            logger.info("DEBUG PLR: Radiology count = {} (matching on DATE only)", radiologyCount);
+            
             if (radiologyCount != null && radiologyCount > 0) {
                 plr.append("R");
             }
             
-            return plr.toString();
+            String result = plr.toString();
+            logger.info("DEBUG PLR: Final PLR result = '{}' (Prescription:{}, Lab:{}, Radiology:{})", 
+                result, prescriptionCount, labCount, radiologyCount);
+            
+            return result;
             
         } catch (Exception e) {
             logger.error("Error calculating PLR indicators for visit: {}", e.getMessage(), e);
