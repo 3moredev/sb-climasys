@@ -54,6 +54,92 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
     );
     
     /**
+     * Get previous date data for a patient (USP_Get_PrevDateData equivalent)
+     * Finds the last completed visit (status 5) before or equal to today's visit
+     * Using List<Object[]> to avoid JPA Map mapping issues
+     */
+    @Query(value = """
+        WITH LastVisitDate AS (
+            SELECT patient_id,
+                   CAST(visit_date AS timestamp) + CAST(visit_time AS interval) AS last_visit_date
+            FROM patient_visits pv
+            WHERE CAST(pv.visit_date AS date) = CAST(:todaysVisitDate AS date)
+              AND pv.shift_id = :shiftId
+              AND pv.clinic_id = :clinicId
+              AND pv.delete_flag = false
+              AND pv.patient_id = :patientId
+              AND pv.patient_visit_no = :patientVisitNo
+        ),
+        PreviousVisits AS (
+            SELECT ROW_NUMBER() OVER (PARTITION BY pv.patient_id ORDER BY pv.visit_date DESC, pv.visit_time DESC) AS rownum,
+                   pv.patient_id,
+                   pv.doctor_id,
+                   pv.patient_visit_no,
+                   pv.visit_date,
+                   pv.visit_time,
+                   pv.shift_id
+            FROM patient_visits pv
+            LEFT JOIN LastVisitDate lv ON pv.patient_id = lv.patient_id
+            WHERE (CAST(pv.visit_date AS timestamp) + CAST(pv.visit_time AS interval)) <= lv.last_visit_date
+              AND pv.status_id = 5
+              AND pv.delete_flag = false
+        )
+        SELECT pv.weight_in_kgs,
+               pv.height_in_cms,
+               pv.pulse,
+               pv.blood_pressure,
+               COALESCE(pv.asthama, false) AS asthama,
+               COALESCE(pv.hypertension, false) AS hypertension,
+               COALESCE(pv.diabetes, false) AS diabetes,
+               COALESCE(pv.cholestrol, false) AS cholestrol,
+               COALESCE(pv.ihd, false) AS ihd,
+               COALESCE(pv.th, false) AS th,
+               pv.instructions,
+               pv.fees_to_collect,
+               pv.patient_visit_no,
+               pv.status_id,
+               COALESCE(pv.smoking, false) AS smoking,
+               COALESCE(pv.tobaco, false) AS tobaco,
+               COALESCE(pv.alchohol, false) AS alchohol,
+               pv.habits_comments,
+               pv.allergy_dtls,
+               pv.observation,
+               pv.symptom_comment,
+               COALESCE(pv.thtext, '') AS thtext,
+               COALESCE(pv.sugar, '') AS sugar,
+               COALESCE(pv.current_medicines, '') AS current_medicines,
+               COALESCE(pv.visit_comments, '') AS visit_comments,
+               COALESCE(pv.current_complaints, '') AS current_complaints,
+               COALESCE(pv.fmp, '') AS fmp,
+               COALESCE(pv.prmc, '') AS prmc,
+               COALESCE(pv.pamc, '') AS pamc,
+               COALESCE(pv.lmp, '') AS lmp,
+               COALESCE(pv.obstetrics_history, '') AS obstetrics_history,
+               COALESCE(pv.surgical_history_past_history, '') AS surgical_history_past_history,
+               COALESCE(pv.gynec_additional_comments, '') AS gynec_additional_comments,
+               pv.edd,
+               COALESCE(pv.pregnant, false) AS pregnant,
+               pv.visit_date AS prev_visit_date,
+               pv.visit_time AS prev_visit_time,
+               pv.doctor_id AS prev_doctor_id
+        FROM patient_visits pv
+        INNER JOIN PreviousVisits pvisit 
+            ON pv.patient_visit_no = pvisit.patient_visit_no 
+            AND pv.patient_id = pvisit.patient_id
+            AND pv.shift_id = pvisit.shift_id
+        WHERE pv.patient_id = :patientId
+          AND pv.delete_flag = false
+          AND pvisit.rownum = 1
+        """, nativeQuery = true)
+    List<Object[]> getPreviousDateDataRaw(
+        @Param("patientId") String patientId,
+        @Param("todaysVisitDate") java.time.LocalDate todaysVisitDate,
+        @Param("shiftId") Short shiftId,
+        @Param("clinicId") String clinicId,
+        @Param("patientVisitNo") Integer patientVisitNo
+    );
+    
+    /**
      * Find a specific visit by patient ID, clinic ID, and visit number
      */
     Optional<PatientVisit> findFirstByPatientIdAndClinicIdAndPatientVisitNoAndDeleteFlag(

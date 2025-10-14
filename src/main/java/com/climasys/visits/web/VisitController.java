@@ -1023,6 +1023,51 @@ public class VisitController {
             return ResponseEntity.internalServerError().body(error);
         }
     }
+    
+    /**
+     * Get previous date data for a patient (USP_Get_PrevDateData equivalent)
+     * Returns data from the last completed visit to pre-populate form fields
+     * 
+     * @param patientId Patient ID
+     * @param doctorId Doctor ID (optional, for logging)
+     * @param patientVisitNo Patient visit number for today's visit
+     * @param todaysVisitDate Today's visit date (YYYY-MM-DD)
+     * @param shiftId Shift ID
+     * @param clinicId Clinic ID
+     * @return Previous visit data for form pre-population
+     */
+    @GetMapping("/prev-date-data")
+    public ResponseEntity<?> getPreviousDateData(
+            @RequestParam String patientId,
+            @RequestParam(required = false) String doctorId,
+            @RequestParam Integer patientVisitNo,
+            @RequestParam String todaysVisitDate,
+            @RequestParam Short shiftId,
+            @RequestParam String clinicId) {
+        try {
+            logger.info("Getting previous date data for patient: {}, visitNo: {}, date: {}", 
+                patientId, patientVisitNo, todaysVisitDate);
+            
+            // Parse the date
+            LocalDate visitDate = LocalDate.parse(todaysVisitDate);
+            
+            Map<String, Object> result = visitJpaService.getPreviousDateData(
+                patientId, doctorId, patientVisitNo, visitDate, shiftId, clinicId);
+            
+            if (result.get("success") != null && (Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error getting previous date data for patient {}: {}", patientId, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get previous date data: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
 
     @GetMapping("/all-visits/{patientId}")
     public ResponseEntity<?> getAllVisitsForPatient(@PathVariable String patientId) {

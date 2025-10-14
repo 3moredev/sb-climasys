@@ -208,6 +208,95 @@ public class VisitJpaService {
     }
     
     /**
+     * Get previous date data for a patient (USP_Get_PrevDateData equivalent)
+     * Returns data from the last completed visit to pre-populate form fields
+     */
+    public Map<String, Object> getPreviousDateData(
+            String patientId, 
+            String doctorId,
+            Integer patientVisitNo,
+            LocalDate todaysVisitDate,
+            Short shiftId,
+            String clinicId) {
+        
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            logger.info("Getting previous date data for patient: {}, visitNo: {}, date: {}, shift: {}, clinic: {}", 
+                patientId, patientVisitNo, todaysVisitDate, shiftId, clinicId);
+            
+            List<Object[]> rawResults = patientVisitRepository.getPreviousDateDataRaw(
+                patientId, todaysVisitDate, shiftId, clinicId, patientVisitNo);
+            
+            if (!rawResults.isEmpty()) {
+                Object[] row = rawResults.get(0);
+                Map<String, Object> data = new HashMap<>();
+                
+                // Map array indices to field names (must match SELECT order in query)
+                int i = 0;
+                data.put("weight_in_kgs", row[i++]);
+                data.put("height_in_cms", row[i++]);
+                data.put("pulse", row[i++]);
+                data.put("blood_pressure", row[i++]);
+                data.put("asthama", row[i++]);
+                data.put("hypertension", row[i++]);
+                data.put("diabetes", row[i++]);
+                data.put("cholestrol", row[i++]);
+                data.put("ihd", row[i++]);
+                data.put("th", row[i++]);
+                data.put("instructions", row[i++]);
+                data.put("fees_to_collect", row[i++]);
+                data.put("patient_visit_no", row[i++]);
+                data.put("status_id", row[i++]);
+                data.put("smoking", row[i++]);
+                data.put("tobaco", row[i++]);
+                data.put("alchohol", row[i++]);
+                data.put("habits_comments", row[i++]);
+                data.put("allergy_dtls", row[i++]);
+                data.put("observation", row[i++]);
+                data.put("symptom_comment", row[i++]);
+                data.put("thtext", row[i++]);
+                data.put("sugar", row[i++]);
+                data.put("current_medicines", row[i++]);
+                data.put("visit_comments", row[i++]);
+                data.put("current_complaints", row[i++]);
+                data.put("fmp", row[i++]);
+                data.put("prmc", row[i++]);
+                data.put("pamc", row[i++]);
+                data.put("lmp", row[i++]);
+                data.put("obstetrics_history", row[i++]);
+                data.put("surgical_history_past_history", row[i++]);
+                data.put("gynec_additional_comments", row[i++]);
+                data.put("edd", row[i++]);
+                data.put("pregnant", row[i++]);
+                data.put("prev_visit_date", row[i++]);
+                data.put("prev_visit_time", row[i++]);
+                data.put("prev_doctor_id", row[i++]);
+                
+                response.put("success", true);
+                response.put("found", true);
+                response.put("data", data);
+                
+                logger.info("Found previous visit data for patient {} from visit date: {} with {} fields", 
+                    patientId, data.get("prev_visit_date"), data.size());
+            } else {
+                response.put("success", true);
+                response.put("found", false);
+                response.put("message", "No previous completed visit found for patient");
+                
+                logger.info("No previous visit data found for patient: {}", patientId);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error getting previous date data for patient {}: {}", patientId, e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to get previous date data: " + e.getMessage());
+        }
+        
+        return response;
+    }
+    
+    /**
      * Get patient appointment details by patient ID, clinic ID, and visit number
      * This replaces the JDBC-based USP_Get_PatientAppointmentDetailsNew implementation
      */
@@ -803,6 +892,10 @@ public class VisitJpaService {
         visitMap.put("notes", visit.getNotes());
         visitMap.put("treatmentPlan", visit.getTreatmentPlan());
         visitMap.put("treatmentComment", visit.getTreatmentComment());
+        
+        // Instructions
+        visitMap.put("instructions", visit.getInstructions());
+        visitMap.put("additionalInstructions", visit.getAdditionalInstructions());
         
         // Audit fields
         visitMap.put("createdOn", visit.getCreatedOn());
