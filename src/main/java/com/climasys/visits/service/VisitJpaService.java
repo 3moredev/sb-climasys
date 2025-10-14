@@ -744,7 +744,7 @@ public class VisitJpaService {
         
         // Visit type and additional info
         visitMap.put("Visit_Type", "Patient_Visit");
-        visitMap.put("Complaints", ""); // Would need to join with complaints table
+        visitMap.put("Complaints", visit.getCurrentComplaints() != null ? visit.getCurrentComplaints() : ""); // Include current_complaints from patient_visits table
         visitMap.put("Diagnosis", ""); // Would need to join with diagnosis table
         visitMap.put("FollowUp_Description", ""); // Would need to join with follow-up table
         
@@ -844,7 +844,9 @@ public class VisitJpaService {
         visitMap.put("followUpFlag", visit.getIsFollowUp());
         // Fetch complaints from visit_complaints table (matching stored procedure logic)
         String complaintsFromTable = getComplaintsFromVisitComplaintsTable(visit);
-        visitMap.put("currentComplaint", complaintsFromTable);
+        visitMap.put("chiefComplaint", complaintsFromTable);
+        // Also include the current_complaints field from patient_visits table
+        visitMap.put("currentComplaints", visit.getCurrentComplaints());
         visitMap.put("currentMedicines", visit.getCurrentMedicines());
         visitMap.put("visitComments", visit.getVisitComments());
         
