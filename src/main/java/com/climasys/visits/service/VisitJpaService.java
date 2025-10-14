@@ -645,6 +645,7 @@ public class VisitJpaService {
         visitMap.put("Blood_Pressure", visitData.get("blood_pressure"));
         visitMap.put("Height_In_Cms", visitData.get("height_in_cms"));
         visitMap.put("Sugar", visitData.get("sugar"));
+        visitMap.put("ThText", visitData.get("thtext"));
         visitMap.put("Hypertension", visitData.get("hypertension"));
         visitMap.put("Diabetes", visitData.get("diabetes"));
         visitMap.put("Cholestrol", visitData.get("cholestrol"));
