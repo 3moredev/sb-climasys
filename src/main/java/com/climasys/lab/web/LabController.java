@@ -52,15 +52,13 @@ public class LabController {
     @PostMapping("/visits/{visitId}/results")
     public ResponseEntity<?> saveResults(@PathVariable String visitId, @RequestBody Map<String, Object> payload) {
         try {
-            SimpleJdbcCall jdbcCall = new SimpleJdbcCall(jdbcTemplate)
-                    .withProcedureName("USP_Save_TestReport");
-
-            Map<String, Object> parameters = new HashMap<>();
-            parameters.put("VisitId", visitId);
-            parameters.putAll(payload);
-
-            Map<String, Object> result = jdbcCall.execute(parameters);
-            return ResponseEntity.ok(result);
+            // Note: This endpoint is deprecated in favor of /api/lab/results/submit
+            // which provides proper JPA implementation equivalent to USP_Insert_LabTestAllData
+            return ResponseEntity.badRequest().body(Map.of(
+                "error", "This endpoint is deprecated. Please use /api/lab/results/submit instead.",
+                "message", "Use the new LabTestResultController for lab test result submission",
+                "newEndpoint", "/api/lab/results/submit"
+            ));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

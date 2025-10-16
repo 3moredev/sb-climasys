@@ -1,0 +1,134 @@
+package com.climasys.repository;
+
+import com.climasys.entity.PatientVisitLabTestResult;
+import com.climasys.entity.PatientVisitLabTestResultId;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * JPA Repository for PatientVisitLabTestResult entity
+ * Provides data access methods for lab test results
+ */
+@Repository
+public interface PatientVisitLabTestResultRepository extends JpaRepository<PatientVisitLabTestResult, PatientVisitLabTestResultId> {
+
+    /**
+     * Find lab test results for a specific patient visit
+     */
+    @Query("SELECT p FROM PatientVisitLabTestResult p WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.patientVisitNo = :patientVisitNo AND " +
+           "p.shiftId = :shiftId AND " +
+           "p.clinicId = :clinicId AND " +
+           "p.doctorId = :doctorId AND " +
+           "p.visitDate = :visitDate AND " +
+           "p.deleteFlag = false")
+    List<PatientVisitLabTestResult> findByPatientVisit(
+            @Param("patientId") String patientId,
+            @Param("patientVisitNo") Integer patientVisitNo,
+            @Param("shiftId") Short shiftId,
+            @Param("clinicId") String clinicId,
+            @Param("doctorId") String doctorId,
+            @Param("visitDate") LocalDateTime visitDate);
+
+    /**
+     * Find lab test results for a specific patient (all visits)
+     */
+    @Query("SELECT p FROM PatientVisitLabTestResult p WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.deleteFlag = false " +
+           "ORDER BY p.visitDate DESC, p.patientVisitNo DESC")
+    List<PatientVisitLabTestResult> findByPatientIdOrderByVisitDateDesc(@Param("patientId") String patientId);
+
+    /**
+     * Find distinct visit numbers for a patient
+     */
+    @Query("SELECT DISTINCT p.patientVisitNo FROM PatientVisitLabTestResult p WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.deleteFlag = false " +
+           "ORDER BY p.patientVisitNo DESC")
+    List<Integer> findDistinctVisitNumbersByPatientId(@Param("patientId") String patientId);
+
+    /**
+     * Find lab test results by lab test description for a patient
+     */
+    @Query("SELECT p FROM PatientVisitLabTestResult p WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.labTestDescription = :labTestDescription AND " +
+           "p.deleteFlag = false " +
+           "ORDER BY p.visitDate DESC")
+    List<PatientVisitLabTestResult> findByPatientIdAndLabTestDescription(
+            @Param("patientId") String patientId,
+            @Param("labTestDescription") String labTestDescription);
+
+    /**
+     * Soft delete lab test results for a specific patient visit
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE PatientVisitLabTestResult p SET p.deleteFlag = true, p.modifiedOn = :modifiedOn, p.modifiedbyName = :modifiedBy WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.patientVisitNo = :patientVisitNo AND " +
+           "p.shiftId = :shiftId AND " +
+           "p.clinicId = :clinicId AND " +
+           "p.doctorId = :doctorId AND " +
+           "p.visitDate = :visitDate")
+    int softDeleteByPatientVisit(
+            @Param("patientId") String patientId,
+            @Param("patientVisitNo") Integer patientVisitNo,
+            @Param("shiftId") Short shiftId,
+            @Param("clinicId") String clinicId,
+            @Param("doctorId") String doctorId,
+            @Param("visitDate") LocalDateTime visitDate,
+            @Param("modifiedOn") LocalDateTime modifiedOn,
+            @Param("modifiedBy") String modifiedBy);
+
+    /**
+     * Check if lab test results exist for a patient visit
+     */
+    @Query("SELECT COUNT(p) > 0 FROM PatientVisitLabTestResult p WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.patientVisitNo = :patientVisitNo AND " +
+           "p.shiftId = :shiftId AND " +
+           "p.clinicId = :clinicId AND " +
+           "p.doctorId = :doctorId AND " +
+           "p.visitDate = :visitDate AND " +
+           "p.deleteFlag = false")
+    boolean existsByPatientVisit(
+            @Param("patientId") String patientId,
+            @Param("patientVisitNo") Integer patientVisitNo,
+            @Param("shiftId") Short shiftId,
+            @Param("clinicId") String clinicId,
+            @Param("doctorId") String doctorId,
+            @Param("visitDate") LocalDateTime visitDate);
+
+    /**
+     * Find lab test results with specific parameters for a patient visit
+     */
+    @Query("SELECT p FROM PatientVisitLabTestResult p WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.patientVisitNo = :patientVisitNo AND " +
+           "p.shiftId = :shiftId AND " +
+           "p.clinicId = :clinicId AND " +
+           "p.doctorId = :doctorId AND " +
+           "p.visitDate = :visitDate AND " +
+           "p.labTestDescription = :labTestDescription AND " +
+           "p.parameterName = :parameterName AND " +
+           "p.deleteFlag = false")
+    PatientVisitLabTestResult findByPatientVisitAndTestParameter(
+            @Param("patientId") String patientId,
+            @Param("patientVisitNo") Integer patientVisitNo,
+            @Param("shiftId") Short shiftId,
+            @Param("clinicId") String clinicId,
+            @Param("doctorId") String doctorId,
+            @Param("visitDate") LocalDateTime visitDate,
+            @Param("labTestDescription") String labTestDescription,
+            @Param("parameterName") String parameterName);
+}
