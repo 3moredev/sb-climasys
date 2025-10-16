@@ -199,6 +199,58 @@ public class LabTestResultService {
     }
     
     /**
+     * Soft delete a specific lab test result parameter
+     * Equivalent to USP_Delete_LabtestParameter stored procedure
+     */
+    @Transactional
+    public boolean deleteLabTestResultParameter(String patientId, Integer patientVisitNo, Short shiftId,
+                                              String clinicId, String doctorId, LocalDateTime visitDate,
+                                              String labTestDescription, String parameterName, String userId) {
+        logger.info("Deleting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}", 
+                patientId, patientVisitNo, labTestDescription, parameterName);
+        
+        try {
+            // Check if the parameter exists before attempting to delete
+            boolean exists = repository.existsByPatientVisitAndParameter(
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
+                    labTestDescription, parameterName);
+            
+            if (!exists) {
+                logger.warn("Lab test result parameter not found for deletion: patient={}, visit={}, test={}, parameter={}", 
+                        patientId, patientVisitNo, labTestDescription, parameterName);
+                return false;
+            }
+            
+            // Perform the soft delete
+            int deletedCount = repository.softDeleteByPatientVisitAndParameter(
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
+                    labTestDescription, parameterName, LocalDateTime.now(), userId);
+            
+            logger.info("Soft deleted {} lab test result parameter", deletedCount);
+            return deletedCount > 0;
+            
+        } catch (Exception e) {
+            logger.error("Error deleting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}", 
+                    patientId, patientVisitNo, labTestDescription, parameterName, e);
+            return false;
+        }
+    }
+    
+    /**
+     * Get a specific lab test result parameter
+     */
+    public PatientVisitLabTestResult getLabTestResultParameter(String patientId, Integer patientVisitNo, Short shiftId,
+                                                             String clinicId, String doctorId, LocalDateTime visitDate,
+                                                             String labTestDescription, String parameterName) {
+        logger.info("Getting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}", 
+                patientId, patientVisitNo, labTestDescription, parameterName);
+        
+        return repository.findByPatientVisitAndTestParameter(
+                patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
+                labTestDescription, parameterName);
+    }
+    
+    /**
      * Validate the request data
      */
     private List<String> validateRequest(LabTestResultRequest request) {

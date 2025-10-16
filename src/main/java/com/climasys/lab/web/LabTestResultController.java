@@ -18,7 +18,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * REST Controller for Lab Test Result operations
@@ -202,6 +206,242 @@ public class LabTestResultController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(
                 LabTestResultResponse.error("Failed to delete lab test results: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Delete a specific lab test result parameter
+     * Equivalent to USP_Delete_LabtestParameter stored procedure
+     * This endpoint handles the trash can icon click from the lab results modal
+     */
+    @Operation(
+        summary = "Delete Lab Test Result Parameter",
+        description = "Soft deletes a specific lab test result parameter. Equivalent to USP_Delete_LabtestParameter stored procedure. " +
+                     "This endpoint handles the trash can icon click from the lab results entry modal."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test result parameter deleted successfully",
+            content = @Content(schema = @Schema(implementation = LabTestResultResponse.class))),
+        @ApiResponse(responseCode = "400", description = "Bad request - Invalid parameters",
+            content = @Content(schema = @Schema(implementation = LabTestResultResponse.class))),
+        @ApiResponse(responseCode = "404", description = "Lab test result parameter not found",
+            content = @Content(schema = @Schema(implementation = LabTestResultResponse.class))),
+        @ApiResponse(responseCode = "500", description = "Internal server error",
+            content = @Content(schema = @Schema(implementation = LabTestResultResponse.class)))
+    })
+    @DeleteMapping("/parameter")
+    public ResponseEntity<?> deleteLabTestResultParameter(
+            @Parameter(description = "Patient ID", required = true, example = "P001")
+            @RequestParam(required = false) String patientId,
+            
+            @Parameter(description = "Patient Visit Number", required = true, example = "1")
+            @RequestParam(required = false) Integer patientVisitNo,
+            
+            @Parameter(description = "Shift ID", required = true, example = "1")
+            @RequestParam(required = false) Short shiftId,
+            
+            @Parameter(description = "Clinic ID", required = true, example = "C001")
+            @RequestParam(required = false) String clinicId,
+            
+            @Parameter(description = "Doctor ID", required = true, example = "D001")
+            @RequestParam(required = false) String doctorId,
+            
+            @Parameter(description = "Visit Date", required = true, example = "2024-01-15T10:30:00")
+            @RequestParam(required = false) String visitDateStr,
+            
+            @Parameter(description = "Lab Test Description", required = true, example = "Complete Blood Count")
+            @RequestParam(required = false) String labTestDescription,
+            
+            @Parameter(description = "Parameter Name", required = true, example = "Hemoglobin")
+            @RequestParam(required = false) String parameterName,
+            
+            @Parameter(description = "User ID performing the deletion", required = true, example = "admin")
+            @RequestParam(required = false) String userId) {
+        
+        try {
+            // Validate required parameters
+            List<String> missingParams = new ArrayList<>();
+            if (patientId == null || patientId.trim().isEmpty()) missingParams.add("patientId");
+            if (patientVisitNo == null) missingParams.add("patientVisitNo");
+            if (shiftId == null) missingParams.add("shiftId");
+            if (clinicId == null || clinicId.trim().isEmpty()) missingParams.add("clinicId");
+            if (doctorId == null || doctorId.trim().isEmpty()) missingParams.add("doctorId");
+            if (visitDateStr == null || visitDateStr.trim().isEmpty()) missingParams.add("visitDate");
+            if (labTestDescription == null || labTestDescription.trim().isEmpty()) missingParams.add("labTestDescription");
+            if (parameterName == null || parameterName.trim().isEmpty()) missingParams.add("parameterName");
+            if (userId == null || userId.trim().isEmpty()) missingParams.add("userId");
+            
+            if (!missingParams.isEmpty()) {
+                return ResponseEntity.badRequest().body(
+                    LabTestResultResponse.error("Missing required parameters: " + String.join(", ", missingParams)));
+            }
+            
+            // Parse visit date with multiple format support
+            LocalDateTime visitDate;
+            try {
+                // Try ISO format first
+                visitDate = LocalDateTime.parse(visitDateStr);
+            } catch (Exception e1) {
+                try {
+                    // Try with space separator
+                    visitDate = LocalDateTime.parse(visitDateStr.replace(" ", "T"));
+                } catch (Exception e2) {
+                    try {
+                        // Try with custom format
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                        visitDate = LocalDateTime.parse(visitDateStr, formatter);
+                    } catch (Exception e3) {
+                        return ResponseEntity.badRequest().body(
+                            LabTestResultResponse.error("Invalid visit date format. Expected: yyyy-MM-ddTHH:mm:ss or yyyy-MM-dd HH:mm:ss. Received: " + visitDateStr));
+                    }
+                }
+            }
+            
+            boolean deleted = labTestResultService.deleteLabTestResultParameter(
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
+                    labTestDescription, parameterName, userId);
+            
+            if (deleted) {
+                return ResponseEntity.ok(LabTestResultResponse.success(
+                        patientId, patientVisitNo, doctorId, clinicId, shiftId, visitDate, 0, 0));
+            } else {
+                return ResponseEntity.status(404).body(
+                    LabTestResultResponse.error("Lab test result parameter not found"));
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(
+                LabTestResultResponse.error("Failed to delete lab test result parameter: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Test endpoint to validate parameters
+     */
+    @Operation(
+        summary = "Test Delete Parameter Endpoint",
+        description = "Test endpoint to validate parameters for delete operation"
+    )
+    @GetMapping("/parameter/test")
+    public ResponseEntity<?> testDeleteParameter(
+            @RequestParam(required = false) String patientId,
+            @RequestParam(required = false) Integer patientVisitNo,
+            @RequestParam(required = false) Short shiftId,
+            @RequestParam(required = false) String clinicId,
+            @RequestParam(required = false) String doctorId,
+            @RequestParam(required = false) String visitDateStr,
+            @RequestParam(required = false) String labTestDescription,
+            @RequestParam(required = false) String parameterName,
+            @RequestParam(required = false) String userId) {
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("received_parameters", Map.of(
+            "patientId", patientId,
+            "patientVisitNo", patientVisitNo,
+            "shiftId", shiftId,
+            "clinicId", clinicId,
+            "doctorId", doctorId,
+            "visitDateStr", visitDateStr,
+            "labTestDescription", labTestDescription,
+            "parameterName", parameterName,
+            "userId", userId
+        ));
+        
+        // Validate required parameters
+        List<String> missingParams = new ArrayList<>();
+        if (patientId == null || patientId.trim().isEmpty()) missingParams.add("patientId");
+        if (patientVisitNo == null) missingParams.add("patientVisitNo");
+        if (shiftId == null) missingParams.add("shiftId");
+        if (clinicId == null || clinicId.trim().isEmpty()) missingParams.add("clinicId");
+        if (doctorId == null || doctorId.trim().isEmpty()) missingParams.add("doctorId");
+        if (visitDateStr == null || visitDateStr.trim().isEmpty()) missingParams.add("visitDate");
+        if (labTestDescription == null || labTestDescription.trim().isEmpty()) missingParams.add("labTestDescription");
+        if (parameterName == null || parameterName.trim().isEmpty()) missingParams.add("parameterName");
+        if (userId == null || userId.trim().isEmpty()) missingParams.add("userId");
+        
+        response.put("missing_parameters", missingParams);
+        response.put("validation_status", missingParams.isEmpty() ? "PASS" : "FAIL");
+        
+        // Test date parsing
+        if (visitDateStr != null && !visitDateStr.trim().isEmpty()) {
+            try {
+                LocalDateTime visitDate = LocalDateTime.parse(visitDateStr);
+                response.put("date_parsing", "SUCCESS");
+                response.put("parsed_date", visitDate.toString());
+            } catch (Exception e1) {
+                try {
+                    LocalDateTime visitDate = LocalDateTime.parse(visitDateStr.replace(" ", "T"));
+                    response.put("date_parsing", "SUCCESS (with space replacement)");
+                    response.put("parsed_date", visitDate.toString());
+                } catch (Exception e2) {
+                    try {
+                        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                        LocalDateTime visitDate = LocalDateTime.parse(visitDateStr, formatter);
+                        response.put("date_parsing", "SUCCESS (with custom format)");
+                        response.put("parsed_date", visitDate.toString());
+                    } catch (Exception e3) {
+                        response.put("date_parsing", "FAILED");
+                        response.put("date_error", e3.getMessage());
+                    }
+                }
+            }
+        }
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Get a specific lab test result parameter
+     */
+    @Operation(
+        summary = "Get Lab Test Result Parameter",
+        description = "Retrieves a specific lab test result parameter for a patient visit"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test result parameter retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - Invalid parameters"),
+        @ApiResponse(responseCode = "404", description = "Lab test result parameter not found")
+    })
+    @GetMapping("/parameter")
+    public ResponseEntity<?> getLabTestResultParameter(
+            @Parameter(description = "Patient ID", required = true, example = "P001")
+            @RequestParam String patientId,
+            
+            @Parameter(description = "Patient Visit Number", required = true, example = "1")
+            @RequestParam Integer patientVisitNo,
+            
+            @Parameter(description = "Shift ID", required = true, example = "1")
+            @RequestParam Short shiftId,
+            
+            @Parameter(description = "Clinic ID", required = true, example = "C001")
+            @RequestParam String clinicId,
+            
+            @Parameter(description = "Doctor ID", required = true, example = "D001")
+            @RequestParam String doctorId,
+            
+            @Parameter(description = "Visit Date", required = true, example = "2024-01-15T10:30:00")
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime visitDate,
+            
+            @Parameter(description = "Lab Test Description", required = true, example = "Complete Blood Count")
+            @RequestParam String labTestDescription,
+            
+            @Parameter(description = "Parameter Name", required = true, example = "Hemoglobin")
+            @RequestParam String parameterName) {
+        
+        try {
+            PatientVisitLabTestResult result = labTestResultService.getLabTestResultParameter(
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
+                    labTestDescription, parameterName);
+            
+            if (result == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            return ResponseEntity.ok(result);
+            
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(
+                LabTestResultResponse.error("Failed to retrieve lab test result parameter: " + e.getMessage()));
         }
     }
 }

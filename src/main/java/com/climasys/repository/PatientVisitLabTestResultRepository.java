@@ -131,4 +131,54 @@ public interface PatientVisitLabTestResultRepository extends JpaRepository<Patie
             @Param("visitDate") LocalDateTime visitDate,
             @Param("labTestDescription") String labTestDescription,
             @Param("parameterName") String parameterName);
+
+    /**
+     * Soft delete a specific lab test result parameter
+     * Equivalent to USP_Delete_LabtestParameter stored procedure
+     */
+    @Modifying
+    @Transactional
+    @Query("UPDATE PatientVisitLabTestResult p SET p.deleteFlag = true, p.modifiedOn = :modifiedOn, p.modifiedbyName = :modifiedBy WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.patientVisitNo = :patientVisitNo AND " +
+           "p.shiftId = :shiftId AND " +
+           "p.clinicId = :clinicId AND " +
+           "p.doctorId = :doctorId AND " +
+           "p.visitDate = :visitDate AND " +
+           "p.labTestDescription = :labTestDescription AND " +
+           "p.parameterName = :parameterName")
+    int softDeleteByPatientVisitAndParameter(
+            @Param("patientId") String patientId,
+            @Param("patientVisitNo") Integer patientVisitNo,
+            @Param("shiftId") Short shiftId,
+            @Param("clinicId") String clinicId,
+            @Param("doctorId") String doctorId,
+            @Param("visitDate") LocalDateTime visitDate,
+            @Param("labTestDescription") String labTestDescription,
+            @Param("parameterName") String parameterName,
+            @Param("modifiedOn") LocalDateTime modifiedOn,
+            @Param("modifiedBy") String modifiedBy);
+
+    /**
+     * Check if a specific lab test result parameter exists
+     */
+    @Query("SELECT COUNT(p) > 0 FROM PatientVisitLabTestResult p WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.patientVisitNo = :patientVisitNo AND " +
+           "p.shiftId = :shiftId AND " +
+           "p.clinicId = :clinicId AND " +
+           "p.doctorId = :doctorId AND " +
+           "p.visitDate = :visitDate AND " +
+           "p.labTestDescription = :labTestDescription AND " +
+           "p.parameterName = :parameterName AND " +
+           "p.deleteFlag = false")
+    boolean existsByPatientVisitAndParameter(
+            @Param("patientId") String patientId,
+            @Param("patientVisitNo") Integer patientVisitNo,
+            @Param("shiftId") Short shiftId,
+            @Param("clinicId") String clinicId,
+            @Param("doctorId") String doctorId,
+            @Param("visitDate") LocalDateTime visitDate,
+            @Param("labTestDescription") String labTestDescription,
+            @Param("parameterName") String parameterName);
 }
