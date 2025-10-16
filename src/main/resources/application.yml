@@ -124,11 +124,13 @@ climasys:
     # File deletion configuration
     delete:
       # Enable strict mode - if true, database transaction will rollback if file deletion fails
-      strict-mode: false
+      strict-mode: true
       # Enable detailed logging for file deletion operations
       detailed-logging: true
       # Retry attempts for file deletion
       retry-attempts: 2
+      # Require physical file deletion before database update
+      require-physical-deletion: true
 
 # SpringDoc OpenAPI Configuration
 springdoc:
