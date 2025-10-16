@@ -42,6 +42,16 @@ public class FileStorageService {
 
     @Value("${climasys.file-upload.upload-keyword-investigations}")
     private String uploadKeywordInvestigations;
+    
+    // File deletion configuration
+    @Value("${climasys.file-upload.delete.strict-mode:false}")
+    private boolean strictMode;
+    
+    @Value("${climasys.file-upload.delete.detailed-logging:true}")
+    private boolean detailedLogging;
+    
+    @Value("${climasys.file-upload.delete.retry-attempts:2}")
+    private int retryAttempts;
 
     @Value("${climasys.file-upload.max-files-per-upload:5}")
     private int maxFilesPerUpload;
@@ -135,22 +145,79 @@ public class FileStorageService {
      * @return true if deleted successfully, false otherwise
      */
     public boolean deleteFile(String relativePath) {
-        try {
-            // Convert relative path to absolute path
-            Path filePath = Paths.get(relativePath);
-            
-            if (Files.exists(filePath)) {
-                Files.delete(filePath);
-                logger.info("File deleted successfully: {}", filePath.toAbsolutePath());
-                return true;
-            } else {
-                logger.warn("File not found for deletion: {}", filePath.toAbsolutePath());
-                return false;
-            }
-        } catch (IOException e) {
-            logger.error("Error deleting file: {}", relativePath, e);
-            return false;
+        if (detailedLogging) {
+            logger.info("Attempting to delete file with path: {}", relativePath);
         }
+        
+        // Try multiple attempts with retry logic
+        for (int attempt = 1; attempt <= retryAttempts; attempt++) {
+            try {
+                if (detailedLogging && attempt > 1) {
+                    logger.info("Retry attempt {} for file deletion: {}", attempt, relativePath);
+                }
+                
+                // Try multiple path resolution strategies
+                Path[] possiblePaths = {
+                    // Strategy 1: Direct path
+                    Paths.get(relativePath),
+                    // Strategy 2: Relative to current working directory
+                    Paths.get(System.getProperty("user.dir"), relativePath),
+                    // Strategy 3: Relative to parent directory (for sb-climasys subdirectory structure)
+                    Paths.get(System.getProperty("user.dir"), "..", relativePath),
+                    // Strategy 4: Relative to upload folder path if configured
+                    uploadFolderPath != null ? Paths.get(uploadFolderPath, relativePath) : null,
+                    // Strategy 5: Remove leading slash if present
+                    relativePath.startsWith("/") ? Paths.get(relativePath.substring(1)) : null,
+                    // Strategy 6: Try with uploads prefix
+                    Paths.get("uploads", relativePath),
+                    // Strategy 7: Try with uploads prefix and remove leading slash
+                    relativePath.startsWith("/") ? Paths.get("uploads", relativePath.substring(1)) : null,
+                    // Strategy 8: Map patient-documents to PatientUploads (based on actual file structure)
+                    relativePath.replace("/patient-documents/", "PatientUploads/").startsWith("/") ? 
+                        Paths.get(relativePath.replace("/patient-documents/", "PatientUploads/").substring(1)) : 
+                        Paths.get(relativePath.replace("/patient-documents/", "PatientUploads/")),
+                    // Strategy 9: Map patient-documents to PatientUploads with leading slash removed
+                    relativePath.startsWith("/patient-documents/") ? 
+                        Paths.get(relativePath.replace("/patient-documents/", "PatientUploads/").substring(1)) : null,
+                    // Strategy 10: Parent directory + PatientUploads mapping
+                    relativePath.startsWith("/patient-documents/") ? 
+                        Paths.get(System.getProperty("user.dir"), "..", relativePath.replace("/patient-documents/", "PatientUploads/").substring(1)) : null
+                };
+                
+                for (Path filePath : possiblePaths) {
+                    if (filePath == null) continue;
+                    
+                    if (detailedLogging) {
+                        logger.debug("Checking file existence at: {}", filePath.toAbsolutePath());
+                    }
+                    
+                    if (Files.exists(filePath)) {
+                        Files.delete(filePath);
+                        logger.info("File deleted successfully: {}", filePath.toAbsolutePath());
+                        return true;
+                    }
+                }
+                
+                if (attempt == retryAttempts) {
+                    logger.warn("File not found for deletion at any of the attempted paths after {} attempts. Original path: {}", retryAttempts, relativePath);
+                }
+                
+            } catch (IOException e) {
+                logger.error("Error deleting file (attempt {}): {}", attempt, relativePath, e);
+                if (attempt == retryAttempts) {
+                    return false;
+                }
+                // Wait before retry (exponential backoff)
+                try {
+                    Thread.sleep(100 * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    return false;
+                }
+            }
+        }
+        
+        return false;
     }
 
     /**

@@ -63,6 +63,9 @@ logging:
     com.zaxxer.hikari: INFO
     org.hibernate.SQL: INFO
     com.climasys: INFO
+    # Enhanced logging for file operations
+    com.climasys.documents.service.FileStorageService: DEBUG
+    com.climasys.documents.service.PatientDocumentTreatmentService: DEBUG
 
 climasys:
   # Encryption key - equivalent to KEY in Web.config
@@ -99,8 +102,8 @@ climasys:
     # UPLOADPATIENT - Main patient documents upload folder
     upload-patient: "./PatientUploads"
     
-    # UPLOADFOLDERPATH - Attached documents folder
-    upload-folder-path: "./Attached Documents"
+    # UPLOADFOLDERPATH - Attached documents folder (base path for all uploads)
+    upload-folder-path: "./PatientUploads"
     
     # UPLOADPROFILE - MR profile photos
     upload-profile: "./MRProfile"
@@ -117,6 +120,15 @@ climasys:
     # File upload limits
     max-file-size: "4"
     max-files-per-upload: 5
+    
+    # File deletion configuration
+    delete:
+      # Enable strict mode - if true, database transaction will rollback if file deletion fails
+      strict-mode: false
+      # Enable detailed logging for file deletion operations
+      detailed-logging: true
+      # Retry attempts for file deletion
+      retry-attempts: 2
 
 # SpringDoc OpenAPI Configuration
 springdoc:

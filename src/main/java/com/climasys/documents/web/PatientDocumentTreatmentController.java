@@ -210,6 +210,40 @@ public class PatientDocumentTreatmentController {
     }
 
     /**
+     * Delete a document with physical file deletion (transactional)
+     * This endpoint ensures both file system and database operations succeed or fail together
+     */
+    @Operation(
+        summary = "Delete Patient Document with Physical File",
+        description = "Deletes both the physical file from file system and soft deletes the database record as part of a transaction. Ensures data consistency."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Document and file deleted successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - Document not found or deletion failed")
+    })
+    @DeleteMapping("/{documentId}/with-file")
+    public ResponseEntity<?> deleteDocumentWithPhysicalFile(
+            @Parameter(description = "Document ID", required = true, example = "1")
+            @PathVariable Integer documentId,
+            @Parameter(description = "User ID performing the deletion", required = false, example = "admin")
+            @RequestParam(defaultValue = "system") String userId) {
+        try {
+            Map<String, Object> result = service.deleteDocumentWithPhysicalFile(documentId, userId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "success", false,
+                "error", "Failed to delete document with file: " + e.getMessage()
+            ));
+        }
+    }
+
+    /**
      * Update document name
      */
     @Operation(

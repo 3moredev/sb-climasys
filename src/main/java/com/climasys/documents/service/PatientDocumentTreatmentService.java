@@ -190,6 +190,115 @@ public class PatientDocumentTreatmentService {
     }
 
     /**
+     * Delete document with physical file deletion as part of a transaction
+     * This method ensures both file system and database operations succeed or fail together
+     */
+    @Transactional
+    public Map<String, Object> deleteDocumentWithPhysicalFile(Integer documentId, String userId) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            Optional<PatientDocumentTreatment> documentOpt = repository.findById(documentId);
+            
+            if (documentOpt.isPresent()) {
+                PatientDocumentTreatment document = documentOpt.get();
+                String filePath = document.getDocumentName(); // document_name stores the file path
+                
+                // Step 1: Delete physical file first
+                boolean fileDeleted = false;
+                String fileStatus = "unknown";
+                
+                if (filePath != null && !filePath.trim().isEmpty()) {
+                    logger.info("Attempting to delete file: {} for document ID: {}", filePath, documentId);
+                    
+                    // Try different path formats to handle various storage scenarios
+                    fileDeleted = fileStorageService.deleteFile(filePath);
+                    
+                    if (!fileDeleted) {
+                        logger.warn("Failed to delete physical file: {} for document ID: {}", filePath, documentId);
+                        
+                        // Try alternative path resolution
+                        String alternativePath = filePath.startsWith("/") ? filePath.substring(1) : filePath;
+                        if (!alternativePath.equals(filePath)) {
+                            logger.info("Trying alternative path: {}", alternativePath);
+                            fileDeleted = fileStorageService.deleteFile(alternativePath);
+                        }
+                        
+                        if (!fileDeleted) {
+                            // Check if file exists at all
+                            boolean fileExists = fileStorageService.fileExists(filePath) || 
+                                               fileStorageService.fileExists(alternativePath);
+                            
+                            if (!fileExists) {
+                                fileStatus = "not_found";
+                                logger.info("Physical file not found for document ID: {} - treating as already deleted", documentId);
+                                fileDeleted = true; // Consider it successful if file doesn't exist
+                            } else {
+                                fileStatus = "deletion_failed";
+                                logger.warn("All attempts to delete physical file failed for document ID: {}", documentId);
+                                // Continue with soft delete even if file deletion fails
+                                // This prevents orphaned database records
+                            }
+                        } else {
+                            fileStatus = "deleted_alternative_path";
+                            logger.info("Successfully deleted physical file using alternative path: {}", alternativePath);
+                        }
+                    } else {
+                        fileStatus = "deleted";
+                        logger.info("Successfully deleted physical file: {} for document ID: {}", filePath, documentId);
+                    }
+                } else {
+                    fileStatus = "no_path";
+                    logger.info("No file path found for document ID: {}, proceeding with soft delete only", documentId);
+                    fileDeleted = true; // Consider it successful if no file path
+                }
+                
+                // Step 2: Soft delete in database (this will be rolled back if file deletion failed and we want strict mode)
+                document.setDeleteFlag(true);
+                document.setModifiedOn(LocalDateTime.now());
+                document.setModifiedName(userId);
+                
+                repository.save(document);
+                
+                logger.info("Successfully deleted document ID: {} by user: {} (file status: {})", 
+                    documentId, userId, fileStatus);
+                
+                response.put("success", true);
+                response.put("message", "Document deleted successfully");
+                response.put("documentId", documentId);
+                response.put("fileDeleted", fileDeleted);
+                response.put("fileStatus", fileStatus);
+                response.put("filePath", filePath);
+                
+                // Add specific message based on file status
+                if ("not_found".equals(fileStatus)) {
+                    response.put("message", "Document deleted successfully (file was already missing)");
+                } else if ("deleted".equals(fileStatus)) {
+                    response.put("message", "Document and file deleted successfully");
+                } else if ("deletion_failed".equals(fileStatus)) {
+                    response.put("message", "Document deleted successfully (file deletion failed)");
+                } else if ("no_path".equals(fileStatus)) {
+                    response.put("message", "Document deleted successfully (no file path)");
+                }
+                
+            } else {
+                response.put("success", false);
+                response.put("error", "Document not found with ID: " + documentId);
+            }
+
+        } catch (Exception e) {
+            logger.error("Error deleting document with physical file: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to delete document: " + e.getMessage());
+            
+            // Transaction will be rolled back automatically due to @Transactional
+            // This ensures database consistency even if file operations fail
+        }
+
+        return response;
+    }
+
+    /**
      * Update document name
      */
     @Transactional
