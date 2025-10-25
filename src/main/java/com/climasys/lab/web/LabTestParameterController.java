@@ -25,16 +25,17 @@ public class LabTestParameterController {
     private LabTestParameterService labTestParameterService;
     
     /**
-     * Get lab test parameters for a specific doctor and lab test description
+     * Get lab test parameters for a specific doctor, clinic and lab test description
      * This endpoint replaces the USP_Get_LabTestAndParameter stored procedure call
      * 
      * @param doctorId Doctor ID to get lab test parameters for
+     * @param clinicId Clinic ID to filter lab test parameters
      * @param labTestDescription Lab test description to filter parameters
-     * @return List of lab test parameters for the doctor and lab test
+     * @return List of lab test parameters for the doctor, clinic and lab test
      */
     @Operation(
-        summary = "Get Lab Test Parameters by Doctor and Test Description",
-        description = "Retrieves all lab test parameters for a specific doctor and lab test description. " +
+        summary = "Get Lab Test Parameters by Doctor, Clinic and Test Description",
+        description = "Retrieves all lab test parameters for a specific doctor, clinic and lab test description. " +
                      "This replaces the USP_Get_LabTestAndParameter stored procedure functionality."
     )
     @ApiResponses(value = {
@@ -42,15 +43,17 @@ public class LabTestParameterController {
         @ApiResponse(responseCode = "400", description = "Bad request - invalid parameters"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    @GetMapping("/doctor/{doctorId}/test/{labTestDescription}")
-    public ResponseEntity<?> getLabTestParametersByDoctorAndTest(
+    @GetMapping("/doctor/{doctorId}/clinic/{clinicId}/test/{labTestDescription}")
+    public ResponseEntity<?> getLabTestParametersByDoctorClinicAndTest(
             @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
             @PathVariable String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @PathVariable String clinicId,
             @Parameter(description = "Lab Test Description", required = true, example = "Complete Blood Count")
             @PathVariable String labTestDescription) {
         
         try {
-            Map<String, Object> result = labTestParameterService.getLabTestAndParameters(doctorId, labTestDescription);
+            Map<String, Object> result = labTestParameterService.getLabTestAndParameters(doctorId, clinicId, labTestDescription);
             
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
@@ -67,30 +70,33 @@ public class LabTestParameterController {
     }
     
     /**
-     * Get lab test parameters for a specific doctor and lab test ID
+     * Get lab test parameters for a specific doctor, clinic and lab test ID
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param labTestId Lab test ID
      * @return List of lab test parameters
      */
     @Operation(
-        summary = "Get Lab Test Parameters by Doctor and Test ID",
-        description = "Retrieves all lab test parameters for a specific doctor and lab test ID."
+        summary = "Get Lab Test Parameters by Doctor, Clinic and Test ID",
+        description = "Retrieves all lab test parameters for a specific doctor, clinic and lab test ID."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lab test parameters retrieved successfully"),
         @ApiResponse(responseCode = "400", description = "Bad request - invalid parameters"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    @GetMapping("/doctor/{doctorId}/test-id/{labTestId}")
-    public ResponseEntity<?> getLabTestParametersByDoctorAndTestId(
+    @GetMapping("/doctor/{doctorId}/clinic/{clinicId}/test-id/{labTestId}")
+    public ResponseEntity<?> getLabTestParametersByDoctorClinicAndTestId(
             @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
             @PathVariable String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @PathVariable String clinicId,
             @Parameter(description = "Lab Test ID", required = true, example = "1")
             @PathVariable Integer labTestId) {
         
         try {
-            Map<String, Object> result = labTestParameterService.getLabTestParametersByTestId(doctorId, labTestId);
+            Map<String, Object> result = labTestParameterService.getLabTestParametersByTestId(doctorId, clinicId, labTestId);
             
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
@@ -107,27 +113,30 @@ public class LabTestParameterController {
     }
     
     /**
-     * Get all lab test parameters for a doctor
+     * Get all lab test parameters for a doctor and clinic
      * 
      * @param doctorId Doctor ID
-     * @return List of all lab test parameters for the doctor
+     * @param clinicId Clinic ID
+     * @return List of all lab test parameters for the doctor and clinic
      */
     @Operation(
-        summary = "Get All Lab Test Parameters by Doctor",
-        description = "Retrieves all lab test parameters for a specific doctor."
+        summary = "Get All Lab Test Parameters by Doctor and Clinic",
+        description = "Retrieves all lab test parameters for a specific doctor and clinic."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lab test parameters retrieved successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request - invalid doctor ID"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid doctor ID or clinic ID"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    @GetMapping("/doctor/{doctorId}")
-    public ResponseEntity<?> getAllLabTestParametersForDoctor(
+    @GetMapping("/doctor/{doctorId}/clinic/{clinicId}")
+    public ResponseEntity<?> getAllLabTestParametersForDoctorAndClinic(
             @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
-            @PathVariable String doctorId) {
+            @PathVariable String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @PathVariable String clinicId) {
         
         try {
-            Map<String, Object> result = labTestParameterService.getAllLabTestParametersForDoctor(doctorId);
+            Map<String, Object> result = labTestParameterService.getAllLabTestParametersForDoctor(doctorId, clinicId);
             
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
@@ -230,28 +239,31 @@ public class LabTestParameterController {
     }
     
     /**
-     * Get all lab tests with their parameters for a doctor
+     * Get all lab tests with their parameters for a doctor and clinic
      * 
      * @param doctorId Doctor ID
-     * @return All lab tests with their parameters for the doctor
+     * @param clinicId Clinic ID
+     * @return All lab tests with their parameters for the doctor and clinic
      */
     @Operation(
-        summary = "Get All Lab Tests with Parameters by Doctor",
-        description = "Retrieves all lab tests with their parameters for a specific doctor. " +
+        summary = "Get All Lab Tests with Parameters by Doctor and Clinic",
+        description = "Retrieves all lab tests with their parameters for a specific doctor and clinic. " +
                      "This combines lab test master data with parameter data in a single response."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lab tests with parameters retrieved successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request - invalid doctor ID"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid doctor ID or clinic ID"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    @GetMapping("/doctor/{doctorId}/all-with-parameters")
+    @GetMapping("/doctor/{doctorId}/clinic/{clinicId}/all-with-parameters")
     public ResponseEntity<?> getAllLabTestsWithParameters(
             @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
-            @PathVariable String doctorId) {
+            @PathVariable String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @PathVariable String clinicId) {
         
         try {
-            Map<String, Object> result = labTestParameterService.getAllLabTestsWithParameters(doctorId);
+            Map<String, Object> result = labTestParameterService.getAllLabTestsWithParameters(doctorId, clinicId);
             
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);

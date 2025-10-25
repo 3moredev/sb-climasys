@@ -4,123 +4,68 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * Entity class for Complaint_Master table
- * Represents complaint master data with operator display filtering
+ * Entity representing the Medicine_Master table
+ * Maps to the medicine master functionality
  * 
- * Note: This entity has a composite primary key (short_description, doctor_id, clinic_id)
+ * Note: This entity has a composite primary key (short_description, clinic_id)
  * to support multi-clinic functionality
  */
 @Entity
-@Table(name = "complaint_master")
-@IdClass(ComplaintMasterId.class)
-public class ComplaintMaster {
-
+@Table(name = "medicine_master")
+@IdClass(MedicineMasterId.class)
+public class MedicineMaster {
+    
     @Id
     @Column(name = "short_description", length = 40, nullable = false)
     private String shortDescription;
     
     @Id
-    @Column(name = "doctor_id", length = 30, nullable = false)
-    private String doctorId;
-    
-    @Id
     @Column(name = "clinic_id", length = 30, nullable = false)
     private String clinicId;
-
-    @Column(name = "complaint_description", length = 1000)
-    private String complaintDescription;
-
+    
+    @Column(name = "medicine_description", length = 1000)
+    private String medicineDescription;
+    
+    @Column(name = "active")
+    private Boolean active;
+    
     @Column(name = "created_on")
     private LocalDateTime createdOn;
-
+    
     @Column(name = "createdby_name", length = 90)
     private String createdByName;
-
+    
     @Column(name = "modified_on")
     private LocalDateTime modifiedOn;
-
+    
     @Column(name = "modifiedby_name", length = 90)
     private String modifiedByName;
-
+    
     @Column(name = "priority_value")
     private Integer priorityValue;
-
-    @Column(name = "display_to_operator", nullable = false)
-    private Short displayToOperator = 0;
-
+    
+    @Column(name = "morning")
+    private Double morning;
+    
+    @Column(name = "afternoon")
+    private Double afternoon;
+    
     // Constructors
-    public ComplaintMaster() {}
-
-    public ComplaintMaster(String shortDescription, String doctorId, String clinicId, String complaintDescription) {
+    public MedicineMaster() {}
+    
+    public MedicineMaster(String shortDescription, String clinicId, String medicineDescription) {
         this.shortDescription = shortDescription;
-        this.doctorId = doctorId;
         this.clinicId = clinicId;
-        this.complaintDescription = complaintDescription;
+        this.medicineDescription = medicineDescription;
     }
-
+    
     // Getters and Setters
     public String getShortDescription() {
         return shortDescription;
     }
-
+    
     public void setShortDescription(String shortDescription) {
         this.shortDescription = shortDescription;
-    }
-
-    public String getComplaintDescription() {
-        return complaintDescription;
-    }
-
-    public void setComplaintDescription(String complaintDescription) {
-        this.complaintDescription = complaintDescription;
-    }
-
-    public LocalDateTime getCreatedOn() {
-        return createdOn;
-    }
-
-    public void setCreatedOn(LocalDateTime createdOn) {
-        this.createdOn = createdOn;
-    }
-
-    public String getCreatedByName() {
-        return createdByName;
-    }
-
-    public void setCreatedByName(String createdByName) {
-        this.createdByName = createdByName;
-    }
-
-    public LocalDateTime getModifiedOn() {
-        return modifiedOn;
-    }
-
-    public void setModifiedOn(LocalDateTime modifiedOn) {
-        this.modifiedOn = modifiedOn;
-    }
-
-    public String getModifiedByName() {
-        return modifiedByName;
-    }
-
-    public void setModifiedByName(String modifiedByName) {
-        this.modifiedByName = modifiedByName;
-    }
-
-    public Integer getPriorityValue() {
-        return priorityValue;
-    }
-
-    public void setPriorityValue(Integer priorityValue) {
-        this.priorityValue = priorityValue;
-    }
-
-    public String getDoctorId() {
-        return doctorId;
-    }
-
-    public void setDoctorId(String doctorId) {
-        this.doctorId = doctorId;
     }
     
     public String getClinicId() {
@@ -130,31 +75,86 @@ public class ComplaintMaster {
     public void setClinicId(String clinicId) {
         this.clinicId = clinicId;
     }
-
-    public Short getDisplayToOperator() {
-        return displayToOperator;
+    
+    public String getMedicineDescription() {
+        return medicineDescription;
     }
-
-    public void setDisplayToOperator(Short displayToOperator) {
-        this.displayToOperator = displayToOperator;
+    
+    public void setMedicineDescription(String medicineDescription) {
+        this.medicineDescription = medicineDescription;
     }
-
-    // Helper methods
-    public boolean isDisplayToOperator() {
-        return displayToOperator != null && displayToOperator == 1;
+    
+    public Boolean getActive() {
+        return active;
     }
-
-    public void setDisplayToOperator(boolean displayToOperator) {
-        this.displayToOperator = displayToOperator ? (short) 1 : (short) 0;
+    
+    public void setActive(Boolean active) {
+        this.active = active;
     }
-
+    
+    public LocalDateTime getCreatedOn() {
+        return createdOn;
+    }
+    
+    public void setCreatedOn(LocalDateTime createdOn) {
+        this.createdOn = createdOn;
+    }
+    
+    public String getCreatedByName() {
+        return createdByName;
+    }
+    
+    public void setCreatedByName(String createdByName) {
+        this.createdByName = createdByName;
+    }
+    
+    public LocalDateTime getModifiedOn() {
+        return modifiedOn;
+    }
+    
+    public void setModifiedOn(LocalDateTime modifiedOn) {
+        this.modifiedOn = modifiedOn;
+    }
+    
+    public String getModifiedByName() {
+        return modifiedByName;
+    }
+    
+    public void setModifiedByName(String modifiedByName) {
+        this.modifiedByName = modifiedByName;
+    }
+    
+    public Integer getPriorityValue() {
+        return priorityValue;
+    }
+    
+    public void setPriorityValue(Integer priorityValue) {
+        this.priorityValue = priorityValue;
+    }
+    
+    public Double getMorning() {
+        return morning;
+    }
+    
+    public void setMorning(Double morning) {
+        this.morning = morning;
+    }
+    
+    public Double getAfternoon() {
+        return afternoon;
+    }
+    
+    public void setAfternoon(Double afternoon) {
+        this.afternoon = afternoon;
+    }
+    
     @Override
     public String toString() {
-        return "ComplaintMaster{" +
+        return "MedicineMaster{" +
                 "shortDescription='" + shortDescription + '\'' +
-                ", complaintDescription='" + complaintDescription + '\'' +
-                ", doctorId='" + doctorId + '\'' +
-                ", displayToOperator=" + displayToOperator +
+                ", clinicId='" + clinicId + '\'' +
+                ", medicineDescription='" + medicineDescription + '\'' +
+                ", active=" + active +
                 ", priorityValue=" + priorityValue +
                 '}';
     }

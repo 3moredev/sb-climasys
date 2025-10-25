@@ -4,7 +4,12 @@ import com.climasys.auth.entity.*;
 import com.climasys.entity.User;
 import com.climasys.entity.Clinic;
 import com.climasys.entity.ClinicId;
+import com.climasys.entity.StatusRef;
+import com.climasys.entity.DoctorClinicShift;
+import com.climasys.entity.DoctorClinicShiftId;
 import com.climasys.auth.repository.*;
+import com.climasys.repository.StatusRefRepository;
+import com.climasys.repository.DoctorClinicShiftRepository;
 import com.climasys.common.crypto.LegacyCrypto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,8 +33,15 @@ public class DatabaseInitializer implements CommandLineRunner {
     @Autowired
     private AuthDoctorMasterRepository doctorMasterRepository;
     
+    @Autowired
+    private StatusRefRepository statusRefRepository;
+    
+    @Autowired
+    private DoctorClinicShiftRepository doctorClinicShiftRepository;
+    
     @Value("${climasys.encryption.key}")
     private String encryptionKey;
+    
     
     @Autowired
     private ClinicMasterRepository clinicMasterRepository;
@@ -48,59 +60,9 @@ public class DatabaseInitializer implements CommandLineRunner {
     }
     
     private void createTestData() {
-        // Create roles if they don't exist
-        if (roleMasterRepository.count() == 0) {
-            RoleMaster doctorRole = new RoleMaster(1, "Doctor");
-            doctorRole.setCreatedbyName("System");
-            RoleMaster nurseRole = new RoleMaster(2, "Nurse");
-            nurseRole.setCreatedbyName("System");
-            roleMasterRepository.save(doctorRole);
-            roleMasterRepository.save(nurseRole);
-        }
-        
-        // Create doctor if doesn't exist
-        if (!doctorMasterRepository.existsById("DOC001")) {
-            AuthDoctorMaster doctor = new AuthDoctorMaster("DOC001", "Dr. Test", "User");
-            doctor.setSpeciality("General Medicine");
-            doctor.setDoctorQual("MBBS, MD");
-            doctorMasterRepository.save(doctor);
-        }
-        
-        // Create clinic if doesn't exist
-        if (!clinicMasterRepository.existsById(new ClinicId("DOC001", "CLINIC001"))) {
-            Clinic clinic = new Clinic();
-            clinic.setClinicId("CLINIC001");
-            clinic.setClinicName("Test Clinic");
-            clinic.setDoctorId("DOC001");
-            clinic.setClinicAddress("123 Test Street, Test City");
-            clinic.setPhoneNo("+1-234-567-8900");
-            clinic.setIsPrint(true);
-            clinic.setCreatedOn(LocalDateTime.now());
-            clinic.setCreatedbyName("System");
-            clinicMasterRepository.save(clinic);
-        }
-        
-        // Create test user if doesn't exist
-        if (!userMasterRepository.findByLoginIdAndIsActive("test_user", true).isPresent()) {
-            User user = new User();
-            user.setLoginId("test_user");
-            // Encrypt the password before storing
-            String encryptedPassword = LegacyCrypto.encryptUnicode(encryptionKey, "test_password");
-            user.setPassword(encryptedPassword);
-            user.setFirstName("Test");
-            user.setDoctorId("DOC001");
-            user.setLanguageId(1);
-            user.setIsActive(true);
-            user.setCreatedOn(LocalDateTime.now());
-            user.setCreatedbyName("System");
-            userMasterRepository.save(user);
-            
-            // Create user role
-            UserRole userRole = new UserRole(1, user.getId(), "CLINIC001", "DOC001");
-            userRole.setIsDefaultClinic(true);
-            userRole.setCreatedOn(LocalDateTime.now());
-            userRole.setCreatedbyName("System");
-            userRoleRepository.save(userRole);
-        }
+        // Test data creation removed to avoid hardcoded values
+        // The application should work with data created through proper APIs
+        // or database migrations rather than hardcoded test data
+        logger.info("Skipping test data creation to avoid hardcoded values");
     }
 }

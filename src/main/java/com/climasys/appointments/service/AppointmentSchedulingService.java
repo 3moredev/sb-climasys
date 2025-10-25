@@ -75,7 +75,7 @@ public class AppointmentSchedulingService {
             if (doctor == null) {
                 logger.warn("Doctor not found with ID: {}", doctorId);
                 auditLogger.warn("APPOINTMENT_QUERY_FAILED - Doctor not found: {}", doctorId);
-                return getMockAppointments(); // Return mock data for testing
+                return new ArrayList<>(); // Return empty list when doctor not found
             }
             
             // Get all future appointments for this doctor using JPA
@@ -106,10 +106,9 @@ public class AppointmentSchedulingService {
                 result.add(appointmentMap);
             }
             
-            // If no appointments found, return mock data for testing
+            // If no appointments found, return empty list
             if (result.isEmpty()) {
-                logger.info("No appointments found for doctor: {}, returning mock data", doctorId);
-                return getMockAppointments();
+                logger.info("No appointments found for doctor: {}", doctorId);
             }
             
             logger.info("Found {} future appointments for doctor: {}", result.size(), doctorId);
@@ -118,7 +117,7 @@ public class AppointmentSchedulingService {
         } catch (Exception e) {
             logger.error("Error getting future appointments for doctor: {} - {}", doctorId, e.getMessage(), e);
             auditLogger.error("APPOINTMENT_QUERY_ERROR - Doctor: {}, Error: {}", doctorId, e.getMessage());
-            return getMockAppointments(); // Return mock data on error
+            return new ArrayList<>(); // Return empty list on error
         }
     }
 
@@ -140,7 +139,7 @@ public class AppointmentSchedulingService {
             
             if (doctor == null) {
                 logger.warn("Doctor not found with ID: {} for date: {}", doctorId, appointmentDate);
-                return getMockAppointmentsForDate(appointmentDate);
+                return new ArrayList<>(); // Return empty list when doctor not found
             }
             
             // Parse the appointment date
@@ -175,15 +174,15 @@ public class AppointmentSchedulingService {
                 result.add(appointmentMap);
             }
             
-            // If no appointments found, return mock data
+            // If no appointments found, return empty list
             if (result.isEmpty()) {
-                return getMockAppointmentsForDate(appointmentDate);
+                logger.info("No appointments found for doctor: {} on date: {}", doctorId, appointmentDate);
             }
             
             return result;
         } catch (Exception e) {
             logger.error("Error getting appointments for date: {} - {}", appointmentDate, e.getMessage(), e);
-            return getMockAppointmentsForDate(appointmentDate);
+            return new ArrayList<>(); // Return empty list on error
         }
     }
 
@@ -244,92 +243,6 @@ public class AppointmentSchedulingService {
         }
     }
     
-    /**
-     * Get mock appointments data for testing when no real data is available
-     */
-    private List<Map<String, Object>> getMockAppointments() {
-        List<Map<String, Object>> mockAppointments = new ArrayList<>();
-        
-        // Create sample appointments
-        Map<String, Object> appointment1 = new HashMap<>();
-        appointment1.put("appointmentId", "APT001");
-        appointment1.put("patientId", "PAT001");
-        appointment1.put("patientName", "John Doe");
-        appointment1.put("appointmentDate", LocalDateTime.now().plusDays(1));
-        appointment1.put("appointmentTime", "10:00 AM");
-        appointment1.put("status", "SCHEDULED");
-        appointment1.put("appointmentType", "General Consultation");
-        appointment1.put("notes", "Regular checkup");
-        appointment1.put("clinicId", "CLINIC001");
-        mockAppointments.add(appointment1);
-        
-        Map<String, Object> appointment2 = new HashMap<>();
-        appointment2.put("appointmentId", "APT002");
-        appointment2.put("patientId", "PAT002");
-        appointment2.put("patientName", "Jane Smith");
-        appointment2.put("appointmentDate", LocalDateTime.now().plusDays(2));
-        appointment2.put("appointmentTime", "2:30 PM");
-        appointment2.put("status", "CONFIRMED");
-        appointment2.put("appointmentType", "Follow-up");
-        appointment2.put("notes", "Post-treatment follow-up");
-        appointment2.put("clinicId", "CLINIC001");
-        mockAppointments.add(appointment2);
-        
-        Map<String, Object> appointment3 = new HashMap<>();
-        appointment3.put("appointmentId", "APT003");
-        appointment3.put("patientId", "PAT003");
-        appointment3.put("patientName", "Bob Johnson");
-        appointment3.put("appointmentDate", LocalDateTime.now().plusDays(3));
-        appointment3.put("appointmentTime", "9:15 AM");
-        appointment3.put("status", "SCHEDULED");
-        appointment3.put("appointmentType", "Initial Consultation");
-        appointment3.put("notes", "New patient consultation");
-        appointment3.put("clinicId", "CLINIC001");
-        mockAppointments.add(appointment3);
-        
-        return mockAppointments;
-    }
-    
-    /**
-     * Get mock appointments for a specific date
-     */
-    private List<Map<String, Object>> getMockAppointmentsForDate(String appointmentDate) {
-        List<Map<String, Object>> mockAppointments = new ArrayList<>();
-        
-        try {
-            LocalDate date = LocalDate.parse(appointmentDate);
-            
-            // Create sample appointments for the specific date
-            Map<String, Object> appointment1 = new HashMap<>();
-            appointment1.put("appointmentId", "APT_" + date.toString().replace("-", "") + "_001");
-            appointment1.put("patientId", "PAT001");
-            appointment1.put("patientName", "John Doe");
-            appointment1.put("appointmentDate", date.atTime(10, 0));
-            appointment1.put("appointmentTime", "10:00 AM");
-            appointment1.put("status", "SCHEDULED");
-            appointment1.put("appointmentType", "General Consultation");
-            appointment1.put("notes", "Regular checkup");
-            appointment1.put("clinicId", "CLINIC001");
-            mockAppointments.add(appointment1);
-            
-            Map<String, Object> appointment2 = new HashMap<>();
-            appointment2.put("appointmentId", "APT_" + date.toString().replace("-", "") + "_002");
-            appointment2.put("patientId", "PAT002");
-            appointment2.put("patientName", "Jane Smith");
-            appointment2.put("appointmentDate", date.atTime(14, 30));
-            appointment2.put("appointmentTime", "2:30 PM");
-            appointment2.put("status", "CONFIRMED");
-            appointment2.put("appointmentType", "Follow-up");
-            appointment2.put("notes", "Post-treatment follow-up");
-            appointment2.put("clinicId", "CLINIC001");
-            mockAppointments.add(appointment2);
-            
-        } catch (Exception e) {
-            logger.error("Error creating mock appointments for date: {} - {}", appointmentDate, e.getMessage(), e);
-        }
-        
-        return mockAppointments;
-    }
     
     /**
      * Book a new appointment using JPA
@@ -395,7 +308,7 @@ public class AppointmentSchedulingService {
     /**
      * Delete appointment using JPA
      */
-    public Map<String, Object> deleteAppointment(String patientId, String visitDate, String doctorId, String userId) {
+    public Map<String, Object> deleteAppointment(String patientId, String visitDate, String doctorId, String clinicId, String userId) {
         logger.info("Deleting appointment using JPA for patient: {}, visitDate: {} (using today's date with visit time)", patientId, visitDate);
         
         try {
@@ -416,7 +329,7 @@ public class AppointmentSchedulingService {
             logger.info("Original: {} (IST), Converted to UTC: {} for database comparison", 
                        dateTime, utcDateTime);
             
-            return appointmentJpaService.deletePatientAppointment(patientId, utcDateTime, doctorId, userId);
+            return appointmentJpaService.deletePatientAppointment(patientId, utcDateTime, doctorId, clinicId, userId);
         } catch (Exception e) {
             logger.error("Error deleting appointment: {}", e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();

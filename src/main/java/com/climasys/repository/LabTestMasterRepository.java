@@ -19,14 +19,15 @@ import java.util.List;
 public interface LabTestMasterRepository extends JpaRepository<LabTestMaster, LabTestMasterId> {
     
     /**
-     * Get lab tests by doctor ID, ordered by priority and description
+     * Get lab tests by doctor ID and clinic ID, ordered by priority and description
      * This replaces the main query from USP_Get_LabTest stored procedure
      * 
      * @param doctorId Doctor ID to filter lab tests
+     * @param clinicId Clinic ID to filter lab tests
      * @return List of lab tests ordered by priority value and description
      */
-    @Query("SELECT ltm FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId ORDER BY ltm.priorityValue ASC, ltm.labTestDescription ASC")
-    List<LabTestMaster> findByDoctorIdOrderByPriorityAndDescription(@Param("doctorId") String doctorId);
+    @Query("SELECT ltm FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.clinicId = :clinicId ORDER BY ltm.priorityValue ASC, ltm.labTestDescription ASC")
+    List<LabTestMaster> findByDoctorIdAndClinicIdOrderByPriorityAndDescription(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
     
     /**
      * Get all lab tests ordered by priority and description
@@ -37,34 +38,37 @@ public interface LabTestMasterRepository extends JpaRepository<LabTestMaster, La
     List<LabTestMaster> findAllOrderByPriorityAndDescription();
     
     /**
-     * Get lab tests by doctor ID and description pattern
+     * Get lab tests by doctor ID, clinic ID and description pattern
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param descriptionPattern Description pattern (with wildcards)
      * @return List of matching lab tests
      */
-    @Query("SELECT ltm FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.labTestDescription LIKE :descriptionPattern ORDER BY ltm.priorityValue ASC, ltm.labTestDescription ASC")
-    List<LabTestMaster> findByDoctorIdAndDescriptionLike(@Param("doctorId") String doctorId, @Param("descriptionPattern") String descriptionPattern);
+    @Query("SELECT ltm FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.clinicId = :clinicId AND ltm.labTestDescription LIKE :descriptionPattern ORDER BY ltm.priorityValue ASC, ltm.labTestDescription ASC")
+    List<LabTestMaster> findByDoctorIdAndClinicIdAndDescriptionLike(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId, @Param("descriptionPattern") String descriptionPattern);
     
     /**
-     * Check if lab test exists for doctor
+     * Check if lab test exists for doctor and clinic
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param labTestDescription Lab test description
      * @return true if exists, false otherwise
      */
-    @Query("SELECT COUNT(ltm) > 0 FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.labTestDescription = :labTestDescription")
-    boolean existsByDoctorIdAndDescription(@Param("doctorId") String doctorId, @Param("labTestDescription") String labTestDescription);
+    @Query("SELECT COUNT(ltm) > 0 FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.clinicId = :clinicId AND ltm.labTestDescription = :labTestDescription")
+    boolean existsByDoctorIdAndClinicIdAndDescription(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId, @Param("labTestDescription") String labTestDescription);
     
     /**
-     * Get lab test by doctor ID and description
+     * Get lab test by doctor ID, clinic ID and description
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param labTestDescription Lab test description
      * @return LabTestMaster entity or null
      */
-    @Query("SELECT ltm FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.labTestDescription = :labTestDescription")
-    LabTestMaster findByDoctorIdAndDescription(@Param("doctorId") String doctorId, @Param("labTestDescription") String labTestDescription);
+    @Query("SELECT ltm FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.clinicId = :clinicId AND ltm.labTestDescription = :labTestDescription")
+    LabTestMaster findByDoctorIdAndClinicIdAndDescription(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId, @Param("labTestDescription") String labTestDescription);
     
     /**
      * Get distinct doctor IDs that have lab tests
@@ -75,21 +79,23 @@ public interface LabTestMasterRepository extends JpaRepository<LabTestMaster, La
     List<String> findDistinctDoctorIds();
     
     /**
-     * Count lab tests by doctor ID
+     * Count lab tests by doctor ID and clinic ID
      * 
      * @param doctorId Doctor ID
-     * @return Count of lab tests for the doctor
+     * @param clinicId Clinic ID
+     * @return Count of lab tests for the doctor and clinic
      */
-    @Query("SELECT COUNT(ltm) FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId")
-    long countByDoctorId(@Param("doctorId") String doctorId);
+    @Query("SELECT COUNT(ltm) FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.clinicId = :clinicId")
+    long countByDoctorIdAndClinicId(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
     
     /**
-     * Get lab tests by group name
+     * Get lab tests by group name for doctor and clinic
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param groupName Group name
      * @return List of lab tests in the group
      */
-    @Query("SELECT ltm FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.groupName = :groupName ORDER BY ltm.priorityValue ASC, ltm.labTestDescription ASC")
-    List<LabTestMaster> findByDoctorIdAndGroupName(@Param("doctorId") String doctorId, @Param("groupName") String groupName);
+    @Query("SELECT ltm FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.clinicId = :clinicId AND ltm.groupName = :groupName ORDER BY ltm.priorityValue ASC, ltm.labTestDescription ASC")
+    List<LabTestMaster> findByDoctorIdAndClinicIdAndGroupName(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId, @Param("groupName") String groupName);
 }

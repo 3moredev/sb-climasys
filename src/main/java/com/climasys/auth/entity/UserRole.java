@@ -45,7 +45,10 @@ public class UserRole {
     private com.climasys.entity.User user;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "role_id", insertable = false, updatable = false)
+    @JoinColumns({
+        @JoinColumn(name = "role_id", referencedColumnName = "role_id", insertable = false, updatable = false),
+        @JoinColumn(name = "clinic_id", referencedColumnName = "clinic_id", insertable = false, updatable = false)
+    })
     private RoleMaster roleMaster;
     
     // Constructors

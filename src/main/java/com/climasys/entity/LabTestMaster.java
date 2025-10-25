@@ -7,9 +7,9 @@ import java.time.LocalDateTime;
  * Entity representing the Lab_Test_Master table
  * Maps to the USP_Get_LabTest stored procedure functionality
  * 
- * Note: This entity maps to the existing database schema which has:
- * - Composite primary key (doctor_id, id)
- * - Different column names than initially assumed
+ * Note: This entity maps to the updated database schema which has:
+ * - Composite primary key (doctor_id, id, clinic_id)
+ * - Multi-clinic support with clinic_id field
  */
 @Entity
 @Table(name = "lab_test_master")
@@ -23,6 +23,10 @@ public class LabTestMaster {
     @Id
     @Column(name = "id")
     private Integer id;
+    
+    @Id
+    @Column(name = "clinic_id", length = 30)
+    private String clinicId;
     
     @Column(name = "lab_test_description", length = 80)
     private String labTestDescription;
@@ -48,9 +52,10 @@ public class LabTestMaster {
     // Constructors
     public LabTestMaster() {}
     
-    public LabTestMaster(String doctorId, Integer id, String labTestDescription, Integer priorityValue) {
+    public LabTestMaster(String doctorId, Integer id, String clinicId, String labTestDescription, Integer priorityValue) {
         this.doctorId = doctorId;
         this.id = id;
+        this.clinicId = clinicId;
         this.labTestDescription = labTestDescription;
         this.priorityValue = priorityValue;
     }
@@ -70,6 +75,14 @@ public class LabTestMaster {
     
     public void setId(Integer id) {
         this.id = id;
+    }
+    
+    public String getClinicId() {
+        return clinicId;
+    }
+    
+    public void setClinicId(String clinicId) {
+        this.clinicId = clinicId;
     }
     
     public String getLabTestDescription() {
