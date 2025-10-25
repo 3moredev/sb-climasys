@@ -11,6 +11,8 @@ import com.climasys.auth.repository.*;
 import com.climasys.repository.StatusRefRepository;
 import com.climasys.repository.DoctorClinicShiftRepository;
 import com.climasys.common.crypto.LegacyCrypto;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
@@ -20,6 +22,8 @@ import java.time.LocalDateTime;
 
 @Component
 public class DatabaseInitializer implements CommandLineRunner {
+
+    private static final Logger logger = LoggerFactory.getLogger(DatabaseInitializer.class);
 
     @Autowired
     private UserMasterRepository userMasterRepository;
