@@ -11,13 +11,11 @@
 SET search_path TO climasys_dev, public;
 
 -- =====================================================
--- STEP 1: CREATE UNIQUE CONSTRAINT ON CLINIC_ID IN CLINIC_MASTER
+-- STEP 1: SKIP UNIQUE CONSTRAINT CREATION
 -- =====================================================
-
--- First, ensure clinic_id is unique in clinic_master
--- This creates a unique constraint that allows foreign key references
-ALTER TABLE clinic_master 
-ADD CONSTRAINT uk_clinic_master_clinic_id UNIQUE (clinic_id);
+-- Since multiple doctors can belong to the same clinic,
+-- we cannot create a unique constraint on clinic_id alone.
+-- Foreign key constraints on clinic_id are not possible.
 
 -- =====================================================
 -- STEP 2: RECREATE ORIGINAL FOREIGN KEY CONSTRAINTS
@@ -39,38 +37,63 @@ ADD CONSTRAINT user_role_role_master_fk
 FOREIGN KEY (role_id) REFERENCES role_master(role_id);
 
 -- =====================================================
--- STEP 3: ADD NEW FOREIGN KEY CONSTRAINTS FOR CLINIC_ID
+-- STEP 2: ADD COMPOSITE FOREIGN KEY CONSTRAINTS
 -- =====================================================
+-- Based on analysis of existing schema, tables with both clinic_id and doctor_id
+-- should use composite foreign keys referencing clinic_master(clinic_id, doctor_id)
+--
+-- Tables that can use composite foreign keys:
+-- - status_order (has doctor_id)
+-- - lab_test_master (has doctor_id) 
+-- - lab_test_parameter (has doctor_id)
+-- - complaint_master (has doctor_id)
+-- - diagnosis_master (has doctor_id)
+-- - medicine_master (has doctor_id)
+--
+-- Tables that need application-level validation (no doctor_id):
+-- - role_master (no doctor_id column)
 
--- Add foreign key constraint for status_order
+-- Add composite foreign key constraint for status_order
 ALTER TABLE status_order 
-ADD CONSTRAINT fk_status_order_clinic_id 
-FOREIGN KEY (clinic_id) REFERENCES clinic_master(clinic_id);
+ADD CONSTRAINT fk_status_order_clinic_master 
+FOREIGN KEY (clinic_id, doctor_id) REFERENCES clinic_master(clinic_id, doctor_id);
 
--- Add foreign key constraint for role_master
-ALTER TABLE role_master 
-ADD CONSTRAINT fk_role_master_clinic_id 
-FOREIGN KEY (clinic_id) REFERENCES clinic_master(clinic_id);
-
--- Add foreign key constraint for lab_test_master
+-- Add composite foreign key constraint for lab_test_master
 ALTER TABLE lab_test_master 
-ADD CONSTRAINT fk_lab_test_master_clinic_id 
-FOREIGN KEY (clinic_id) REFERENCES clinic_master(clinic_id);
+ADD CONSTRAINT fk_lab_test_master_clinic_master 
+FOREIGN KEY (clinic_id, doctor_id) REFERENCES clinic_master(clinic_id, doctor_id);
 
--- Add foreign key constraint for lab_test_parameter
+-- Add composite foreign key constraint for lab_test_parameter
 ALTER TABLE lab_test_parameter 
-ADD CONSTRAINT fk_lab_test_parameter_clinic_id 
-FOREIGN KEY (clinic_id) REFERENCES clinic_master(clinic_id);
+ADD CONSTRAINT fk_lab_test_parameter_clinic_master 
+FOREIGN KEY (clinic_id, doctor_id) REFERENCES clinic_master(clinic_id, doctor_id);
 
--- Add foreign key constraint for complaint_master
+-- Add composite foreign key constraint for complaint_master
 ALTER TABLE complaint_master 
-ADD CONSTRAINT fk_complaint_master_clinic_id 
-FOREIGN KEY (clinic_id) REFERENCES clinic_master(clinic_id);
+ADD CONSTRAINT fk_complaint_master_clinic_master 
+FOREIGN KEY (clinic_id, doctor_id) REFERENCES clinic_master(clinic_id, doctor_id);
 
--- Add foreign key constraint for medicine_master
+-- Add composite foreign key constraint for diagnosis_master
+ALTER TABLE diagnosis_master 
+ADD CONSTRAINT fk_diagnosis_master_clinic_master 
+FOREIGN KEY (clinic_id, doctor_id) REFERENCES clinic_master(clinic_id, doctor_id);
+
+-- Add composite foreign key constraint for medicine_master
 ALTER TABLE medicine_master 
-ADD CONSTRAINT fk_medicine_master_clinic_id 
-FOREIGN KEY (clinic_id) REFERENCES clinic_master(clinic_id);
+ADD CONSTRAINT fk_medicine_master_clinic_master 
+FOREIGN KEY (clinic_id, doctor_id) REFERENCES clinic_master(clinic_id, doctor_id);
+
+-- =====================================================
+-- STEP 3: APPLICATION-LEVEL VALIDATION FOR TABLES WITHOUT DOCTOR_ID
+-- =====================================================
+-- Tables with only clinic_id (no doctor_id) require application-level validation
+-- because clinic_master has composite primary key (clinic_id, doctor_id)
+--
+-- Tables requiring application validation:
+-- - role_master (no doctor_id column)
+--
+-- Example validation query for application:
+-- SELECT COUNT(*) FROM clinic_master WHERE clinic_id = ?
 
 -- Add foreign key constraint for referal_doctors_list (if exists)
 DO $$
@@ -151,12 +174,16 @@ WHERE c.clinic_id IS NULL AND m.clinic_id IS NOT NULL;
 -- =====================================================
 
 -- Create indexes on foreign key columns for better performance
-CREATE INDEX IF NOT EXISTS idx_status_order_clinic_id_fk ON status_order(clinic_id);
+-- Composite foreign key indexes for tables with both clinic_id and doctor_id
+CREATE INDEX IF NOT EXISTS idx_status_order_clinic_doctor_fk ON status_order(clinic_id, doctor_id);
+CREATE INDEX IF NOT EXISTS idx_lab_test_master_clinic_doctor_fk ON lab_test_master(clinic_id, doctor_id);
+CREATE INDEX IF NOT EXISTS idx_lab_test_parameter_clinic_doctor_fk ON lab_test_parameter(clinic_id, doctor_id);
+CREATE INDEX IF NOT EXISTS idx_complaint_master_clinic_doctor_fk ON complaint_master(clinic_id, doctor_id);
+CREATE INDEX IF NOT EXISTS idx_diagnosis_master_clinic_doctor_fk ON diagnosis_master(clinic_id, doctor_id);
+CREATE INDEX IF NOT EXISTS idx_medicine_master_clinic_doctor_fk ON medicine_master(clinic_id, doctor_id);
+
+-- Single column indexes for tables using application-level validation
 CREATE INDEX IF NOT EXISTS idx_role_master_clinic_id_fk ON role_master(clinic_id);
-CREATE INDEX IF NOT EXISTS idx_lab_test_master_clinic_id_fk ON lab_test_master(clinic_id);
-CREATE INDEX IF NOT EXISTS idx_lab_test_parameter_clinic_id_fk ON lab_test_parameter(clinic_id);
-CREATE INDEX IF NOT EXISTS idx_complaint_master_clinic_id_fk ON complaint_master(clinic_id);
-CREATE INDEX IF NOT EXISTS idx_medicine_master_clinic_id_fk ON medicine_master(clinic_id);
 
 -- Create index on referal_doctors_list if it exists
 DO $$

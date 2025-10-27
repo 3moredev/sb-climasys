@@ -11,7 +11,8 @@
 -- 4. lab_test_parameter
 -- 5. complaint_master
 -- 6. medicine_master
--- 7. referal_doctors_list (if exists)
+-- 7. diagnosis_master
+-- 8. referal_doctors_list (if exists)
 --
 -- =====================================================
 
@@ -181,7 +182,35 @@ CREATE INDEX IF NOT EXISTS idx_medicine_master_medicine_clinic ON medicine_maste
 COMMENT ON COLUMN medicine_master.clinic_id IS 'Clinic ID for multi-clinic support';
 
 -- =====================================================
--- 7. REFERAL_DOCTORS_LIST TABLE (if exists)
+-- 7. DIAGNOSIS_MASTER TABLE
+-- =====================================================
+
+-- Add clinic_id column to diagnosis_master table
+ALTER TABLE diagnosis_master 
+ADD COLUMN clinic_id VARCHAR(30);
+
+-- Note: Cannot add foreign key constraint to clinic_id alone since clinic_master has composite primary key (clinic_id, doctor_id)
+-- Foreign key constraint will be added after ensuring data integrity
+
+-- Drop existing primary key constraint
+ALTER TABLE diagnosis_master 
+DROP CONSTRAINT IF EXISTS symptom_refv1_pk;
+
+-- Add new primary key constraint including clinic_id
+ALTER TABLE diagnosis_master 
+ADD CONSTRAINT diagnosis_master_pkey 
+PRIMARY KEY (short_description, doctor_id, clinic_id);
+
+-- Create index for performance
+CREATE INDEX IF NOT EXISTS idx_diagnosis_master_clinic_id ON diagnosis_master(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_diagnosis_master_doctor_clinic ON diagnosis_master(doctor_id, clinic_id);
+CREATE INDEX IF NOT EXISTS idx_diagnosis_master_description_clinic ON diagnosis_master(short_description, clinic_id);
+
+-- Add comments
+COMMENT ON COLUMN diagnosis_master.clinic_id IS 'Clinic ID for multi-clinic support';
+
+-- =====================================================
+-- 8. REFERAL_DOCTORS_LIST TABLE (if exists)
 -- =====================================================
 
 -- Check if referal_doctors_list table exists and add clinic_id if it does
@@ -239,7 +268,7 @@ CREATE INDEX IF NOT EXISTS idx_medicine_master_medicine_clinic ON medicine_maste
 -- This should be done based on your business logic and data migration requirements
 
 -- Example for updating existing records (uncomment and modify as needed):
-/*
+
 -- Update status_order with default clinic_id
 UPDATE status_order SET clinic_id = 'DEFAULT_CLINIC' WHERE clinic_id IS NULL;
 
@@ -257,7 +286,10 @@ UPDATE complaint_master SET clinic_id = 'DEFAULT_CLINIC' WHERE clinic_id IS NULL
 
 -- Update medicine_master with default clinic_id
 UPDATE medicine_master SET clinic_id = 'DEFAULT_CLINIC' WHERE clinic_id IS NULL;
-*/
+
+-- Update diagnosis_master with default clinic_id
+UPDATE diagnosis_master SET clinic_id = 'DEFAULT_CLINIC' WHERE clinic_id IS NULL;
+
 
 -- =====================================================
 -- VERIFICATION QUERIES
@@ -272,7 +304,7 @@ SELECT
 FROM information_schema.columns 
 WHERE table_schema = 'climasys_dev' 
 AND column_name = 'clinic_id'
-AND table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list')
+AND table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list')
 ORDER BY table_name;
 
 -- Verify primary key constraints
@@ -286,7 +318,7 @@ JOIN information_schema.key_column_usage kcu
     ON tc.constraint_name = kcu.constraint_name
 WHERE tc.table_schema = 'climasys_dev' 
 AND tc.constraint_type = 'PRIMARY KEY'
-AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list')
+AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list')
 ORDER BY tc.table_name, kcu.ordinal_position;
 
 -- =====================================================

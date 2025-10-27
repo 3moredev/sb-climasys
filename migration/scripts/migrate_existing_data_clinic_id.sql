@@ -45,6 +45,11 @@ UPDATE medicine_master
 SET clinic_id = 'CL-00001' 
 WHERE clinic_id IS NULL;
 
+-- Update diagnosis_master with default clinic_id
+UPDATE diagnosis_master 
+SET clinic_id = 'CL-00001' 
+WHERE clinic_id IS NULL;
+
 -- Update referal_doctors_list with default clinic_id (if exists)
 UPDATE referal_doctors_list 
 SET clinic_id = 'CL-00001' 
@@ -176,7 +181,10 @@ SELECT 'complaint_master' as table_name, COUNT(*) as null_clinic_count
 FROM complaint_master WHERE clinic_id IS NULL
 UNION ALL
 SELECT 'medicine_master' as table_name, COUNT(*) as null_clinic_count 
-FROM medicine_master WHERE clinic_id IS NULL;
+FROM medicine_master WHERE clinic_id IS NULL
+UNION ALL
+SELECT 'diagnosis_master' as table_name, COUNT(*) as null_clinic_count 
+FROM diagnosis_master WHERE clinic_id IS NULL;
 
 -- Check clinic_id distribution
 SELECT 
@@ -260,6 +268,12 @@ BEGIN
     SELECT COUNT(*) INTO null_count FROM medicine_master WHERE clinic_id IS NULL;
     IF null_count > 0 THEN
         RAISE WARNING 'medicine_master has % records with NULL clinic_id', null_count;
+    END IF;
+    
+    -- Check diagnosis_master
+    SELECT COUNT(*) INTO null_count FROM diagnosis_master WHERE clinic_id IS NULL;
+    IF null_count > 0 THEN
+        RAISE WARNING 'diagnosis_master has % records with NULL clinic_id', null_count;
     END IF;
     
     RAISE NOTICE 'Data migration verification completed';

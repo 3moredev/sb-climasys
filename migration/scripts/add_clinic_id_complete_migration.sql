@@ -39,7 +39,7 @@ BEGIN
             ON ccu.constraint_name = tc.constraint_name
         WHERE tc.constraint_type = 'FOREIGN KEY'
         AND tc.table_schema = 'climasys_dev'
-        AND ccu.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master')
+        AND ccu.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master')
     LOOP
         EXECUTE 'ALTER TABLE ' || constraint_record.table_name || ' DROP CONSTRAINT IF EXISTS ' || constraint_record.constraint_name;
         RAISE NOTICE 'Dropped foreign key constraint: % on table %', constraint_record.constraint_name, constraint_record.table_name;
@@ -88,7 +88,7 @@ BEGIN
         FROM information_schema.table_constraints tc
         WHERE tc.constraint_type = 'PRIMARY KEY'
         AND tc.table_schema = 'climasys_dev'
-        AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list')
+        AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list')
     LOOP
         BEGIN
             EXECUTE 'ALTER TABLE ' || constraint_record.table_name || ' DROP CONSTRAINT ' || constraint_record.constraint_name || ' CASCADE';
@@ -126,7 +126,7 @@ BEGIN
         JOIN pg_namespace n ON c.relnamespace = n.oid
         WHERE con.contype = 'p'  -- Primary key constraint type
         AND n.nspname = 'climasys_dev'
-        AND c.relname IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list')
+        AND c.relname IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list')
     LOOP
         BEGIN
             EXECUTE 'ALTER TABLE ' || constraint_record.table_name || ' DROP CONSTRAINT ' || constraint_record.constraint_name || ' CASCADE';
@@ -151,7 +151,7 @@ BEGIN
     FROM information_schema.table_constraints tc
     WHERE tc.constraint_type = 'PRIMARY KEY'
     AND tc.table_schema = 'climasys_dev'
-    AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list');
+    AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list');
     
     IF constraint_count > 0 THEN
         RAISE WARNING 'Found % primary key constraints still on our tables. This may cause issues.', constraint_count;
@@ -162,7 +162,7 @@ BEGIN
             FROM information_schema.table_constraints tc
             WHERE tc.constraint_type = 'PRIMARY KEY'
             AND tc.table_schema = 'climasys_dev'
-            AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list')
+            AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list')
         LOOP
             RAISE WARNING 'Remaining primary key (info_schema): % on table %', constraint_record.constraint_name, constraint_record.table_name;
         END LOOP;
@@ -177,7 +177,7 @@ BEGIN
             JOIN pg_namespace n ON c.relnamespace = n.oid
             WHERE con.contype = 'p'
             AND n.nspname = 'climasys_dev'
-            AND c.relname IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list')
+            AND c.relname IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list')
         LOOP
             RAISE WARNING 'Remaining primary key (pg_constraint): % on table %', constraint_record.constraint_name, constraint_record.table_name;
         END LOOP;
@@ -209,6 +209,9 @@ ADD COLUMN clinic_id VARCHAR(30);
 ALTER TABLE medicine_master 
 ADD COLUMN clinic_id VARCHAR(30);
 
+ALTER TABLE diagnosis_master 
+ADD COLUMN clinic_id VARCHAR(30);
+
 -- Add clinic_id to referal_doctors_list if it exists
 DO $$
 BEGIN
@@ -238,7 +241,7 @@ BEGIN
     FROM information_schema.table_constraints tc
     WHERE tc.constraint_type = 'PRIMARY KEY'
     AND tc.table_schema = 'climasys_dev'
-    AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list');
+    AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list');
     
     IF constraint_count > 0 THEN
         RAISE EXCEPTION 'Cannot create new primary key constraints. % primary key constraints still exist on our tables.', constraint_count;
@@ -269,6 +272,10 @@ PRIMARY KEY (short_description, doctor_id, clinic_id);
 ALTER TABLE medicine_master 
 ADD CONSTRAINT medicine_master_pkey 
 PRIMARY KEY (short_description, clinic_id);
+
+ALTER TABLE diagnosis_master 
+ADD CONSTRAINT diagnosis_master_pkey 
+PRIMARY KEY (short_description, doctor_id, clinic_id);
 
 -- Add primary key for referal_doctors_list if it exists
 DO $$
@@ -310,6 +317,10 @@ CREATE INDEX IF NOT EXISTS idx_complaint_master_doctor_clinic ON complaint_maste
 CREATE INDEX IF NOT EXISTS idx_medicine_master_clinic_id ON medicine_master(clinic_id);
 CREATE INDEX IF NOT EXISTS idx_medicine_master_medicine_clinic ON medicine_master(short_description, clinic_id);
 
+CREATE INDEX IF NOT EXISTS idx_diagnosis_master_clinic_id ON diagnosis_master(clinic_id);
+CREATE INDEX IF NOT EXISTS idx_diagnosis_master_doctor_clinic ON diagnosis_master(doctor_id, clinic_id);
+CREATE INDEX IF NOT EXISTS idx_diagnosis_master_description_clinic ON diagnosis_master(short_description, clinic_id);
+
 -- Create indexes for referal_doctors_list if it exists
 DO $$
 BEGIN
@@ -348,7 +359,7 @@ SELECT
 FROM information_schema.columns 
 WHERE table_schema = 'climasys_dev' 
 AND column_name = 'clinic_id'
-AND table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list')
+AND table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list')
 ORDER BY table_name;
 
 -- Verify primary key constraints
@@ -362,7 +373,7 @@ JOIN information_schema.key_column_usage kcu
     ON tc.constraint_name = kcu.constraint_name
 WHERE tc.table_schema = 'climasys_dev' 
 AND tc.constraint_type = 'PRIMARY KEY'
-AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'referal_doctors_list')
+AND tc.table_name IN ('status_order', 'role_master', 'lab_test_master', 'lab_test_parameter', 'complaint_master', 'medicine_master', 'diagnosis_master', 'referal_doctors_list')
 ORDER BY tc.table_name, kcu.ordinal_position;
 
 -- =====================================================
