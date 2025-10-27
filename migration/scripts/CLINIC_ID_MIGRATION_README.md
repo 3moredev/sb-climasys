@@ -14,7 +14,8 @@ The following tables have been modified to include `clinic_id` field:
 4. **lab_test_parameter** - Parameters for lab tests
 5. **complaint_master** - Master table for complaints
 6. **medicine_master** - Master table for medicines
-7. **referal_doctors_list** - List of referral doctors (if exists)
+7. **diagnosis_master** - Master table for diagnoses
+8. **referal_doctors_list** - List of referral doctors (if exists)
 
 ## Migration Scripts
 
@@ -59,26 +60,26 @@ The primary key constraints have been updated to include `clinic_id`:
 | lab_test_parameter | (doctor_id, id, lab_test_id) | (doctor_id, id, lab_test_id, clinic_id) |
 | complaint_master | (short_description, doctor_id) | (short_description, doctor_id, clinic_id) |
 | medicine_master | (short_description) | (short_description, clinic_id) |
+| diagnosis_master | (short_description, doctor_id) | (short_description, doctor_id, clinic_id) |
 | referal_doctors_list | (id) | (id, clinic_id) |
 
 ## Foreign Key Constraints
 
-**Important Note:** The `clinic_master` table has a composite primary key `(clinic_id, doctor_id)`, not just `clinic_id`. This means we cannot directly create foreign key constraints referencing only `clinic_id`.
+**Important Note:** The `clinic_master` table has a composite primary key `(clinic_id, doctor_id)`, not just `clinic_id`. Since multiple doctors can belong to the same clinic, we **cannot** create foreign key constraints referencing only `clinic_id`.
 
-### Solution:
-1. **First:** Add a unique constraint on `clinic_id` in `clinic_master`
-2. **Then:** Add foreign key constraints referencing the unique `clinic_id`
+### Solution: Application-Level Validation
+Since multiple doctors per clinic is allowed, use application-level validation instead of database foreign key constraints:
 
 ```sql
--- Step 1: Create unique constraint on clinic_id
-ALTER TABLE clinic_master 
-ADD CONSTRAINT uk_clinic_master_clinic_id UNIQUE (clinic_id);
-
--- Step 2: Add foreign key constraints
-ALTER TABLE table_name 
-ADD CONSTRAINT fk_table_name_clinic_id 
-FOREIGN KEY (clinic_id) REFERENCES clinic_master(clinic_id);
+-- Application validation query (use in your service layer)
+SELECT COUNT(*) FROM clinic_master 
+WHERE clinic_id = ? AND doctor_id = ?;
 ```
+
+**Benefits:**
+- Maintains data integrity through application logic
+- Allows flexible multi-doctor-per-clinic relationships
+- Avoids database constraint conflicts
 
 ## Performance Indexes
 
@@ -94,6 +95,7 @@ The following indexes have been created for optimal performance:
 - `idx_lab_test_parameter_doctor_lab_clinic` - For parameter queries
 - `idx_complaint_master_doctor_clinic` - For complaint queries
 - `idx_medicine_master_medicine_clinic` - For medicine queries (using short_description)
+- `idx_diagnosis_master_description_clinic` - For diagnosis queries (using short_description)
 
 ## Migration Steps
 

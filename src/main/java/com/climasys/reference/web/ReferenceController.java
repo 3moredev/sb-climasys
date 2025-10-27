@@ -50,9 +50,9 @@ public class ReferenceController {
     }
 
     @GetMapping("/impressions")
-    public ResponseEntity<?> getImpressions(@RequestParam String doctorId) {
+    public ResponseEntity<?> getImpressions(@RequestParam String doctorId, @RequestParam(required = false) String clinicId) {
         try {
-            List<?> result = referenceDataService.getImpressions(doctorId);
+            List<?> result = referenceDataService.getImpressions(doctorId, clinicId);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();

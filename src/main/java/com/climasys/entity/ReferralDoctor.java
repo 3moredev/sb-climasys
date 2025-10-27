@@ -5,6 +5,12 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
+/**
+ * Entity representing the referrel_doctors_list table
+ * Maps to the referral doctors functionality
+ * 
+ * Note: This entity has been updated to include clinic_id for multi-clinic support
+ */
 @Entity
 @Table(name = "referrel_doctors_list")
 @Data
@@ -40,4 +46,7 @@ public class ReferralDoctor {
     
     @Column(name = "delete_flag")
     private Boolean deleteFlag = false;
+    
+    @Column(name = "clinic_id", length = 30, nullable = false)
+    private String clinicId;
 }
