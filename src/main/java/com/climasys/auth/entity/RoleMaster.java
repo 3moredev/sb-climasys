@@ -1,15 +1,22 @@
 package com.climasys.auth.entity;
 
 import jakarta.persistence.*;
+import java.io.Serializable;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Table(name = "role_master")
+@IdClass(RoleMasterId.class)
 public class RoleMaster {
     
     @Id
     @Column(name = "role_id")
     private Integer roleId;
+    
+    @Id
+    @Column(name = "clinic_id", length = 30, nullable = false)
+    private String clinicId;
     
     @Column(name = "role_name", length = 30)
     private String roleName;
@@ -29,8 +36,9 @@ public class RoleMaster {
     // Constructors
     public RoleMaster() {}
     
-    public RoleMaster(Integer roleId, String roleName) {
+    public RoleMaster(Integer roleId, String clinicId, String roleName) {
         this.roleId = roleId;
+        this.clinicId = clinicId;
         this.roleName = roleName;
         this.createdOn = LocalDateTime.now();
     }
@@ -38,6 +46,9 @@ public class RoleMaster {
     // Getters and Setters
     public Integer getRoleId() { return roleId; }
     public void setRoleId(Integer roleId) { this.roleId = roleId; }
+    
+    public String getClinicId() { return clinicId; }
+    public void setClinicId(String clinicId) { this.clinicId = clinicId; }
     
     public String getRoleName() { return roleName; }
     public void setRoleName(String roleName) { this.roleName = roleName; }
@@ -53,4 +64,17 @@ public class RoleMaster {
     
     public String getModifiedbyName() { return modifiedbyName; }
     public void setModifiedbyName(String modifiedbyName) { this.modifiedbyName = modifiedbyName; }
+    
+    @Override
+    public String toString() {
+        return "RoleMaster{" +
+                "roleId=" + roleId +
+                ", clinicId='" + clinicId + '\'' +
+                ", roleName='" + roleName + '\'' +
+                ", createdOn=" + createdOn +
+                ", createdbyName='" + createdbyName + '\'' +
+                ", modifiedOn=" + modifiedOn +
+                ", modifiedbyName='" + modifiedbyName + '\'' +
+                '}';
+    }
 }

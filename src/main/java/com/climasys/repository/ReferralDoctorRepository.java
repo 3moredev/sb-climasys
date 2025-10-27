@@ -12,14 +12,26 @@ import java.util.List;
 @Repository
 public interface ReferralDoctorRepository extends JpaRepository<ReferralDoctor, Integer> {
     
+    @Query("SELECT rd FROM ReferralDoctor rd WHERE rd.languageId = :languageId AND rd.clinicId = :clinicId AND (rd.deleteFlag = false OR rd.deleteFlag IS NULL) ORDER BY rd.doctorName")
+    List<ReferralDoctor> findByLanguageIdAndClinicId(@Param("languageId") Integer languageId, @Param("clinicId") String clinicId);
+    
     @Query("SELECT rd FROM ReferralDoctor rd WHERE rd.languageId = :languageId AND (rd.deleteFlag = false OR rd.deleteFlag IS NULL) ORDER BY rd.doctorName")
     List<ReferralDoctor> findByLanguageId(@Param("languageId") Integer languageId);
+    
+    @Query("SELECT rd FROM ReferralDoctor rd WHERE rd.doctorMob = :mobile AND rd.clinicId = :clinicId AND (rd.deleteFlag = false OR rd.deleteFlag IS NULL)")
+    List<ReferralDoctor> findByDoctorMobAndClinicId(@Param("mobile") String mobile, @Param("clinicId") String clinicId);
     
     @Query("SELECT rd FROM ReferralDoctor rd WHERE rd.doctorMob = :mobile AND (rd.deleteFlag = false OR rd.deleteFlag IS NULL)")
     List<ReferralDoctor> findByDoctorMob(@Param("mobile") String mobile);
     
+    @Query("SELECT rd FROM ReferralDoctor rd WHERE rd.doctorName LIKE %:searchStr% AND rd.clinicId = :clinicId AND (rd.deleteFlag = false OR rd.deleteFlag IS NULL) ORDER BY rd.doctorName")
+    List<ReferralDoctor> findByDoctorNameContainingAndClinicId(@Param("searchStr") String searchStr, @Param("clinicId") String clinicId);
+    
     @Query("SELECT rd FROM ReferralDoctor rd WHERE rd.doctorName LIKE %:searchStr% AND (rd.deleteFlag = false OR rd.deleteFlag IS NULL) ORDER BY rd.doctorName")
     List<ReferralDoctor> findByDoctorNameContaining(@Param("searchStr") String searchStr);
+    
+    @Query("SELECT rd FROM ReferralDoctor rd WHERE rd.rdId = :rdId AND rd.languageId = :languageId AND rd.clinicId = :clinicId AND (rd.deleteFlag = false OR rd.deleteFlag IS NULL)")
+    ReferralDoctor findByRdIdAndLanguageIdAndClinicId(@Param("rdId") Integer rdId, @Param("languageId") Integer languageId, @Param("clinicId") String clinicId);
     
     @Query("SELECT rd FROM ReferralDoctor rd WHERE rd.rdId = :rdId AND rd.languageId = :languageId AND (rd.deleteFlag = false OR rd.deleteFlag IS NULL)")
     ReferralDoctor findByRdIdAndLanguageId(@Param("rdId") Integer rdId, @Param("languageId") Integer languageId);

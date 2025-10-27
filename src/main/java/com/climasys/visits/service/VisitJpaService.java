@@ -37,6 +37,9 @@ public class VisitJpaService {
     @Autowired
     private JdbcTemplate jdbcTemplate;
     
+    @Autowired
+    private com.climasys.service.RelationshipService relationshipService;
+    
     /**
      * Save or update a comprehensive patient visit using JPA
      */
@@ -45,6 +48,13 @@ public class VisitJpaService {
         logger.info("Saving comprehensive visit for patient: {} using JPA", request.patientId());
         
         try {
+            // Ensure required relationships exist before validation
+            relationshipService.ensureVisitRelationships(
+                request.doctorId(), 
+                request.clinicId(), 
+                request.shiftId()
+            );
+            
             // Log the search parameters for debugging
             logger.info("Searching for existing visit with parameters:");
             logger.info("  PatientId: {}", request.patientId());

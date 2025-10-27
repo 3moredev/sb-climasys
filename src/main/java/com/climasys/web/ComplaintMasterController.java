@@ -27,7 +27,27 @@ public class ComplaintMasterController {
     private ComplaintMasterService complaintMasterService;
 
     /**
-     * Get all complaints for a specific doctor
+     * Get all complaints for a specific doctor and clinic
+     * GET /api/complaint-master/doctor/{doctorId}/clinic/{clinicId}
+     */
+    @GetMapping("/doctor/{doctorId}/clinic/{clinicId}")
+    public ResponseEntity<?> getAllComplaintsForDoctorAndClinic(
+            @PathVariable String doctorId, 
+            @PathVariable String clinicId) {
+        try {
+            logger.info("Getting all complaints for doctor: {} and clinic: {}", doctorId, clinicId);
+            List<ComplaintMaster> complaints = complaintMasterService.getAllComplaintsForDoctorAndClinic(doctorId, clinicId);
+            return ResponseEntity.ok(complaints);
+        } catch (Exception e) {
+            logger.error("Error getting complaints for doctor {} and clinic {}: {}", doctorId, clinicId, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get complaints: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * Get all complaints for a specific doctor (backward compatibility)
      * GET /api/complaint-master/doctor/{doctorId}
      */
     @GetMapping("/doctor/{doctorId}")
@@ -45,7 +65,28 @@ public class ComplaintMasterController {
     }
 
     /**
-     * Get complaints that are visible to operators for a specific doctor
+     * Get complaints that are visible to operators for a specific doctor and clinic
+     * This is the main endpoint that replicates the stored procedure functionality
+     * GET /api/complaint-master/doctor/{doctorId}/clinic/{clinicId}/operator-visible
+     */
+    @GetMapping("/doctor/{doctorId}/clinic/{clinicId}/operator-visible")
+    public ResponseEntity<?> getComplaintsForOperatorDisplayByDoctorAndClinic(
+            @PathVariable String doctorId, 
+            @PathVariable String clinicId) {
+        try {
+            logger.info("Getting complaints for operator display for doctor: {} and clinic: {}", doctorId, clinicId);
+            List<ComplaintMaster> complaints = complaintMasterService.getComplaintsForOperatorDisplayByDoctorAndClinic(doctorId, clinicId);
+            return ResponseEntity.ok(complaints);
+        } catch (Exception e) {
+            logger.error("Error getting operator visible complaints for doctor {} and clinic {}: {}", doctorId, clinicId, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get operator visible complaints: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * Get complaints that are visible to operators for a specific doctor (backward compatibility)
      * This is the main endpoint that replicates the stored procedure functionality
      * GET /api/complaint-master/doctor/{doctorId}/operator-visible
      */
@@ -64,7 +105,28 @@ public class ComplaintMasterController {
     }
 
     /**
-     * Get complaints for operator display in the same format as stored procedure
+     * Get complaints for operator display in the same format as stored procedure for doctor and clinic
+     * Returns data with concatenated ID field for backward compatibility
+     * GET /api/complaint-master/doctor/{doctorId}/clinic/{clinicId}/operator-visible/formatted
+     */
+    @GetMapping("/doctor/{doctorId}/clinic/{clinicId}/operator-visible/formatted")
+    public ResponseEntity<?> getComplaintsForOperatorDisplayFormattedByDoctorAndClinic(
+            @PathVariable String doctorId, 
+            @PathVariable String clinicId) {
+        try {
+            logger.info("Getting formatted complaints for operator display for doctor: {} and clinic: {}", doctorId, clinicId);
+            List<Map<String, Object>> complaints = complaintMasterService.getComplaintsForOperatorDisplayFormattedByDoctorAndClinic(doctorId, clinicId);
+            return ResponseEntity.ok(complaints);
+        } catch (Exception e) {
+            logger.error("Error getting formatted operator visible complaints for doctor {} and clinic {}: {}", doctorId, clinicId, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get formatted operator visible complaints: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * Get complaints for operator display in the same format as stored procedure (backward compatibility)
      * Returns data with concatenated ID field for backward compatibility
      * GET /api/complaint-master/doctor/{doctorId}/operator-visible/formatted
      */

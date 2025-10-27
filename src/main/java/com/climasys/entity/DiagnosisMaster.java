@@ -4,17 +4,17 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 /**
- * Entity class for Complaint_Master table
- * Represents complaint master data with operator display filtering
+ * Entity representing the Diagnosis_Master table
+ * Maps to the diagnosis master functionality
  * 
  * Note: This entity has a composite primary key (short_description, doctor_id, clinic_id)
  * to support multi-clinic functionality
  */
 @Entity
-@Table(name = "complaint_master")
-@IdClass(ComplaintMasterId.class)
-public class ComplaintMaster {
-
+@Table(name = "diagnosis_master")
+@IdClass(DiagnosisMasterId.class)
+public class DiagnosisMaster {
+    
     @Id
     @Column(name = "short_description", length = 40, nullable = false)
     private String shortDescription;
@@ -26,99 +26,50 @@ public class ComplaintMaster {
     @Id
     @Column(name = "clinic_id", length = 30, nullable = false)
     private String clinicId;
-
-    @Column(name = "complaint_description", length = 1000)
-    private String complaintDescription;
-
+    
+    @Column(name = "diagnosis_description", length = 1000)
+    private String diagnosisDescription;
+    
     @Column(name = "created_on")
     private LocalDateTime createdOn;
-
+    
     @Column(name = "createdby_name", length = 90)
     private String createdByName;
-
+    
     @Column(name = "modified_on")
     private LocalDateTime modifiedOn;
-
+    
     @Column(name = "modifiedby_name", length = 90)
     private String modifiedByName;
-
+    
     @Column(name = "priority_value")
     private Integer priorityValue;
-
-    @Column(name = "display_to_operator", nullable = false)
-    private Short displayToOperator = 0;
-
+    
+    
     // Constructors
-    public ComplaintMaster() {}
-
-    public ComplaintMaster(String shortDescription, String doctorId, String clinicId, String complaintDescription) {
+    public DiagnosisMaster() {}
+    
+    public DiagnosisMaster(String shortDescription, String doctorId, String clinicId, String diagnosisDescription) {
         this.shortDescription = shortDescription;
         this.doctorId = doctorId;
         this.clinicId = clinicId;
-        this.complaintDescription = complaintDescription;
+        this.diagnosisDescription = diagnosisDescription;
+        this.createdOn = LocalDateTime.now();
     }
-
+    
     // Getters and Setters
     public String getShortDescription() {
         return shortDescription;
     }
-
+    
     public void setShortDescription(String shortDescription) {
         this.shortDescription = shortDescription;
     }
-
-    public String getComplaintDescription() {
-        return complaintDescription;
-    }
-
-    public void setComplaintDescription(String complaintDescription) {
-        this.complaintDescription = complaintDescription;
-    }
-
-    public LocalDateTime getCreatedOn() {
-        return createdOn;
-    }
-
-    public void setCreatedOn(LocalDateTime createdOn) {
-        this.createdOn = createdOn;
-    }
-
-    public String getCreatedByName() {
-        return createdByName;
-    }
-
-    public void setCreatedByName(String createdByName) {
-        this.createdByName = createdByName;
-    }
-
-    public LocalDateTime getModifiedOn() {
-        return modifiedOn;
-    }
-
-    public void setModifiedOn(LocalDateTime modifiedOn) {
-        this.modifiedOn = modifiedOn;
-    }
-
-    public String getModifiedByName() {
-        return modifiedByName;
-    }
-
-    public void setModifiedByName(String modifiedByName) {
-        this.modifiedByName = modifiedByName;
-    }
-
-    public Integer getPriorityValue() {
-        return priorityValue;
-    }
-
-    public void setPriorityValue(Integer priorityValue) {
-        this.priorityValue = priorityValue;
-    }
-
+    
     public String getDoctorId() {
         return doctorId;
     }
-
+    
     public void setDoctorId(String doctorId) {
         this.doctorId = doctorId;
     }
@@ -130,31 +81,73 @@ public class ComplaintMaster {
     public void setClinicId(String clinicId) {
         this.clinicId = clinicId;
     }
-
-    public Short getDisplayToOperator() {
-        return displayToOperator;
+    
+    public String getDiagnosisDescription() {
+        return diagnosisDescription;
     }
-
-    public void setDisplayToOperator(Short displayToOperator) {
-        this.displayToOperator = displayToOperator;
+    
+    public void setDiagnosisDescription(String diagnosisDescription) {
+        this.diagnosisDescription = diagnosisDescription;
     }
-
-    // Helper methods
-    public boolean isDisplayToOperator() {
-        return displayToOperator != null && displayToOperator == 1;
+    
+    public LocalDateTime getCreatedOn() {
+        return createdOn;
     }
-
-    public void setDisplayToOperator(boolean displayToOperator) {
-        this.displayToOperator = displayToOperator ? (short) 1 : (short) 0;
+    
+    public void setCreatedOn(LocalDateTime createdOn) {
+        this.createdOn = createdOn;
     }
-
+    
+    public String getCreatedByName() {
+        return createdByName;
+    }
+    
+    public void setCreatedByName(String createdByName) {
+        this.createdByName = createdByName;
+    }
+    
+    public LocalDateTime getModifiedOn() {
+        return modifiedOn;
+    }
+    
+    public void setModifiedOn(LocalDateTime modifiedOn) {
+        this.modifiedOn = modifiedOn;
+    }
+    
+    public String getModifiedByName() {
+        return modifiedByName;
+    }
+    
+    public void setModifiedByName(String modifiedByName) {
+        this.modifiedByName = modifiedByName;
+    }
+    
+    public Integer getPriorityValue() {
+        return priorityValue;
+    }
+    
+    public void setPriorityValue(Integer priorityValue) {
+        this.priorityValue = priorityValue;
+    }
+    
+    
+    @PrePersist
+    protected void onCreate() {
+        createdOn = LocalDateTime.now();
+    }
+    
+    @PreUpdate
+    protected void onUpdate() {
+        modifiedOn = LocalDateTime.now();
+    }
+    
     @Override
     public String toString() {
-        return "ComplaintMaster{" +
+        return "DiagnosisMaster{" +
                 "shortDescription='" + shortDescription + '\'' +
-                ", complaintDescription='" + complaintDescription + '\'' +
                 ", doctorId='" + doctorId + '\'' +
-                ", displayToOperator=" + displayToOperator +
+                ", clinicId='" + clinicId + '\'' +
+                ", diagnosisDescription='" + diagnosisDescription + '\'' +
                 ", priorityValue=" + priorityValue +
                 '}';
     }

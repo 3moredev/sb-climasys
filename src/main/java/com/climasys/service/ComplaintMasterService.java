@@ -27,7 +27,19 @@ public class ComplaintMasterService {
     private ComplaintMasterRepository complaintMasterRepository;
 
     /**
-     * Get all complaints for a specific doctor
+     * Get all complaints for a specific doctor and clinic
+     * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
+     * @return List of complaints for the doctor and clinic
+     */
+    @Transactional(readOnly = true)
+    public List<ComplaintMaster> getAllComplaintsForDoctorAndClinic(String doctorId, String clinicId) {
+        logger.info("Getting all complaints for doctor: {} and clinic: {}", doctorId, clinicId);
+        return complaintMasterRepository.findByDoctorIdAndClinicIdOrderByPriorityValueAscShortDescriptionAsc(doctorId, clinicId);
+    }
+
+    /**
+     * Get all complaints for a specific doctor (backward compatibility)
      * @param doctorId Doctor ID
      * @return List of complaints for the doctor
      */
@@ -38,7 +50,20 @@ public class ComplaintMasterService {
     }
 
     /**
-     * Get complaints that are visible to operators for a specific doctor
+     * Get complaints that are visible to operators for a specific doctor and clinic
+     * This is the main method that replicates the stored procedure functionality
+     * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
+     * @return List of complaints visible to operators
+     */
+    @Transactional(readOnly = true)
+    public List<ComplaintMaster> getComplaintsForOperatorDisplayByDoctorAndClinic(String doctorId, String clinicId) {
+        logger.info("Getting complaints for operator display for doctor: {} and clinic: {}", doctorId, clinicId);
+        return complaintMasterRepository.findComplaintsForOperatorDisplayByDoctorAndClinic(doctorId, clinicId);
+    }
+
+    /**
+     * Get complaints that are visible to operators for a specific doctor (backward compatibility)
      * This is the main method that replicates the stored procedure functionality
      * @param doctorId Doctor ID
      * @return List of complaints visible to operators
@@ -50,7 +75,20 @@ public class ComplaintMasterService {
     }
 
     /**
-     * Get complaints for operator display in the same format as stored procedure
+     * Get complaints for operator display in the same format as stored procedure for doctor and clinic
+     * Returns data with concatenated ID field for backward compatibility
+     * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
+     * @return List of complaint data with formatted ID field
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getComplaintsForOperatorDisplayFormattedByDoctorAndClinic(String doctorId, String clinicId) {
+        logger.info("Getting formatted complaints for operator display for doctor: {} and clinic: {}", doctorId, clinicId);
+        return complaintMasterRepository.findComplaintsForOperatorDisplayFormattedByDoctorAndClinic(doctorId, clinicId);
+    }
+
+    /**
+     * Get complaints for operator display in the same format as stored procedure (backward compatibility)
      * Returns data with concatenated ID field for backward compatibility
      * @param doctorId Doctor ID
      * @return List of complaint data with formatted ID field

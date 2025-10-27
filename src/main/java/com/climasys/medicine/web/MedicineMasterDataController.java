@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,7 +20,30 @@ public class MedicineMasterDataController {
     private MedicineMasterDataService medicineMasterDataService;
 
     /**
-     * Get active medicines for a doctor
+     * Test endpoint to check if the service is working
+     */
+    @GetMapping("/test")
+    public ResponseEntity<Map<String, Object>> testEndpoint() {
+        Map<String, Object> result = new HashMap<>();
+        result.put("status", "success");
+        result.put("message", "Medicine API is working");
+        result.put("timestamp", java.time.LocalDateTime.now());
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Get active medicines for a doctor and clinic
+     */
+    @GetMapping("/active-medicines/{doctorId}/clinic/{clinicId}")
+    public ResponseEntity<List<Map<String, Object>>> getActiveMedicinesByDoctorAndClinic(
+            @PathVariable String doctorId, 
+            @PathVariable String clinicId) {
+        List<Map<String, Object>> result = medicineMasterDataService.getActiveMedicinesByDoctorAndClinic(doctorId, clinicId);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Get active medicines for a doctor (backward compatibility)
      */
     @GetMapping("/active-medicines/{doctorId}")
     public ResponseEntity<List<Map<String, Object>>> getActiveMedicines(@PathVariable String doctorId) {
@@ -68,7 +92,18 @@ public class MedicineMasterDataController {
     }
 
     /**
-     * Get disease master data
+     * Get disease master data for doctor and clinic
+     */
+    @GetMapping("/diseases/{doctorId}/clinic/{clinicId}")
+    public ResponseEntity<List<Map<String, Object>>> getDiseaseMasterDataByDoctorAndClinic(
+            @PathVariable String doctorId, 
+            @PathVariable String clinicId) {
+        List<Map<String, Object>> result = medicineMasterDataService.getDiseaseMasterDataByDoctorAndClinic(doctorId, clinicId);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Get disease master data (backward compatibility)
      */
     @GetMapping("/diseases/{doctorId}")
     public ResponseEntity<List<Map<String, Object>>> getDiseaseMasterData(@PathVariable String doctorId) {

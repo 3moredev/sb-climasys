@@ -85,6 +85,16 @@ public class ReferenceDataService {
         return bloodGroupRepository.findAllOrdered();
     }
     
+    public List<ImpressionFinding> getImpressions(String doctorId, String clinicId) {
+        // Note: ImpressionFinding entity doesn't have clinic_id field yet
+        // For now, we'll ignore clinicId and use the existing logic
+        // TODO: Add clinic_id support to ImpressionFinding entity when needed
+        if (doctorId != null && !doctorId.isEmpty()) {
+            return impressionFindingRepository.findByDoctorId(doctorId);
+        }
+        return impressionFindingRepository.findAllOrdered();
+    }
+    
     public List<ImpressionFinding> getImpressions(String doctorId) {
         if (doctorId != null && !doctorId.isEmpty()) {
             return impressionFindingRepository.findByDoctorId(doctorId);

@@ -4,22 +4,24 @@ import java.io.Serializable;
 import java.util.Objects;
 
 /**
- * Composite primary key for LabTestMaster entity
- * Represents the (doctor_id, id, clinic_id) composite key from the database
+ * Composite primary key for StatusOrder entity
+ * Represents the (doctor_id, role_id, status_id, clinic_id) composite key from the database
  */
-public class LabTestMasterId implements Serializable {
+public class StatusOrderId implements Serializable {
     
     private String doctorId;
-    private Integer id;
+    private Integer roleId;
+    private Short statusId;
     private String clinicId;
     
     // Default constructor
-    public LabTestMasterId() {}
+    public StatusOrderId() {}
     
     // Constructor with parameters
-    public LabTestMasterId(String doctorId, Integer id, String clinicId) {
+    public StatusOrderId(String doctorId, Integer roleId, Short statusId, String clinicId) {
         this.doctorId = doctorId;
-        this.id = id;
+        this.roleId = roleId;
+        this.statusId = statusId;
         this.clinicId = clinicId;
     }
     
@@ -32,12 +34,20 @@ public class LabTestMasterId implements Serializable {
         this.doctorId = doctorId;
     }
     
-    public Integer getId() {
-        return id;
+    public Integer getRoleId() {
+        return roleId;
     }
     
-    public void setId(Integer id) {
-        this.id = id;
+    public void setRoleId(Integer roleId) {
+        this.roleId = roleId;
+    }
+    
+    public Short getStatusId() {
+        return statusId;
+    }
+    
+    public void setStatusId(Short statusId) {
+        this.statusId = statusId;
     }
     
     public String getClinicId() {
@@ -53,22 +63,24 @@ public class LabTestMasterId implements Serializable {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        LabTestMasterId that = (LabTestMasterId) o;
+        StatusOrderId that = (StatusOrderId) o;
         return Objects.equals(doctorId, that.doctorId) && 
-               Objects.equals(id, that.id) && 
+               Objects.equals(roleId, that.roleId) && 
+               Objects.equals(statusId, that.statusId) && 
                Objects.equals(clinicId, that.clinicId);
     }
     
     @Override
     public int hashCode() {
-        return Objects.hash(doctorId, id, clinicId);
+        return Objects.hash(doctorId, roleId, statusId, clinicId);
     }
     
     @Override
     public String toString() {
-        return "LabTestMasterId{" +
+        return "StatusOrderId{" +
                 "doctorId='" + doctorId + '\'' +
-                ", id=" + id +
+                ", roleId=" + roleId +
+                ", statusId=" + statusId +
                 ", clinicId='" + clinicId + '\'' +
                 '}';
     }

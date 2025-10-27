@@ -121,31 +121,34 @@ public interface AppointmentRepository extends JpaRepository<PatientVisit, Long>
     // Soft delete appointment by exact datetime match
     @Modifying
     @Transactional
-    @Query("UPDATE PatientVisit pv SET pv.deleteFlag = true, pv.modifiedOn = :modifiedOn, pv.modifiedbyName = :modifiedBy WHERE pv.patientId = :patientId AND pv.visitDate = :visitDate AND pv.doctorId = :doctorId")
+    @Query("UPDATE PatientVisit pv SET pv.deleteFlag = true, pv.modifiedOn = :modifiedOn, pv.modifiedbyName = :modifiedBy WHERE pv.patientId = :patientId AND pv.visitDate = :visitDate AND pv.doctorId = :doctorId AND pv.clinicId = :clinicId")
     int softDeleteAppointment(@Param("patientId") String patientId,
                               @Param("visitDate") LocalDateTime visitDate,
                               @Param("doctorId") String doctorId,
+                              @Param("clinicId") String clinicId,
                               @Param("modifiedOn") LocalDateTime modifiedOn,
                               @Param("modifiedBy") String modifiedBy);
     
     // Soft delete appointment by date (ignoring time)
     @Modifying
     @Transactional
-    @Query("UPDATE PatientVisit pv SET pv.deleteFlag = true, pv.modifiedOn = :modifiedOn, pv.modifiedbyName = :modifiedBy WHERE pv.patientId = :patientId AND pv.doctorId = :doctorId AND CAST(pv.visitDate AS date) = CAST(:visitDate AS date) AND pv.deleteFlag = false")
+    @Query("UPDATE PatientVisit pv SET pv.deleteFlag = true, pv.modifiedOn = :modifiedOn, pv.modifiedbyName = :modifiedBy WHERE pv.patientId = :patientId AND pv.doctorId = :doctorId AND pv.clinicId = :clinicId AND CAST(pv.visitDate AS date) = CAST(:visitDate AS date) AND pv.deleteFlag = false")
     int softDeleteAppointmentByDate(@Param("patientId") String patientId,
                                     @Param("visitDate") LocalDateTime visitDate,
                                     @Param("doctorId") String doctorId,
+                                    @Param("clinicId") String clinicId,
                                     @Param("modifiedOn") LocalDateTime modifiedOn,
                                     @Param("modifiedBy") String modifiedBy);
     
     // Soft delete appointment by date and time (matching separate date and time fields)
     @Modifying
     @Transactional
-    @Query("UPDATE PatientVisit pv SET pv.deleteFlag = true, pv.modifiedOn = :modifiedOn, pv.modifiedbyName = :modifiedBy WHERE pv.patientId = :patientId AND pv.doctorId = :doctorId AND CAST(pv.visitDate AS date) = :visitDate AND pv.visitTime = :visitTime AND pv.deleteFlag = false")
+    @Query("UPDATE PatientVisit pv SET pv.deleteFlag = true, pv.modifiedOn = :modifiedOn, pv.modifiedbyName = :modifiedBy WHERE pv.patientId = :patientId AND pv.doctorId = :doctorId AND pv.clinicId = :clinicId AND CAST(pv.visitDate AS date) = :visitDate AND pv.visitTime = :visitTime AND pv.deleteFlag = false")
     int softDeleteAppointmentByDateAndTime(@Param("patientId") String patientId,
                                            @Param("visitDate") java.time.LocalDate visitDate,
                                            @Param("visitTime") java.sql.Time visitTime,
                                            @Param("doctorId") String doctorId,
+                                           @Param("clinicId") String clinicId,
                                            @Param("modifiedOn") LocalDateTime modifiedOn,
                                            @Param("modifiedBy") String modifiedBy);
     

@@ -145,7 +145,13 @@ public class AppointmentJpaService {
             appointment.setDiscount(BigDecimal.ZERO); // Set default discount to 0
             appointment.setOriginalDiscount(BigDecimal.ZERO); // Set default original discount to 0
             
-            // Save appointment
+            // Set additional required fields for validation
+            appointment.setFeesToCollect(BigDecimal.ZERO); // Set default fees to 0
+            appointment.setIsSubmitPatientVisitDetails(false); // Set default submit flag
+            appointment.setModifiedOn(LocalDateTime.now());
+            appointment.setModifiedbyName(userId);
+            
+            // Save appointment (bypass validation for now)
             PatientVisit savedAppointment = appointmentRepository.save(appointment);
             
             Map<String, Object> result = new HashMap<>();
@@ -190,7 +196,7 @@ public class AppointmentJpaService {
      * Soft delete an appointment
      */
     @Transactional
-    public Map<String, Object> deletePatientAppointment(String patientId, LocalDateTime visitDate, String doctorId, String userId) {
+    public Map<String, Object> deletePatientAppointment(String patientId, LocalDateTime visitDate, String doctorId, String clinicId, String userId) {
         logger.info("Deleting today's appointment for patient: {} at time {} with doctor: {}", patientId, visitDate.toLocalTime(), doctorId);
         
         try {
@@ -211,7 +217,7 @@ public class AppointmentJpaService {
             
             // Try exact datetime match (since DB stores both date and time in UTC)
             int deletedCount = appointmentRepository.softDeleteAppointment(
-                patientId, visitDate, doctorId, LocalDateTime.now(), userId);
+                patientId, visitDate, doctorId, clinicId, LocalDateTime.now(), userId);
             
             logger.info("Exact datetime match deleted {} records", deletedCount);
             
@@ -224,7 +230,7 @@ public class AppointmentJpaService {
                 
                 if (!dateOnlyAppointments.isEmpty()) {
                     deletedCount = appointmentRepository.softDeleteAppointmentByDate(
-                        patientId, visitDate, doctorId, LocalDateTime.now(), userId);
+                        patientId, visitDate, doctorId, clinicId, LocalDateTime.now(), userId);
                     logger.info("Date-only match deleted {} records", deletedCount);
                 }
             }

@@ -1,5 +1,7 @@
 package com.climasys.patients.web;
 
+import com.climasys.patients.exception.AreaValidationException;
+import com.climasys.patients.exception.GenderValidationException;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -63,12 +65,48 @@ public class PatientController {
                 occupation = null;
             }
 
+            // Validate area_id, city_id, state_id, country_id combination exists in area_master (using id column)
+            Integer areaId = req.areaId();
+            String cityId = req.cityId();
+            String stateId = req.stateId();
+            String countryId = req.countryId();
+            
+            // Area ID is mandatory - check if provided
+            if (areaId == null) {
+                throw new AreaValidationException("Area ID is required and cannot be null");
+            }
+            
+            // Validate area combination exists in area_master table
+            if (cityId != null && stateId != null && countryId != null) {
+                String areaValidationSql = "SELECT COUNT(*) FROM area_master WHERE id = ? AND city_id = ? AND state_id = ? AND country_id = ?";
+                Integer count = jdbcTemplate.queryForObject(areaValidationSql, Integer.class, areaId, cityId, stateId, countryId);
+                
+                if (count == null || count == 0) {
+                    throw new AreaValidationException(areaId, cityId, stateId, countryId);
+                }
+            } else {
+                throw new AreaValidationException("City ID, State ID, and Country ID are required when Area ID is provided");
+            }
+
+            // Validate gender_id exists in gender_master table
+            String genderId = req.gender();
+            if (genderId == null || genderId.trim().isEmpty()) {
+                throw new GenderValidationException("Gender is required and cannot be null or empty", true);
+            }
+            
+            String genderValidationSql = "SELECT COUNT(*) FROM gender_master WHERE id = ?";
+            Integer genderCount = jdbcTemplate.queryForObject(genderValidationSql, Integer.class, genderId);
+            
+            if (genderCount == null || genderCount == 0) {
+                throw new GenderValidationException(genderId);
+            }
+
             // Check for duplicate patient (matching stored procedure logic)
             String duplicateCheckSql = "SELECT ID FROM patient_master " +
                     "WHERE last_name = ? AND first_name = ? AND gender_id = ? AND clinic_id = ?";
             
             List<Map<String, Object>> existingPatients = jdbcTemplate.queryForList(duplicateCheckSql,
-                    req.lastName(), req.firstName(), req.gender(), req.clinicId());
+                    req.lastName(), req.firstName(), genderId, req.clinicId());
             
             if (!existingPatients.isEmpty()) {
                 Map<String, Object> result = new HashMap<>();
@@ -104,13 +142,13 @@ public class PatientController {
                     req.middleName(),
                     req.lastName(),
                     req.mobile(),
-                    req.areaId(),
+                    areaId, // Use validated areaId
                     req.cityId(),
                     req.stateId(),
                     req.countryId(),
                     req.dob() != null ? java.sql.Date.valueOf(req.dob()) : null,
                     req.age() != null ? Short.valueOf(req.age()) : null,
-                    req.gender(),
+                    genderId,
                     req.regYear() != null ? Integer.valueOf(req.regYear()) : null,
                     req.registrationStatus(),
                     maritalStatus,

@@ -187,11 +187,13 @@ public class AppointmentController {
             @RequestParam String visitDate,
             @Parameter(description = "Doctor ID", required = true, example = "DR-00010")
             @RequestParam String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @RequestParam String clinicId,
             @Parameter(description = "User ID performing the deletion", required = false, example = "admin")
             @RequestParam(defaultValue = "system") String userId) {
         try {
             Map<String, Object> result = appointmentSchedulingService.deleteAppointment(
-                patientId, visitDate, doctorId, userId);
+                patientId, visitDate, doctorId, clinicId, userId);
             
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);

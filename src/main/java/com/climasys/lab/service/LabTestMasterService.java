@@ -24,20 +24,21 @@ public class LabTestMasterService {
     private LabTestMasterRepository labTestMasterRepository;
     
     /**
-     * Get lab tests for a specific doctor
+     * Get lab tests for a specific doctor and clinic
      * This method replaces the USP_Get_LabTest stored procedure call
      * 
      * @param doctorId Doctor ID to get lab tests for
+     * @param clinicId Clinic ID to filter lab tests
      * @return Map containing lab tests and additional data (matching stored procedure response)
      */
-    public Map<String, Object> getLabTestsForDoctor(String doctorId) {
+    public Map<String, Object> getLabTestsForDoctor(String doctorId, String clinicId) {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            logger.info("Getting lab tests for doctor: {}", doctorId);
+            logger.info("Getting lab tests for doctor: {} and clinic: {}", doctorId, clinicId);
             
             // Get lab tests ordered by priority and description (main result set from stored procedure)
-            List<LabTestMaster> labTests = labTestMasterRepository.findByDoctorIdOrderByPriorityAndDescription(doctorId);
+            List<LabTestMaster> labTests = labTestMasterRepository.findByDoctorIdAndClinicIdOrderByPriorityAndDescription(doctorId, clinicId);
             
             // Convert to response format matching the stored procedure output
             List<Map<String, Object>> labTestList = labTests.stream()
@@ -47,12 +48,13 @@ public class LabTestMasterService {
             response.put("success", true);
             response.put("labTests", labTestList);
             response.put("doctorId", doctorId);
+            response.put("clinicId", clinicId);
             response.put("totalCount", labTests.size());
             
-            logger.info("Found {} lab tests for doctor: {}", labTests.size(), doctorId);
+            logger.info("Found {} lab tests for doctor: {} and clinic: {}", labTests.size(), doctorId, clinicId);
             
         } catch (Exception e) {
-            logger.error("Error getting lab tests for doctor {}: {}", doctorId, e.getMessage(), e);
+            logger.error("Error getting lab tests for doctor {} and clinic {}: {}", doctorId, clinicId, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to get lab tests: " + e.getMessage());
         }
@@ -96,17 +98,18 @@ public class LabTestMasterService {
      * Search lab tests by description pattern
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param searchTerm Search term for lab test description
      * @return Map containing matching lab tests
      */
-    public Map<String, Object> searchLabTests(String doctorId, String searchTerm) {
+    public Map<String, Object> searchLabTests(String doctorId, String clinicId, String searchTerm) {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            logger.info("Searching lab tests for doctor: {} with term: {}", doctorId, searchTerm);
+            logger.info("Searching lab tests for doctor: {} and clinic: {} with term: {}", doctorId, clinicId, searchTerm);
             
             String searchPattern = "%" + searchTerm + "%";
-            List<LabTestMaster> labTests = labTestMasterRepository.findByDoctorIdAndDescriptionLike(doctorId, searchPattern);
+            List<LabTestMaster> labTests = labTestMasterRepository.findByDoctorIdAndClinicIdAndDescriptionLike(doctorId, clinicId, searchPattern);
             
             List<Map<String, Object>> labTestList = labTests.stream()
                 .map(this::convertToMap)
@@ -115,13 +118,14 @@ public class LabTestMasterService {
             response.put("success", true);
             response.put("labTests", labTestList);
             response.put("doctorId", doctorId);
+            response.put("clinicId", clinicId);
             response.put("searchTerm", searchTerm);
             response.put("totalCount", labTests.size());
             
-            logger.info("Found {} lab tests matching search term: {}", labTests.size(), searchTerm);
+            logger.info("Found {} lab tests matching search term: {} for doctor: {} and clinic: {}", labTests.size(), searchTerm, doctorId, clinicId);
             
         } catch (Exception e) {
-            logger.error("Error searching lab tests for doctor {} with term {}: {}", doctorId, searchTerm, e.getMessage(), e);
+            logger.error("Error searching lab tests for doctor {} and clinic {} with term {}: {}", doctorId, clinicId, searchTerm, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to search lab tests: " + e.getMessage());
         }
@@ -130,66 +134,70 @@ public class LabTestMasterService {
     }
     
     /**
-     * Check if lab test exists for doctor
+     * Check if lab test exists for doctor and clinic
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param labTestDescription Lab test description
      * @return true if exists, false otherwise
      */
-    public boolean labTestExists(String doctorId, String labTestDescription) {
+    public boolean labTestExists(String doctorId, String clinicId, String labTestDescription) {
         try {
-            return labTestMasterRepository.existsByDoctorIdAndDescription(doctorId, labTestDescription);
+            return labTestMasterRepository.existsByDoctorIdAndClinicIdAndDescription(doctorId, clinicId, labTestDescription);
         } catch (Exception e) {
-            logger.error("Error checking if lab test exists for doctor {} and description {}: {}", doctorId, labTestDescription, e.getMessage(), e);
+            logger.error("Error checking if lab test exists for doctor {} and clinic {} and description {}: {}", doctorId, clinicId, labTestDescription, e.getMessage(), e);
             return false;
         }
     }
     
     /**
-     * Get lab test by doctor ID and description
+     * Get lab test by doctor ID, clinic ID and description
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param labTestDescription Lab test description
      * @return LabTestMaster entity or null
      */
-    public LabTestMaster getLabTestByDoctorAndDescription(String doctorId, String labTestDescription) {
+    public LabTestMaster getLabTestByDoctorAndDescription(String doctorId, String clinicId, String labTestDescription) {
         try {
-            return labTestMasterRepository.findByDoctorIdAndDescription(doctorId, labTestDescription);
+            return labTestMasterRepository.findByDoctorIdAndClinicIdAndDescription(doctorId, clinicId, labTestDescription);
         } catch (Exception e) {
-            logger.error("Error getting lab test for doctor {} and description {}: {}", doctorId, labTestDescription, e.getMessage(), e);
+            logger.error("Error getting lab test for doctor {} and clinic {} and description {}: {}", doctorId, clinicId, labTestDescription, e.getMessage(), e);
             return null;
         }
     }
     
     /**
-     * Get count of lab tests for doctor
+     * Get count of lab tests for doctor and clinic
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @return Count of lab tests
      */
-    public long getLabTestCountForDoctor(String doctorId) {
+    public long getLabTestCountForDoctor(String doctorId, String clinicId) {
         try {
-            return labTestMasterRepository.countByDoctorId(doctorId);
+            return labTestMasterRepository.countByDoctorIdAndClinicId(doctorId, clinicId);
         } catch (Exception e) {
-            logger.error("Error getting lab test count for doctor {}: {}", doctorId, e.getMessage(), e);
+            logger.error("Error getting lab test count for doctor {} and clinic {}: {}", doctorId, clinicId, e.getMessage(), e);
             return 0;
         }
     }
     
     /**
-     * Get lab tests by group name for a doctor
+     * Get lab tests by group name for a doctor and clinic
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param groupName Group name
      * @return Map containing lab tests in the group
      */
-    public Map<String, Object> getLabTestsByGroup(String doctorId, String groupName) {
+    public Map<String, Object> getLabTestsByGroup(String doctorId, String clinicId, String groupName) {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            logger.info("Getting lab tests for doctor: {} and group: {}", doctorId, groupName);
+            logger.info("Getting lab tests for doctor: {} and clinic: {} and group: {}", doctorId, clinicId, groupName);
             
-            List<LabTestMaster> labTests = labTestMasterRepository.findByDoctorIdAndGroupName(doctorId, groupName);
+            List<LabTestMaster> labTests = labTestMasterRepository.findByDoctorIdAndClinicIdAndGroupName(doctorId, clinicId, groupName);
             
             List<Map<String, Object>> labTestList = labTests.stream()
                 .map(this::convertToMap)
@@ -198,13 +206,14 @@ public class LabTestMasterService {
             response.put("success", true);
             response.put("labTests", labTestList);
             response.put("doctorId", doctorId);
+            response.put("clinicId", clinicId);
             response.put("groupName", groupName);
             response.put("totalCount", labTests.size());
             
-            logger.info("Found {} lab tests for doctor: {} and group: {}", labTests.size(), doctorId, groupName);
+            logger.info("Found {} lab tests for doctor: {} and clinic: {} and group: {}", labTests.size(), doctorId, clinicId, groupName);
             
         } catch (Exception e) {
-            logger.error("Error getting lab tests for doctor {} and group {}: {}", doctorId, groupName, e.getMessage(), e);
+            logger.error("Error getting lab tests for doctor {} and clinic {} and group {}: {}", doctorId, clinicId, groupName, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to get lab tests: " + e.getMessage());
         }
@@ -225,6 +234,7 @@ public class LabTestMasterService {
         labTestMap.put("Lab_Test_Description", labTest.getLabTestDescription());
         labTestMap.put("Priority_Value", labTest.getPriorityValue());
         labTestMap.put("Doctor_ID", labTest.getDoctorId());
+        labTestMap.put("Clinic_ID", labTest.getClinicId());
         labTestMap.put("Group_Name", labTest.getGroupName());
         labTestMap.put("Created_On", labTest.getCreatedOn());
         labTestMap.put("Createdby_Name", labTest.getCreatedbyName());

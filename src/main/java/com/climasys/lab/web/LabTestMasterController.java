@@ -27,30 +27,33 @@ public class LabTestMasterController {
     private LabTestMasterService labTestMasterService;
     
     /**
-     * Get lab tests for a specific doctor
+     * Get lab tests for a specific doctor and clinic
      * This endpoint replaces the USP_Get_LabTest stored procedure call
      * Used to populate the lab test dropdown in the modal
      * 
      * @param doctorId Doctor ID to get lab tests for
-     * @return List of lab tests for the doctor
+     * @param clinicId Clinic ID to filter lab tests
+     * @return List of lab tests for the doctor and clinic
      */
     @Operation(
-        summary = "Get Lab Tests by Doctor",
-        description = "Retrieves all lab tests available for a specific doctor, ordered by priority and description. " +
+        summary = "Get Lab Tests by Doctor and Clinic",
+        description = "Retrieves all lab tests available for a specific doctor and clinic, ordered by priority and description. " +
                      "This replaces the USP_Get_LabTest stored procedure functionality."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lab tests retrieved successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request - invalid doctor ID"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid doctor ID or clinic ID"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    @GetMapping("/tests/doctor/{doctorId}")
-    public ResponseEntity<?> getLabTestsByDoctor(
+    @GetMapping("/tests/doctor/{doctorId}/clinic/{clinicId}")
+    public ResponseEntity<?> getLabTestsByDoctorAndClinic(
             @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
-            @PathVariable String doctorId) {
+            @PathVariable String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @PathVariable String clinicId) {
         
         try {
-            Map<String, Object> result = labTestMasterService.getLabTestsForDoctor(doctorId);
+            Map<String, Object> result = labTestMasterService.getLabTestsForDoctor(doctorId, clinicId);
             
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
@@ -102,12 +105,13 @@ public class LabTestMasterController {
      * Search lab tests by description
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param searchTerm Search term for lab test description
      * @return List of matching lab tests
      */
     @Operation(
         summary = "Search Lab Tests",
-        description = "Searches lab tests by description pattern for a specific doctor."
+        description = "Searches lab tests by description pattern for a specific doctor and clinic."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lab tests retrieved successfully"),
@@ -118,11 +122,13 @@ public class LabTestMasterController {
     public ResponseEntity<?> searchLabTests(
             @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
             @RequestParam String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @RequestParam String clinicId,
             @Parameter(description = "Search term for lab test description", required = true, example = "Blood")
             @RequestParam String searchTerm) {
         
         try {
-            Map<String, Object> result = labTestMasterService.searchLabTests(doctorId, searchTerm);
+            Map<String, Object> result = labTestMasterService.searchLabTests(doctorId, clinicId, searchTerm);
             
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
@@ -139,15 +145,16 @@ public class LabTestMasterController {
     }
     
     /**
-     * Check if lab test exists for doctor
+     * Check if lab test exists for doctor and clinic
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param labTestDescription Lab test description
      * @return true if exists, false otherwise
      */
     @Operation(
         summary = "Check Lab Test Exists",
-        description = "Checks if a specific lab test exists for a doctor."
+        description = "Checks if a specific lab test exists for a doctor and clinic."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Check completed successfully"),
@@ -158,16 +165,19 @@ public class LabTestMasterController {
     public ResponseEntity<?> checkLabTestExists(
             @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
             @RequestParam String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @RequestParam String clinicId,
             @Parameter(description = "Lab test description", required = true, example = "Blood Sugar (Fasting)")
             @RequestParam String labTestDescription) {
         
         try {
-            boolean exists = labTestMasterService.labTestExists(doctorId, labTestDescription);
+            boolean exists = labTestMasterService.labTestExists(doctorId, clinicId, labTestDescription);
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "exists", exists,
                 "doctorId", doctorId,
+                "clinicId", clinicId,
                 "labTestDescription", labTestDescription
             ));
             
@@ -180,32 +190,36 @@ public class LabTestMasterController {
     }
     
     /**
-     * Get lab test count for doctor
+     * Get lab test count for doctor and clinic
      * 
      * @param doctorId Doctor ID
-     * @return Count of lab tests for the doctor
+     * @param clinicId Clinic ID
+     * @return Count of lab tests for the doctor and clinic
      */
     @Operation(
         summary = "Get Lab Test Count",
-        description = "Gets the count of lab tests available for a specific doctor."
+        description = "Gets the count of lab tests available for a specific doctor and clinic."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Count retrieved successfully"),
         @ApiResponse(responseCode = "400", description = "Bad request"),
         @ApiResponse(responseCode = "500", description = "Internal server error")
     })
-    @GetMapping("/tests/count/{doctorId}")
+    @GetMapping("/tests/count/{doctorId}/clinic/{clinicId}")
     public ResponseEntity<?> getLabTestCount(
             @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
-            @PathVariable String doctorId) {
+            @PathVariable String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @PathVariable String clinicId) {
         
         try {
-            long count = labTestMasterService.getLabTestCountForDoctor(doctorId);
+            long count = labTestMasterService.getLabTestCountForDoctor(doctorId, clinicId);
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
                 "count", count,
-                "doctorId", doctorId
+                "doctorId", doctorId,
+                "clinicId", clinicId
             ));
             
         } catch (Exception e) {
@@ -217,15 +231,16 @@ public class LabTestMasterController {
     }
     
     /**
-     * Get lab tests by group name for a doctor
+     * Get lab tests by group name for a doctor and clinic
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param groupName Group name
      * @return List of lab tests in the group
      */
     @Operation(
         summary = "Get Lab Tests by Group",
-        description = "Gets lab tests for a specific doctor filtered by group name."
+        description = "Gets lab tests for a specific doctor and clinic filtered by group name."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lab tests retrieved successfully"),
@@ -236,11 +251,13 @@ public class LabTestMasterController {
     public ResponseEntity<?> getLabTestsByGroup(
             @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
             @RequestParam String doctorId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @RequestParam String clinicId,
             @Parameter(description = "Group name", required = true, example = "Biochemistry")
             @RequestParam String groupName) {
         
         try {
-            Map<String, Object> result = labTestMasterService.getLabTestsByGroup(doctorId, groupName);
+            Map<String, Object> result = labTestMasterService.getLabTestsByGroup(doctorId, clinicId, groupName);
             
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);

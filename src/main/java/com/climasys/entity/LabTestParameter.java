@@ -7,18 +7,15 @@ import java.time.LocalDateTime;
  * Entity representing the Lab_Test_Parameter table
  * Maps to the USP_Get_LabTestAndParameter stored procedure functionality
  * 
- * Note: This entity maps to the existing database schema which has:
- * - Composite primary key (lab_test_id, doctor_id, id)
+ * Note: This entity maps to the updated database schema which has:
+ * - Composite primary key (doctor_id, id, lab_test_id, clinic_id)
  * - Foreign key relationship with Lab_Test_Master table
+ * - Multi-clinic support with clinic_id field
  */
 @Entity
 @Table(name = "lab_test_parameter")
 @IdClass(LabTestParameterId.class)
 public class LabTestParameter {
-    
-    @Id
-    @Column(name = "lab_test_id")
-    private Integer labTestId;
     
     @Id
     @Column(name = "doctor_id", length = 30)
@@ -27,6 +24,14 @@ public class LabTestParameter {
     @Id
     @Column(name = "id")
     private Integer id;
+    
+    @Id
+    @Column(name = "lab_test_id")
+    private Integer labTestId;
+    
+    @Id
+    @Column(name = "clinic_id", length = 30)
+    private String clinicId;
     
     @Column(name = "parameter_name", length = 100)
     private String parameterName;
@@ -46,10 +51,11 @@ public class LabTestParameter {
     // Constructors
     public LabTestParameter() {}
     
-    public LabTestParameter(Integer labTestId, String doctorId, Integer id, String parameterName) {
-        this.labTestId = labTestId;
+    public LabTestParameter(String doctorId, Integer id, Integer labTestId, String clinicId, String parameterName) {
         this.doctorId = doctorId;
         this.id = id;
+        this.labTestId = labTestId;
+        this.clinicId = clinicId;
         this.parameterName = parameterName;
     }
     
@@ -76,6 +82,14 @@ public class LabTestParameter {
     
     public void setId(Integer id) {
         this.id = id;
+    }
+    
+    public String getClinicId() {
+        return clinicId;
+    }
+    
+    public void setClinicId(String clinicId) {
+        this.clinicId = clinicId;
     }
     
     public String getParameterName() {

@@ -30,22 +30,23 @@ public class LabTestParameterService {
     private LabTestMasterRepository labTestMasterRepository;
     
     /**
-     * Get lab test and parameters for a specific doctor and lab test description
+     * Get lab test and parameters for a specific doctor, clinic and lab test description
      * This method replaces the USP_Get_LabTestAndParameter stored procedure call
      * 
      * @param doctorId Doctor ID to get lab test parameters for
+     * @param clinicId Clinic ID to filter lab test parameters
      * @param labTestDescription Lab test description to filter parameters
      * @return Map containing lab test parameters and additional data (matching stored procedure response)
      */
-    public Map<String, Object> getLabTestAndParameters(String doctorId, String labTestDescription) {
+    public Map<String, Object> getLabTestAndParameters(String doctorId, String clinicId, String labTestDescription) {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            logger.info("Getting lab test parameters for doctor: {} and lab test: {}", doctorId, labTestDescription);
+            logger.info("Getting lab test parameters for doctor: {} and clinic: {} and lab test: {}", doctorId, clinicId, labTestDescription);
             
             // Get lab test parameters with lab test master data (main result set from stored procedure)
             List<Object[]> labTestParameters = labTestParameterRepository
-                    .findLabTestAndParametersByDoctorAndTestDescription(doctorId, labTestDescription);
+                    .findLabTestAndParametersByDoctorAndClinicAndTestDescription(doctorId, clinicId, labTestDescription);
             
             // Convert to response format matching the stored procedure output
             List<Map<String, Object>> parameterList = labTestParameters.stream()
@@ -55,15 +56,16 @@ public class LabTestParameterService {
             response.put("success", true);
             response.put("labTestParameters", parameterList);
             response.put("doctorId", doctorId);
+            response.put("clinicId", clinicId);
             response.put("labTestDescription", labTestDescription);
             response.put("totalCount", parameterList.size());
             
-            logger.info("Found {} lab test parameters for doctor: {} and lab test: {}", 
-                    parameterList.size(), doctorId, labTestDescription);
+            logger.info("Found {} lab test parameters for doctor: {} and clinic: {} and lab test: {}", 
+                    parameterList.size(), doctorId, clinicId, labTestDescription);
             
         } catch (Exception e) {
-            logger.error("Error getting lab test parameters for doctor {} and lab test {}: {}", 
-                    doctorId, labTestDescription, e.getMessage(), e);
+            logger.error("Error getting lab test parameters for doctor {} and clinic {} and lab test {}: {}", 
+                    doctorId, clinicId, labTestDescription, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to get lab test parameters: " + e.getMessage());
         }
@@ -72,20 +74,21 @@ public class LabTestParameterService {
     }
     
     /**
-     * Get lab test parameters by doctor ID and lab test ID
+     * Get lab test parameters by doctor ID, clinic ID and lab test ID
      * 
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param labTestId Lab test ID
      * @return Map containing lab test parameters
      */
-    public Map<String, Object> getLabTestParametersByTestId(String doctorId, Integer labTestId) {
+    public Map<String, Object> getLabTestParametersByTestId(String doctorId, String clinicId, Integer labTestId) {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            logger.info("Getting lab test parameters for doctor: {} and lab test ID: {}", doctorId, labTestId);
+            logger.info("Getting lab test parameters for doctor: {} and clinic: {} and lab test ID: {}", doctorId, clinicId, labTestId);
             
             List<LabTestParameter> parameters = labTestParameterRepository
-                    .findByDoctorIdAndLabTestId(doctorId, labTestId);
+                    .findByDoctorIdAndClinicIdAndLabTestId(doctorId, clinicId, labTestId);
             
             List<Map<String, Object>> parameterList = parameters.stream()
                     .map(this::convertParameterToMap)
@@ -94,15 +97,16 @@ public class LabTestParameterService {
             response.put("success", true);
             response.put("labTestParameters", parameterList);
             response.put("doctorId", doctorId);
+            response.put("clinicId", clinicId);
             response.put("labTestId", labTestId);
             response.put("totalCount", parameterList.size());
             
-            logger.info("Found {} lab test parameters for doctor: {} and lab test ID: {}", 
-                    parameterList.size(), doctorId, labTestId);
+            logger.info("Found {} lab test parameters for doctor: {} and clinic: {} and lab test ID: {}", 
+                    parameterList.size(), doctorId, clinicId, labTestId);
             
         } catch (Exception e) {
-            logger.error("Error getting lab test parameters for doctor {} and lab test ID {}: {}", 
-                    doctorId, labTestId, e.getMessage(), e);
+            logger.error("Error getting lab test parameters for doctor {} and clinic {} and lab test ID {}: {}", 
+                    doctorId, clinicId, labTestId, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to get lab test parameters: " + e.getMessage());
         }
@@ -111,18 +115,19 @@ public class LabTestParameterService {
     }
     
     /**
-     * Get all lab test parameters for a doctor
+     * Get all lab test parameters for a doctor and clinic
      * 
      * @param doctorId Doctor ID
-     * @return Map containing all lab test parameters for the doctor
+     * @param clinicId Clinic ID
+     * @return Map containing all lab test parameters for the doctor and clinic
      */
-    public Map<String, Object> getAllLabTestParametersForDoctor(String doctorId) {
+    public Map<String, Object> getAllLabTestParametersForDoctor(String doctorId, String clinicId) {
         Map<String, Object> response = new HashMap<>();
         
         try {
-            logger.info("Getting all lab test parameters for doctor: {}", doctorId);
+            logger.info("Getting all lab test parameters for doctor: {} and clinic: {}", doctorId, clinicId);
             
-            List<LabTestParameter> parameters = labTestParameterRepository.findByDoctorId(doctorId);
+            List<LabTestParameter> parameters = labTestParameterRepository.findByDoctorIdAndClinicId(doctorId, clinicId);
             
             List<Map<String, Object>> parameterList = parameters.stream()
                     .map(this::convertParameterToMap)
@@ -131,12 +136,13 @@ public class LabTestParameterService {
             response.put("success", true);
             response.put("labTestParameters", parameterList);
             response.put("doctorId", doctorId);
+            response.put("clinicId", clinicId);
             response.put("totalCount", parameterList.size());
             
-            logger.info("Found {} lab test parameters for doctor: {}", parameterList.size(), doctorId);
+            logger.info("Found {} lab test parameters for doctor: {} and clinic: {}", parameterList.size(), doctorId, clinicId);
             
         } catch (Exception e) {
-            logger.error("Error getting all lab test parameters for doctor {}: {}", doctorId, e.getMessage(), e);
+            logger.error("Error getting all lab test parameters for doctor {} and clinic {}: {}", doctorId, clinicId, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to get lab test parameters: " + e.getMessage());
         }
@@ -174,14 +180,14 @@ public class LabTestParameterService {
      * @param doctorId Doctor ID to get lab tests and parameters for
      * @return Map containing all lab tests with their parameters
      */
-    public Map<String, Object> getAllLabTestsWithParameters(String doctorId) {
+    public Map<String, Object> getAllLabTestsWithParameters(String doctorId, String clinicId) {
         Map<String, Object> response = new HashMap<>();
         
         try {
             logger.info("Getting all lab tests with parameters for doctor: {}", doctorId);
             
             // Get all lab tests for the doctor
-            List<LabTestMaster> labTests = labTestMasterRepository.findByDoctorIdOrderByPriorityAndDescription(doctorId);
+            List<LabTestMaster> labTests = labTestMasterRepository.findByDoctorIdAndClinicIdOrderByPriorityAndDescription(doctorId, clinicId);
             
             // For each lab test, get its parameters
             List<Map<String, Object>> labTestsWithParameters = labTests.stream()
@@ -201,7 +207,7 @@ public class LabTestParameterService {
                         
                         // Get parameters for this lab test
                         List<LabTestParameter> parameters = labTestParameterRepository
-                                .findByDoctorIdAndLabTestId(doctorId, labTest.getId());
+                                .findByDoctorIdAndLabTestIdAndClinicId(doctorId, labTest.getId(), clinicId);
                         
                         // Convert parameters to map format
                         List<Map<String, Object>> parameterList = parameters.stream()
@@ -267,6 +273,7 @@ public class LabTestParameterService {
         parameterMap.put("ID", parameter.getId());
         parameterMap.put("Lab_Test_ID", parameter.getLabTestId());
         parameterMap.put("Doctor_ID", parameter.getDoctorId());
+        parameterMap.put("Clinic_ID", parameter.getClinicId());
         parameterMap.put("Parameter_Name", parameter.getParameterName());
         parameterMap.put("Created_On", parameter.getCreatedOn());
         parameterMap.put("Createdby_Name", parameter.getCreatedbyName());
