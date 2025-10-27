@@ -130,13 +130,6 @@ public class DiagnosisMaster {
         this.priorityValue = priorityValue;
     }
     
-    public Boolean getActive() {
-        return active;
-    }
-    
-    public void setActive(Boolean active) {
-        this.active = active;
-    }
     
     @PrePersist
     protected void onCreate() {
@@ -156,7 +149,6 @@ public class DiagnosisMaster {
                 ", clinicId='" + clinicId + '\'' +
                 ", diagnosisDescription='" + diagnosisDescription + '\'' +
                 ", priorityValue=" + priorityValue +
-                ", active=" + active +
                 '}';
     }
 }
