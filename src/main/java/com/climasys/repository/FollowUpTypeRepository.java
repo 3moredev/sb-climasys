@@ -12,12 +12,12 @@ import java.util.Optional;
 @Repository
 public interface FollowUpTypeRepository extends JpaRepository<FollowUpType, Short> {
     
-    @Query("SELECT f FROM FollowUpType f WHERE f.id = :id AND (f.deleteFlag = false OR f.deleteFlag IS NULL)")
+    @Query("SELECT f FROM FollowUpType f WHERE f.id = :id")
     Optional<FollowUpType> findByIdAndActive(@Param("id") Short id);
     
-    @Query("SELECT f FROM FollowUpType f WHERE (f.deleteFlag = false OR f.deleteFlag IS NULL)")
+    @Query("SELECT f FROM FollowUpType f")
     List<FollowUpType> findAllActive();
     
-    @Query("SELECT f FROM FollowUpType f WHERE f.followUpCode = :followUpCode AND (f.deleteFlag = false OR f.deleteFlag IS NULL)")
-    Optional<FollowUpType> findByFollowUpCodeAndActive(@Param("followUpCode") String followUpCode);
+    @Query("SELECT f FROM FollowUpType f WHERE f.followUpDescription = :followUpDescription")
+    Optional<FollowUpType> findByFollowUpDescription(@Param("followUpDescription") String followUpDescription);
 }

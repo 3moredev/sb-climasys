@@ -6,7 +6,7 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 
 @Entity
-@Table(name = "follow-up_type")
+@Table(name = "follow_up_type")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -16,27 +16,6 @@ public class FollowUpType {
     @Column(name = "id", nullable = false)
     private Short id;
     
-    @Column(name = "followup_description", length = 100)
+    @Column(name = "followup_description", length = 15)
     private String followUpDescription;
-    
-    @Column(name = "followup_code", length = 20)
-    private String followUpCode;
-    
-    @Column(name = "is_active")
-    private Boolean isActive;
-    
-    @Column(name = "created_on")
-    private java.time.LocalDateTime createdOn;
-    
-    @Column(name = "created_by", length = 50)
-    private String createdBy;
-    
-    @Column(name = "modified_on")
-    private java.time.LocalDateTime modifiedOn;
-    
-    @Column(name = "modified_by", length = 50)
-    private String modifiedBy;
-    
-    @Column(name = "delete_flag")
-    private Boolean deleteFlag;
 }

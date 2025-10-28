@@ -440,7 +440,7 @@ public class AppointmentJpaService {
                 Map<String, Object> followUpMap = new HashMap<>();
                 followUpMap.put("id", followUp.getId());
                 followUpMap.put("description", followUp.getFollowUpDescription());
-                followUpMap.put("code", followUp.getFollowUpCode());
+                followUpMap.put("code", followUp.getFollowUpDescription()); // Use description as code since code field doesn't exist
                 return followUpMap;
             }).collect(Collectors.toList());
         } catch (Exception e) {

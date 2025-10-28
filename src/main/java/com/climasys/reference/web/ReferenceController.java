@@ -260,4 +260,73 @@ public class ReferenceController {
             return ResponseEntity.badRequest().body(error);
         }
     }
+    
+    // =====================================================
+    // NEW ENDPOINTS FOR USP_Get_BloodGroupDetails REPLACEMENT
+    // =====================================================
+    
+    @Operation(summary = "Get Payment Methods", description = "Retrieve all available payment method options")
+    @GetMapping("/payment-methods")
+    public ResponseEntity<?> getPaymentMethods() {
+        try {
+            List<?> result = referenceDataService.getPaymentMethods();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get payment methods: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @Operation(summary = "Get Titles", description = "Retrieve all available title options")
+    @GetMapping("/titles")
+    public ResponseEntity<?> getTitles() {
+        try {
+            List<?> result = referenceDataService.getTitles();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get titles: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @Operation(summary = "Get Follow-up Types", description = "Retrieve all available follow-up type options")
+    @GetMapping("/follow-up-types")
+    public ResponseEntity<?> getFollowUpTypes() {
+        try {
+            List<?> result = referenceDataService.getFollowUpTypes();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get follow-up types: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @Operation(summary = "Get Follow-up After Options", description = "Retrieve all available follow-up after period options")
+    @GetMapping("/followup-after")
+    public ResponseEntity<?> getFollowupAfterOptions() {
+        try {
+            List<?> result = referenceDataService.getFollowupAfterOptions();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get follow-up after options: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    @Operation(summary = "Get All Reference Data", description = "Retrieve all reference data in the same format as USP_Get_BloodGroupDetails stored procedure")
+    @GetMapping("/all-reference-data")
+    public ResponseEntity<?> getAllReferenceData() {
+        try {
+            Map<String, Object> result = referenceDataService.getAllReferenceData();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get all reference data: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
 }

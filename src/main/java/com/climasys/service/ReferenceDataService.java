@@ -77,6 +77,18 @@ public class ReferenceDataService {
     @Autowired
     private PatientRepository patientRepository;
     
+    @Autowired
+    private PaymentMethodRepository paymentMethodRepository;
+    
+    @Autowired
+    private TitleMasterRepository titleMasterRepository;
+    
+    @Autowired
+    private FollowupAfterRepository followupAfterRepository;
+    
+    @Autowired
+    private FollowUpTypeRepository followUpTypeRepository;
+    
     public List<Gender> getGenders() {
         return genderRepository.findAllOrdered();
     }
@@ -321,5 +333,76 @@ public class ReferenceDataService {
     
     public List<Country> getCountries() {
         return countryRepository.findAllOrdered();
+    }
+    
+    // =====================================================
+    // NEW METHODS FOR USP_Get_BloodGroupDetails REPLACEMENT
+    // =====================================================
+    
+    /**
+     * Get all payment methods
+     * @return List of payment methods
+     */
+    public List<PaymentMethod> getPaymentMethods() {
+        return paymentMethodRepository.findAllActiveOrdered();
+    }
+    
+    /**
+     * Get all titles
+     * @return List of titles
+     */
+    public List<TitleMaster> getTitles() {
+        return titleMasterRepository.findAllActiveOrdered();
+    }
+    
+    /**
+     * Get all follow-up types
+     * @return List of follow-up types
+     */
+    public List<FollowUpType> getFollowUpTypes() {
+        return followUpTypeRepository.findAllActive();
+    }
+    
+    /**
+     * Get all follow-up after periods
+     * @return List of follow-up after periods
+     */
+    public List<FollowupAfter> getFollowupAfterOptions() {
+        return followupAfterRepository.findAllActiveOrdered();
+    }
+    
+    /**
+     * Get all reference data in the same format as USP_Get_BloodGroupDetails
+     * This method combines all the data that the stored procedure returns
+     * @return Map containing all reference data tables
+     */
+    public Map<String, Object> getAllReferenceData() {
+        Map<String, Object> result = new HashMap<>();
+        
+        try {
+            // Table[0]: Blood Groups
+            result.put("bloodGroups", getBloodGroups());
+            
+            // Table[1]: Payment Methods
+            result.put("paymentMethods", getPaymentMethods());
+            
+            // Table[2]: Titles
+            result.put("titles", getTitles());
+            
+            // Table[3]: Follow-up Types
+            result.put("followUpTypes", getFollowUpTypes());
+            
+            // Table[4]: Follow-up After Periods
+            result.put("followupAfterOptions", getFollowupAfterOptions());
+            
+            result.put("success", true);
+            result.put("message", "All reference data retrieved successfully");
+            
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("error", "Failed to retrieve reference data: " + e.getMessage());
+        }
+        
+        return result;
     }
 }
