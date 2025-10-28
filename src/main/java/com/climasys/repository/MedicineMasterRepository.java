@@ -62,7 +62,10 @@ public interface MedicineMasterRepository extends JpaRepository<MedicineMaster, 
             priority_value,
             active,
             morning,
-            afternoon
+            afternoon,
+            night,
+            no_of_days,
+            instruction
         FROM medicine_master 
         WHERE doctor_id = :doctorId AND clinic_id = :clinicId
         AND COALESCE(active, true) = true
@@ -84,7 +87,10 @@ public interface MedicineMasterRepository extends JpaRepository<MedicineMaster, 
             priority_value,
             active,
             morning,
-            afternoon
+            afternoon,
+            night,
+            no_of_days,
+            instruction
         FROM medicine_master 
         WHERE clinic_id = :clinicId
         AND COALESCE(active, true) = true
@@ -105,7 +111,10 @@ public interface MedicineMasterRepository extends JpaRepository<MedicineMaster, 
             priority_value,
             active,
             morning,
-            afternoon
+            afternoon,
+            night,
+            no_of_days,
+            instruction
         FROM medicine_master 
         WHERE COALESCE(active, true) = true
         ORDER BY priority_value ASC, short_description ASC

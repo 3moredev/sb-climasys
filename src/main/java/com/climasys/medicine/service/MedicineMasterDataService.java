@@ -171,6 +171,9 @@ public class MedicineMasterDataService {
             map.put("priority_value", medicine.getPriorityValue());
             map.put("morning", medicine.getMorning());
             map.put("afternoon", medicine.getAfternoon());
+            map.put("night", medicine.getNight());
+            map.put("no_of_days", medicine.getNoOfDays());
+            map.put("instruction", medicine.getInstruction());
             map.put("created_on", medicine.getCreatedOn());
             map.put("modified_on", medicine.getModifiedOn());
             result.add(map);

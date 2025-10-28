@@ -54,6 +54,15 @@ public class MedicineMaster {
     @Column(name = "afternoon")
     private Double afternoon;
     
+    @Column(name = "night")
+    private Double night;
+    
+    @Column(name = "no_of_days")
+    private Integer noOfDays;
+    
+    @Column(name = "instruction", length = 4000)
+    private String instruction;
+    
     // Constructors
     public MedicineMaster() {}
     
@@ -161,6 +170,30 @@ public class MedicineMaster {
         this.afternoon = afternoon;
     }
     
+    public Double getNight() {
+        return night;
+    }
+    
+    public void setNight(Double night) {
+        this.night = night;
+    }
+    
+    public Integer getNoOfDays() {
+        return noOfDays;
+    }
+    
+    public void setNoOfDays(Integer noOfDays) {
+        this.noOfDays = noOfDays;
+    }
+    
+    public String getInstruction() {
+        return instruction;
+    }
+    
+    public void setInstruction(String instruction) {
+        this.instruction = instruction;
+    }
+    
     @Override
     public String toString() {
         return "MedicineMaster{" +
@@ -170,6 +203,11 @@ public class MedicineMaster {
                 ", medicineDescription='" + medicineDescription + '\'' +
                 ", active=" + active +
                 ", priorityValue=" + priorityValue +
+                ", morning=" + morning +
+                ", afternoon=" + afternoon +
+                ", night=" + night +
+                ", noOfDays=" + noOfDays +
+                ", instruction='" + instruction + '\'' +
                 '}';
     }
 }
