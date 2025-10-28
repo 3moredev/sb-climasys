@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
  * Entity representing the Medicine_Master table
  * Maps to the medicine master functionality
  * 
- * Note: This entity has a composite primary key (short_description, clinic_id)
+ * Note: This entity has a composite primary key (short_description, doctor_id, clinic_id)
  * to support multi-clinic functionality
  */
 @Entity
@@ -18,6 +18,10 @@ public class MedicineMaster {
     @Id
     @Column(name = "short_description", length = 40, nullable = false)
     private String shortDescription;
+    
+    @Id
+    @Column(name = "doctor_id", length = 30, nullable = false)
+    private String doctorId;
     
     @Id
     @Column(name = "clinic_id", length = 30, nullable = false)
@@ -53,8 +57,9 @@ public class MedicineMaster {
     // Constructors
     public MedicineMaster() {}
     
-    public MedicineMaster(String shortDescription, String clinicId, String medicineDescription) {
+    public MedicineMaster(String shortDescription, String doctorId, String clinicId, String medicineDescription) {
         this.shortDescription = shortDescription;
+        this.doctorId = doctorId;
         this.clinicId = clinicId;
         this.medicineDescription = medicineDescription;
     }
@@ -66,6 +71,14 @@ public class MedicineMaster {
     
     public void setShortDescription(String shortDescription) {
         this.shortDescription = shortDescription;
+    }
+    
+    public String getDoctorId() {
+        return doctorId;
+    }
+    
+    public void setDoctorId(String doctorId) {
+        this.doctorId = doctorId;
     }
     
     public String getClinicId() {
@@ -152,6 +165,7 @@ public class MedicineMaster {
     public String toString() {
         return "MedicineMaster{" +
                 "shortDescription='" + shortDescription + '\'' +
+                ", doctorId='" + doctorId + '\'' +
                 ", clinicId='" + clinicId + '\'' +
                 ", medicineDescription='" + medicineDescription + '\'' +
                 ", active=" + active +

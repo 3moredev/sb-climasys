@@ -29,7 +29,7 @@ public class MedicineMasterDataService {
      */
     public List<Map<String, Object>> getActiveMedicinesByDoctorAndClinic(String doctorId, String clinicId) {
         try {
-            List<MedicineMaster> medicines = medicineMasterRepository.findByClinicIdAndActiveOrderByPriorityValueAscShortDescriptionAsc(clinicId, true);
+            List<MedicineMaster> medicines = medicineMasterRepository.findByDoctorIdAndClinicIdAndActiveOrderByPriorityValueAscShortDescriptionAsc(doctorId, clinicId, true);
             return convertToMapList(medicines);
         } catch (Exception e) {
             throw new RuntimeException("Failed to get active medicines: " + e.getMessage(), e);
@@ -164,6 +164,7 @@ public class MedicineMasterDataService {
         for (MedicineMaster medicine : medicines) {
             Map<String, Object> map = new HashMap<>();
             map.put("short_description", medicine.getShortDescription());
+            map.put("doctor_id", medicine.getDoctorId());
             map.put("medicine_description", medicine.getMedicineDescription());
             map.put("clinic_id", medicine.getClinicId());
             map.put("active", medicine.getActive());
