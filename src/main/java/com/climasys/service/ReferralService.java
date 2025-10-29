@@ -7,6 +7,7 @@ import com.climasys.repository.ReferByRepository;
 import com.climasys.repository.ReferByTranslationRepository;
 import com.climasys.repository.ReferralDoctorRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -24,6 +25,9 @@ public class ReferralService {
     
     @Autowired
     private ReferralDoctorRepository referralDoctorRepository;
+    
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
     
     public List<ReferBy> getReferByOptions() {
         return referByRepository.findAllOrdered();
@@ -63,6 +67,15 @@ public class ReferralService {
     
     public ReferralDoctor saveReferralDoctor(ReferralDoctor referralDoctor) {
         try {
+            // Validate clinic_id is provided and exists
+            if (referralDoctor.getClinicId() == null || referralDoctor.getClinicId().trim().isEmpty()) {
+                throw new IllegalArgumentException("clinic_id is required and cannot be null or empty.");
+            }
+            
+            if (!validateClinicId(referralDoctor.getClinicId())) {
+                throw new IllegalArgumentException("Invalid clinic_id: " + referralDoctor.getClinicId() + ". Clinic does not exist.");
+            }
+            
             return referralDoctorRepository.save(referralDoctor);
         } catch (Exception e) {
             // If there's a sequence sync issue, try to fix it and retry
@@ -93,5 +106,24 @@ public class ReferralService {
         }
         
         return result;
+    }
+    
+    /**
+     * Validate that a clinic_id exists in the clinic_master table
+     * This provides application-level validation since clinic_master has a composite primary key
+     * 
+     * @param clinicId The clinic ID to validate
+     * @return true if the clinic exists, false otherwise
+     */
+    private boolean validateClinicId(String clinicId) {
+        try {
+            String sql = "SELECT COUNT(*) FROM clinic_master WHERE clinic_id = ?";
+            Integer count = jdbcTemplate.queryForObject(sql, Integer.class, clinicId);
+            return count != null && count > 0;
+        } catch (Exception e) {
+            // Log the error but return false to indicate validation failed
+            System.err.println("Error validating clinic_id " + clinicId + ": " + e.getMessage());
+            return false;
+        }
     }
 }
