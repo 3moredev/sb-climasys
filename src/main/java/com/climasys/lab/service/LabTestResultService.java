@@ -5,16 +5,15 @@ import com.climasys.dto.LabTestResultResponse;
 import com.climasys.entity.PatientVisitLabTestResult;
 import com.climasys.entity.PatientVisitLabTestResultId;
 import com.climasys.repository.PatientVisitLabTestResultRepository;
+import com.climasys.repository.PatientVisitRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.dao.EmptyResultDataAccessException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,7 +32,7 @@ public class LabTestResultService {
     private PatientVisitLabTestResultRepository repository;
     
     @Autowired
-    private JdbcTemplate jdbcTemplate;
+    private PatientVisitRepository patientVisitRepository;
     
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -55,14 +54,8 @@ public class LabTestResultService {
                 return LabTestResultResponse.error("Validation failed", validationErrors);
             }
             
-            // Get the actual visit date from the patient visit record
-            LocalDateTime actualVisitDate = getActualVisitDate(
-                request.patientId(), 
-                request.patientVisitNo(), 
-                request.doctorId(), 
-                request.clinicId(), 
-                request.shiftId()
-            );
+            // Parse visit date from the first test parameter
+            LocalDateTime visitDate = parseVisitDate(request.testReportData().get(0).visitDate());
             
             int recordsInserted = 0;
             int recordsUpdated = 0;
@@ -71,12 +64,37 @@ public class LabTestResultService {
             // Process each test parameter
             for (LabTestResultRequest.LabTestParameterData testData : request.testReportData()) {
                 try {
-                    // Use the actual visit date from the patient visit record
-                    LocalDateTime paramVisitDate = actualVisitDate;
+                    LocalDateTime paramVisitDate = parseVisitDate(testData.visitDate());
                     
+                    // Check if the patient visit exists before attempting to insert lab test results
+                    // Compare by date only to avoid time mismatches
+                    LocalDate paramVisitLocalDate = paramVisitDate.toLocalDate();
+                    var visitOptional = patientVisitRepository
+                            .findByCompositeKeyAndDate(
+                                    testData.patientId(),
+                                    testData.doctorId(),
+                                    testData.clinicId(),
+                                    testData.shiftId(),
+                                    testData.patientVisitNo(),
+                                    paramVisitLocalDate
+                            );
+                    boolean visitExists = visitOptional.isPresent();
+                    
+                    if (!visitExists) {
+                        String errorMsg = String.format("Patient visit does not exist for patient: %s, visit: %s, doctor: %s, clinic: %s, shift: %s, date: %s", 
+                                testData.patientId(), testData.patientVisitNo(), testData.doctorId(), 
+                                testData.clinicId(), testData.shiftId(), paramVisitDate);
+                        errors.add(errorMsg);
+                        logger.error(errorMsg);
+                        continue; // Skip this test parameter and continue with the next one
+                    }
+                    
+                    // Use the exact visitDate from patient_visits to satisfy FK (avoid time mismatches)
+                    LocalDateTime exactVisitDate = visitOptional.get().getVisitDate();
+
                     // Create composite key
                     PatientVisitLabTestResultId id = new PatientVisitLabTestResultId(
-                            paramVisitDate,
+                            exactVisitDate,
                             testData.patientVisitNo(),
                             testData.shiftId(),
                             testData.clinicId(),
@@ -108,7 +126,7 @@ public class LabTestResultService {
                     } else {
                         // Create new record
                         PatientVisitLabTestResult newResult = new PatientVisitLabTestResult(
-                                paramVisitDate,
+                                exactVisitDate,
                                 testData.patientVisitNo(),
                                 testData.shiftId(),
                                 testData.clinicId(),
@@ -156,7 +174,7 @@ public class LabTestResultService {
                     request.doctorId(),
                     request.clinicId(),
                     request.shiftId(),
-                    actualVisitDate,
+                    visitDate,
                     recordsInserted,
                     recordsUpdated
             );
@@ -316,46 +334,6 @@ public class LabTestResultService {
     }
     
     /**
-     * Get the actual visit date from the patient visit record
-     * If exact match not found, try to find the most recent visit for this patient
-     */
-    private LocalDateTime getActualVisitDate(String patientId, Integer patientVisitNo, 
-                                           String doctorId, String clinicId, Short shiftId) {
-        // First try exact match
-        String exactQuery = "SELECT visit_date FROM patient_visits WHERE " +
-                           "patient_id = ? AND patient_visit_no = ? AND doctor_id = ? " +
-                           "AND clinic_id = ? AND shift_id = ? AND delete_flag = false";
-        
-        try {
-            LocalDateTime actualVisitDate = jdbcTemplate.queryForObject(
-                exactQuery, LocalDateTime.class, patientId, patientVisitNo, doctorId, clinicId, shiftId);
-            logger.debug("Found exact visit date: {} for patient: {}, visit: {}", 
-                        actualVisitDate, patientId, patientVisitNo);
-            return actualVisitDate;
-        } catch (EmptyResultDataAccessException e) {
-            logger.warn("Exact patient visit not found, trying to find most recent visit for patient: {}, visit: {}", 
-                       patientId, patientVisitNo);
-            
-            // Try to find the most recent visit for this patient with the same doctor and clinic
-            String recentQuery = "SELECT visit_date FROM patient_visits WHERE " +
-                               "patient_id = ? AND doctor_id = ? AND clinic_id = ? " +
-                               "AND delete_flag = false ORDER BY visit_date DESC LIMIT 1";
-            
-            try {
-                LocalDateTime recentVisitDate = jdbcTemplate.queryForObject(
-                    recentQuery, LocalDateTime.class, patientId, doctorId, clinicId);
-                logger.warn("Using most recent visit date: {} for patient: {} (original visit: {})", 
-                           recentVisitDate, patientId, patientVisitNo);
-                return recentVisitDate;
-            } catch (EmptyResultDataAccessException e2) {
-                logger.error("No patient visits found for patient: {}, doctor: {}, clinic: {}", 
-                           patientId, doctorId, clinicId);
-                throw new IllegalArgumentException("No patient visits found for patient: " + patientId);
-            }
-        }
-    }
-
-    /**
      * Parse visit date from string
      */
     private LocalDateTime parseVisitDate(String visitDateStr) {
@@ -366,19 +344,8 @@ public class LabTestResultService {
             try {
                 return LocalDateTime.parse(visitDateStr);
             } catch (Exception e2) {
-                // Try parsing as date only and add default time
-                try {
-                    LocalDate date = LocalDate.parse(visitDateStr);
-                    return date.atStartOfDay(); // Use 00:00:00 as default time
-                } catch (Exception e3) {
-                    // Try parsing with space replacement for ISO format
-                    try {
-                        return LocalDateTime.parse(visitDateStr.replace(" ", "T"));
-                    } catch (Exception e4) {
-                        logger.error("Failed to parse visit date: {}", visitDateStr, e4);
-                        throw new IllegalArgumentException("Invalid visit date format: " + visitDateStr);
-                    }
-                }
+                logger.error("Failed to parse visit date: {}", visitDateStr, e2);
+                throw new IllegalArgumentException("Invalid visit date format: " + visitDateStr);
             }
         }
     }
