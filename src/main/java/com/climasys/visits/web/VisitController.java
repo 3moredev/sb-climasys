@@ -258,7 +258,7 @@ public class VisitController {
             BigDecimal originalDiscount,
             
             // Status and User
-            Short statusId,
+            Integer statusId,
             String userId,
             Boolean isSubmitPatientVisitDetails
     ) {}
@@ -1323,7 +1323,7 @@ public class VisitController {
                 "AND PV.visit_date::date = ? " +
                 "AND PV.status_id NOT IN (4, 5, 11, 12) " +
                 "AND GT.language_id = ? " +
-                "ORDER BY PV.visit_time ASC";
+                "ORDER BY PV.status_id ASC, PV.visit_time ASC";
         
         System.out.println("DEBUG - Query: " + query);
         
