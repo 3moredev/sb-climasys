@@ -1,15 +1,17 @@
 package com.climasys.trends.repository;
 
+import com.climasys.entity.PatientVisit;
+import com.climasys.entity.PatientVisitId;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
-import org.springframework.data.repository.RepositoryDefinition;
 
 import java.util.List;
 import java.util.Map;
 
 @Repository
-public interface PatientTrendsRepository extends org.springframework.data.repository.Repository<Object, Long> {
+public interface PatientTrendsRepository extends JpaRepository<PatientVisit, PatientVisitId> {
 
     @Query(value = """
         WITH LastVisitDate AS (

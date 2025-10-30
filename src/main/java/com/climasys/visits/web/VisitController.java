@@ -321,6 +321,33 @@ public class VisitController {
     }
 
     /**
+     * JPA replacement for USP_Get_MasterLists (subset required by UI)
+     */
+    @GetMapping("/master-lists")
+    public ResponseEntity<?> getMasterLists(
+            @RequestParam String patientId,
+            @RequestParam Short shiftId,
+            @RequestParam String clinicId,
+            @RequestParam String doctorId,
+            @RequestParam String visitDate, // YYYY-MM-DD
+            @RequestParam Integer patientVisitNo) {
+        try {
+            LocalDate date = LocalDate.parse(visitDate);
+            Map<String, Object> result = visitJpaService.getMasterLists(
+                patientId, shiftId, clinicId, doctorId, date, patientVisitNo);
+            if (result.get("success") != null && (Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            }
+            return ResponseEntity.badRequest().body(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get master lists: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
      * Delete visit using composite key parameters
      */
     @DeleteMapping

@@ -406,6 +406,203 @@ public class VisitJpaService {
         
         return response;
     }
+
+    /**
+     * JPA/JDBC replacement for USP_Get_MasterLists (subset required by UI).
+     * Returns grouped lists: vitals, complaints, diagnosis, dressing,
+     * medicines (overwrite preferred), prescriptions (overwrite preferred),
+     * labTestsAsked, billing (overwrite preferred).
+     */
+    public Map<String, Object> getMasterLists(
+            String patientId,
+            Short shiftId,
+            String clinicId,
+            String doctorId,
+            LocalDate visitDate,
+            Integer patientVisitNo) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            logger.info("Building master-lists for patient: {}, visitNo: {}, date: {}", patientId, patientVisitNo, visitDate);
+
+            // 1) Vitals from patient_visits
+            String vitalsSql = """
+                SELECT pv.weight_in_kgs, pv.height_in_cms, pv.pulse, pv.blood_pressure,
+                       COALESCE(pv.asthama,false) AS asthama,
+                       COALESCE(pv.hypertension,false) AS hypertension,
+                       COALESCE(pv.diabetes,false) AS diabetes,
+                       COALESCE(pv.cholestrol,false) AS cholestrol,
+                       COALESCE(pv.ihd,false) AS ihd,
+                       COALESCE(pv.th,false) AS th,
+                       pv.instructions, pv.fees_to_collect,
+                       pv.patient_visit_no, pv.status_id,
+                       COALESCE(pv.smoking,false) AS smoking,
+                       COALESCE(pv.tobaco,false) AS tobaco,
+                       COALESCE(pv.alchohol,false) AS alchohol,
+                       pv.habits_comments, pv.allergy_dtls, pv.discount
+                FROM patient_visits pv
+                WHERE pv.patient_id = ? AND pv.shift_id = ? AND pv.clinic_id = ?
+                  AND pv.doctor_id = ? AND DATE(pv.visit_date) = ? AND pv.patient_visit_no = ?
+                  AND COALESCE(pv.delete_flag,false) = false
+            """;
+            List<Map<String, Object>> vitals = jdbcTemplate.queryForList(
+                vitalsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+
+            // 2) Complaints
+            String complaintsSql = """
+                SELECT short_description || '*' || complaint_description AS id,
+                       short_description || ' : ' || complaint_description AS symptoms_description,
+                       complaint_description, COALESCE(complaint_comment,'') AS complaint_comment
+                FROM visit_complaints vc
+                WHERE vc.patient_id = ? AND vc.shift_id = ? AND vc.clinic_id = ? AND vc.doctor_id = ?
+                  AND DATE(vc.visit_date) = ? AND vc.patient_visit_no = ? AND COALESCE(vc.delete_flag,false) = false
+            """;
+            List<Map<String, Object>> complaints = jdbcTemplate.queryForList(
+                complaintsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+
+            // 3) Diagnosis
+            String diagnosisSql = """
+                SELECT short_description || '*' || desease_description AS id,
+                       short_description || ' : ' || desease_description AS diagnosis_description,
+                       desease_description
+                FROM visit_diagnosis vd
+                WHERE vd.patient_id = ? AND vd.shift_id = ? AND vd.clinic_id = ? AND vd.doctor_id = ?
+                  AND DATE(vd.visit_date) = ? AND vd.patient_visit_no = ? AND COALESCE(vd.delete_flag,false) = false
+            """;
+            List<Map<String, Object>> diagnosis = jdbcTemplate.queryForList(
+                diagnosisSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+
+            // 4) Dressing
+            String dressingSql = """
+                SELECT dressing_description AS dressing_description,
+                       dressing_description AS short_description,
+                       dressing_description AS longdressing_description
+                FROM visit_dressing dd
+                WHERE dd.patient_id = ? AND dd.shift_id = ? AND dd.clinic_id = ? AND dd.doctor_id = ?
+                  AND DATE(dd.visit_date) = ? AND dd.patient_visit_no = ? AND COALESCE(dd.delete_flag,false) = false
+            """;
+            List<Map<String, Object>> dressing = jdbcTemplate.queryForList(
+                dressingSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+
+            // 5) Medicines - prefer overwrite
+            String medicineOverwriteSql = """
+                SELECT vm.short_description || '*' || vm.medicine_description AS id,
+                       vm.short_description AS short_description,
+                       vm.medicine_description,
+                       vm.morning, vm.afternoon, vm.night, vm.no_of_days, vm.instruction
+                FROM visit_medicine_overwrite vm
+                WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? AND vm.doctor_id = ?
+                  AND DATE(vm.visit_date) = ? AND vm.patient_visit_no = ?
+                  AND COALESCE(vm.delete_indicator,false) = false AND COALESCE(vm.delete_flag,false) = false
+            """;
+            List<Map<String, Object>> medicines = jdbcTemplate.queryForList(
+                medicineOverwriteSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            if (medicines.isEmpty()) {
+                String medicineSql = """
+                    SELECT vm.short_description || '*' || vm.medicine_description AS id,
+                           vm.short_description AS short_description,
+                           vm.medicine_description,
+                           vm.morning, vm.afternoon, vm.night, vm.no_of_days, vm.instruction
+                    FROM visit_medicine vm
+                    WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? AND vm.doctor_id = ?
+                      AND DATE(vm.visit_date) = ? AND vm.patient_visit_no = ?
+                      AND COALESCE(vm.delete_flag,false) = false
+                """;
+                medicines = jdbcTemplate.queryForList(
+                    medicineSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            }
+
+            // 6) Prescriptions - prefer overwrite
+            String prescriptionOverwriteSql = """
+                SELECT vp.medicine_name AS medicine_name,
+                       vp.brand_name AS brand_name,
+                       vp.medicine_name || '*' || vp.brand_name || '*' || vp.cat_short_name || '*' || vp.catsub_description AS id,
+                       vp.morning, vp.afternoon, vp.night, vp.no_of_days, vp.instruction, vp.sequence_id
+                FROM visit_prescription_overwrite vp
+                WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? AND vp.doctor_id = ?
+                  AND DATE(vp.visit_date) = ? AND vp.patient_visit_no = ?
+                  AND COALESCE(vp.delete_indicator,false) = false AND COALESCE(vp.delete_flag,false) = false
+                ORDER BY vp.sequence_id
+            """;
+            List<Map<String, Object>> prescriptions = jdbcTemplate.queryForList(
+                prescriptionOverwriteSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            if (prescriptions.isEmpty()) {
+                String prescriptionSql = """
+                    SELECT vp.medicine_name AS medicine_name,
+                           vp.brand_name AS brand_name,
+                           vp.medicine_name || '*' || vp.brand_name || '*' || vp.cat_short_name || '*' || vp.catsub_description AS id,
+                           vp.morning, vp.afternoon, vp.night, vp.no_of_days, vp.instruction, vp.sequence_id
+                    FROM visit_prescription vp
+                    WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? AND vp.doctor_id = ?
+                      AND DATE(vp.visit_date) = ? AND vp.patient_visit_no = ?
+                      AND COALESCE(vp.delete_flag,false) = false
+                    ORDER BY vp.sequence_id
+                """;
+                prescriptions = jdbcTemplate.queryForList(
+                    prescriptionSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            }
+
+            // 7) Lab tests asked
+            String labsSql = """
+                SELECT lab_test_description AS id
+                FROM patient_visit_labtestasked pvla
+                WHERE pvla.patient_id = ? AND pvla.shift_id = ? AND pvla.clinic_id = ? AND pvla.doctor_id = ?
+                  AND DATE(pvla.visit_date) = ? AND pvla.patient_visit_no = ? AND COALESCE(pvla.delete_flag,false) = false
+            """;
+            List<Map<String, Object>> labTests = jdbcTemplate.queryForList(
+                labsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+
+            // 8) Billing - prefer overwrite
+            String billingOverwriteSql = """
+                SELECT billing_details, billing_group_name, billing_subgroup_name,
+                       default_fees, collected_fees,
+                       billing_group_name || '*' || billing_subgroup_name || '*' || billing_details AS billing_id
+                FROM patient_visit_billinginfooverwrite pvb
+                WHERE pvb.patient_id = ? AND pvb.clinic_id = ? AND pvb.doctor_id = ?
+                  AND pvb.patient_visit_no = ? AND COALESCE(pvb.delete_flag,false) = false
+            """;
+            List<Map<String, Object>> billing = jdbcTemplate.queryForList(
+                billingOverwriteSql, patientId, clinicId, doctorId, patientVisitNo);
+            if (billing.isEmpty()) {
+                String billingSql = """
+                    SELECT billing_details, billing_group_name, billing_subgroup_name,
+                           default_fees, collected_fees,
+                           billing_group_name || '*' || billing_subgroup_name || '*' || billing_details AS billing_id
+                    FROM patient_visit_billinginfo pvb
+                    WHERE pvb.patient_id = ? AND pvb.clinic_id = ? AND pvb.doctor_id = ?
+                      AND pvb.patient_visit_no = ?
+                """;
+                billing = jdbcTemplate.queryForList(
+                    billingSql, patientId, clinicId, doctorId, patientVisitNo);
+            }
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("vitals", vitals);
+            data.put("complaints", complaints);
+            data.put("diagnosis", diagnosis);
+            data.put("dressing", dressing);
+            data.put("medicines", medicines);
+            data.put("prescriptions", prescriptions);
+            data.put("labTestsAsked", labTests);
+            data.put("billing", billing);
+
+            response.put("success", true);
+            response.put("patientId", patientId);
+            response.put("clinicId", clinicId);
+            response.put("doctorId", doctorId);
+            response.put("shiftId", shiftId);
+            response.put("visitDate", visitDate);
+            response.put("patientVisitNo", patientVisitNo);
+            response.put("data", data);
+
+            return response;
+        } catch (Exception e) {
+            logger.error("Error building master-lists: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to build master lists: " + e.getMessage());
+            return response;
+        }
+    }
     
     /**
      * Get patient previous visits with comprehensive details (replicating USP_Get_Patient_Previous_Visits logic)

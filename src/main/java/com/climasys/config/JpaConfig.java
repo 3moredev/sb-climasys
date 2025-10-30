@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @Configuration
-@EnableJpaRepositories(basePackages = {"com.climasys.repository", "com.climasys.auth.repository"})
+@EnableJpaRepositories(basePackages = {"com.climasys.repository", "com.climasys.auth.repository", "com.climasys.trends.repository"})
 @EntityScan(basePackages = {"com.climasys.entity", "com.climasys.auth.entity"})
 @EnableTransactionManagement
 public class JpaConfig {
