@@ -71,6 +71,18 @@ public class VisitController {
             }
         }
     }
+
+    private Integer toIntSafe(Object val) {
+        try {
+            if (val == null) return 0;
+            if (val instanceof Number n) return n.intValue();
+            String s = val.toString().trim();
+            if (s.isEmpty()) return 0;
+            return Integer.parseInt(s);
+        } catch (Exception e) {
+            return 0;
+        }
+    }
     
     
     // Convert timezone in Java for time fields
@@ -261,6 +273,11 @@ public class VisitController {
             Integer statusId,
             String userId,
             Boolean isSubmitPatientVisitDetails
+            ,
+            // Optional treatment arrays
+            java.util.List<Map<String, Object>> diagnosisRows,
+            java.util.List<Map<String, Object>> medicineRows,
+            java.util.List<Map<String, Object>> prescriptionRows
     ) {}
 
     @PostMapping
@@ -312,6 +329,36 @@ public class VisitController {
             parameters.put("RoleId", roleId);
 
             Map<String, Object> result = jdbcCall.execute(parameters);
+
+            // Augment with a direct query that includes status 9 (saved) for doctor views
+            try {
+                String itemsQuery = "SELECT " +
+                        "PV.patient_id AS patientId, " +
+                        "PM.first_name || ' ' || PM.last_name AS patientName, " +
+                        "PV.doctor_id AS doctorId, " +
+                        "DM.prefix || ' ' || DM.first_name AS doctorName, " +
+                        "PV.clinic_id AS clinicId, " +
+                        "TO_CHAR(PV.visit_date, 'YYYY-MM-DD') AS visitDate, " +
+                        "PV.shift_id AS shiftId, " +
+                        "PV.status_id AS status, " +
+                        "PV.patient_visit_no AS visitId " +
+                        "FROM patient_visits PV " +
+                        "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
+                        "INNER JOIN doctor_master DM ON PV.doctor_id = DM.doctor_id " +
+                        "WHERE PV.delete_flag = false " +
+                        "AND PV.doctor_id = ? " +
+                        "AND PV.clinic_id = ? " +
+                        "AND PV.shift_id = CAST(? AS SMALLINT) " +
+                        "AND PV.visit_date::date = CURRENT_DATE " +
+                        "AND PV.status_id NOT IN (4, 5, 12) " +
+                        "ORDER BY PV.visit_time ASC";
+
+                List<Map<String, Object>> items = jdbcTemplate.queryForList(itemsQuery, doctorId, clinicId, shiftId);
+                result.put("items", items);
+            } catch (Exception augmentEx) {
+                logger.warn("Failed to augment today's visits with direct query: {}", augmentEx.getMessage());
+            }
+
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -660,6 +707,54 @@ public class VisitController {
             Map<String, Object> result = visitJpaService.saveComprehensiveVisit(serviceRequest);
             
             if (result.get("success") != null && (Boolean) result.get("success")) {
+                // Persist treatment detail arrays if provided
+                try {
+                    // Keys
+                    String patientId = req.patientId();
+                    String doctorId = req.doctorId();
+                    String clinicId = req.clinicId();
+                    Short shiftIdVal = shiftId;
+                    Integer patientVisitNoVal = patientVisitNo;
+                    java.sql.Timestamp visitDateTs = java.sql.Timestamp.valueOf(visitDate);
+
+                    // Diagnosis
+                    if (req.diagnosisRows() != null) {
+                        String delDiag = "DELETE FROM visit_diagnosis WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
+                        jdbcTemplate.update(delDiag, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, visitDateTs);
+
+                        String insDiag = "INSERT INTO visit_diagnosis (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, short_description, desease_description) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                        for (Map<String, Object> row : req.diagnosisRows()) {
+                            String shortDesc = String.valueOf(row.getOrDefault("short_description", ""));
+                            String diagnosis = String.valueOf(row.getOrDefault("diagnosis", ""));
+                            if ((shortDesc != null && !shortDesc.isEmpty()) || (diagnosis != null && !diagnosis.isEmpty())) {
+                                jdbcTemplate.update(insDiag, patientId, visitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId, shortDesc, diagnosis);
+                            }
+                        }
+                    }
+
+                    // Medicines
+                    if (req.medicineRows() != null) {
+                        String delMed = "DELETE FROM visit_medicine WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
+                        jdbcTemplate.update(delMed, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, visitDateTs);
+
+                        String insMed = "INSERT INTO visit_medicine (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, short_description, medicine_description, morning, afternoon, night, no_of_days, instruction) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                        for (Map<String, Object> row : req.medicineRows()) {
+                            String shortDesc = String.valueOf(row.getOrDefault("short_description", ""));
+                            String medicine = String.valueOf(row.getOrDefault("medicine", ""));
+                            Integer morning = toIntSafe(row.get("morning"));
+                            Integer afternoon = toIntSafe(row.get("afternoon"));
+                            Integer night = toIntSafe(row.get("night"));
+                            String days = String.valueOf(row.getOrDefault("days", ""));
+                            String instruction = String.valueOf(row.getOrDefault("instruction", ""));
+                            if ((shortDesc != null && !shortDesc.isEmpty()) || (medicine != null && !medicine.isEmpty())) {
+                                jdbcTemplate.update(insMed, patientId, visitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
+                                        shortDesc, medicine, morning, afternoon, night, days, instruction);
+                            }
+                        }
+                    }
+                } catch (Exception persistEx) {
+                    logger.warn("Failed to persist treatment arrays (diagnosis/medicines): {}", persistEx.getMessage());
+                }
                 return ResponseEntity.ok(result);
             } else {
                 return ResponseEntity.badRequest().body(result);
@@ -1348,7 +1443,7 @@ public class VisitController {
                 "WHERE PV.delete_flag = false " +
                 "AND PV.doctor_id = ? " +
                 "AND PV.visit_date::date = ? " +
-                "AND PV.status_id NOT IN (4, 5, 11, 12) " +
+                "AND PV.status_id NOT IN (4, 5, 12) " +
                 "AND GT.language_id = ? " +
                 "ORDER BY PV.status_id ASC, PV.visit_time ASC";
         
@@ -1487,7 +1582,7 @@ public class VisitController {
                 "WHERE PV.delete_flag = false " +
                 "AND PV.doctor_id = ? " +
                 "AND PV.visit_date >= CURRENT_DATE " +
-                "AND PV.status_id NOT IN (4, 5, 11, 12) " +
+                "AND PV.status_id NOT IN (4, 5, 12) " +
                 "AND GT.language_id = ? " +
                 "ORDER BY PV.visit_date ASC, PV.visit_time ASC";
         

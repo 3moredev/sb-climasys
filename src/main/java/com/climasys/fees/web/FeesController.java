@@ -30,6 +30,20 @@ public class FeesController {
         Map<String, Object> result = feesDetailsService.getPatientFeesDetails(patientId);
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * JPA/JDBC equivalent for USP_Get_PatientFolderAmountForBilling
+     */
+    @GetMapping("/folder-amount")
+    public ResponseEntity<Map<String, Object>> getPatientFolderAmountForBilling(
+            @RequestParam String clinicId,
+            @RequestParam String doctorId,
+            @RequestParam String folderNo,
+            @RequestParam Integer patientVisitNo) {
+        Map<String, Object> result = feesDetailsService.getPatientFolderAmountForBilling(
+                clinicId, doctorId, folderNo, patientVisitNo);
+        return ResponseEntity.ok(result);
+    }
 }
 
 
