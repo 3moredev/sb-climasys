@@ -20,6 +20,7 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
     /**
      * Previous completed services visits for a patient, sorted newest first.
      * Returns rows with visit_date, shift_id, patient_visit_no.
+     * Uses status_id = 8 for "Service Completed" status (consistent with FeeDetailsRepository).
      */
     @Query(value = """
             SELECT CAST(pvs.visit_date AS date)            AS visit_date,
@@ -30,13 +31,7 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
               AND pvs.doctor_id = :doctorId
               AND pvs.clinic_id = :clinicId
               AND COALESCE(pvs.delete_flag, false) = false
-              AND pvs.status_id IN (
-                    SELECT sr.id
-                    FROM status_ref sr
-                    WHERE sr.doctor_id = :doctorId
-                      AND sr.clinic_id = :clinicId
-                      AND sr.status_description = 'Service Completed'
-                )
+              AND pvs.status_id = 8
               AND CAST(pvs.visit_date AS date) <= CAST(:todaysVisitDate AS date)
             ORDER BY CAST(pvs.visit_date AS date) DESC, pvs.visit_time DESC
             """, nativeQuery = true)

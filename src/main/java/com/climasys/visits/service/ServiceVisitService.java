@@ -22,7 +22,12 @@ public class ServiceVisitService {
     public Map<String, Object> getPreviousServiceVisitDates(String patientId, String doctorId, String clinicId, LocalDate todaysVisitDate) {
         Map<String, Object> response = new HashMap<>();
         try {
+            logger.info("Fetching previous service visit dates for patient: {}, doctor: {}, clinic: {}, today: {}", 
+                patientId, doctorId, clinicId, todaysVisitDate);
+            
             List<Object[]> rows = serviceVisitRepository.findPreviousServiceVisitDates(patientId, doctorId, clinicId, todaysVisitDate);
+            logger.info("Found {} previous service visit records for patient: {}", rows.size(), patientId);
+            
             List<Map<String, Object>> visits = new ArrayList<>();
             for (Object[] r : rows) {
                 Map<String, Object> m = new HashMap<>();
@@ -30,11 +35,14 @@ public class ServiceVisitService {
                 m.put("shiftId", r[1]);
                 m.put("patientVisitNo", r[2]);
                 visits.add(m);
+                logger.debug("Added service visit: date={}, shiftId={}, visitNo={}", r[0], r[1], r[2]);
             }
             response.put("success", true);
             response.put("visits", visits);
+            logger.info("Returning {} service visits for patient: {}", visits.size(), patientId);
         } catch (Exception e) {
-            logger.error("Failed to fetch previous service visit dates: {}", e.getMessage(), e);
+            logger.error("Failed to fetch previous service visit dates for patient: {}, doctor: {}, clinic: {}: {}", 
+                patientId, doctorId, clinicId, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to fetch previous service visit dates: " + e.getMessage());
         }
