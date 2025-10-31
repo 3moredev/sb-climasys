@@ -1,9 +1,16 @@
 package com.climasys.visits.service;
 
 import com.climasys.entity.PatientVisit;
+import com.climasys.entity.PatientVisitId;
+import com.climasys.entity.VisitMedicineOverwrite;
+import com.climasys.entity.VisitMedicineOverwriteId;
+import com.climasys.entity.Medicine;
+import com.climasys.entity.MedicineId;
 import com.climasys.repository.PatientVisitRepository;
 import com.climasys.repository.DoctorClinicShiftRepository;
 import com.climasys.repository.StatusRefRepository;
+import com.climasys.repository.VisitMedicineOverwriteRepository;
+import com.climasys.repository.VisitPrescriptionOverwriteRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +46,12 @@ public class VisitJpaService {
     
     @Autowired
     private com.climasys.service.RelationshipService relationshipService;
+    
+    @Autowired
+    private VisitMedicineOverwriteRepository visitMedicineOverwriteRepository;
+    
+    @Autowired
+    private VisitPrescriptionOverwriteRepository visitPrescriptionOverwriteRepository;
 
     private BigDecimal toBigDecimal(Object value) {
         if (value == null) return null;
@@ -1620,6 +1633,265 @@ public class VisitJpaService {
         // Expect optional arrays provided through controller layer via request context map
         // For simplicity, read them from a ThreadLocal or expand signature later. Here we attempt to fetch
         // from a well-known key map attached to the visit entity is not available, so no-op.
+    }
+    
+    /**
+     * Save medicine and prescription data to overwrite tables and update visit payment details
+     * This method replicates the logic of USP_Insert_MedicineDataOverwrite stored procedure
+     * 
+     * @param visitDate - Visit date
+     * @param patientVisitNo - Patient visit number
+     * @param shiftId - Shift ID
+     * @param clinicId - Clinic ID
+     * @param doctorId - Doctor ID
+     * @param patientId - Patient ID
+     * @param medicineRows - List of medicine rows (maps with short_description, medicine_description, morning, afternoon, night, no_of_days, instruction, delete)
+     * @param prescriptionRows - List of prescription rows (maps with brand_name, medicine_name, marketed_by, catsub_description, cat_short_name, morning, afternoon, night, no_of_days, instruction, delete)
+     * @param feesToCollect - Fees to collect
+     * @param feesCollected - Fees collected
+     * @param userId - User ID
+     * @param statusId - Status ID
+     * @param bloodPressure - Blood pressure
+     * @param allergyDetails - Allergy details
+     * @param habitDetails - Habit details
+     * @param comment - Comment
+     * @param paymentById - Payment by ID
+     * @param paymentRemark - Payment remark
+     * @param discount - Discount amount
+     * @return Map with success status and message
+     */
+    @Transactional
+    public Map<String, Object> saveMedicineOverwrite(
+            LocalDateTime visitDate,
+            Integer patientVisitNo,
+            Short shiftId,
+            String clinicId,
+            String doctorId,
+            String patientId,
+            List<Map<String, Object>> medicineRows,
+            List<Map<String, Object>> prescriptionRows,
+            BigDecimal feesToCollect,
+            BigDecimal feesCollected,
+            String userId,
+            Short statusId,
+            String bloodPressure,
+            String allergyDetails,
+            String habitDetails,
+            String comment,
+            Short paymentById,
+            String paymentRemark,
+            BigDecimal discount) {
+        
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            
+            // 1. MERGE medicine data into visit_medicine_overwrite
+            if (medicineRows != null) {
+                for (Map<String, Object> row : medicineRows) {
+                    Boolean deleteIndicator = toBooleanSafe(row.get("delete"), false);
+                    
+                    if (Boolean.TRUE.equals(deleteIndicator)) {
+                        // Delete the record
+                        VisitMedicineOverwriteId id = new VisitMedicineOverwriteId(
+                            visitDate, patientVisitNo, shiftId, clinicId, doctorId, patientId,
+                            toStringSafe(row.get("short_description"), "")
+                        );
+                        visitMedicineOverwriteRepository.deleteById(id);
+                    } else {
+                        // MERGE (insert or update)
+                        VisitMedicineOverwriteId id = new VisitMedicineOverwriteId(
+                            visitDate, patientVisitNo, shiftId, clinicId, doctorId, patientId,
+                            toStringSafe(row.get("short_description"), "")
+                        );
+                        
+                        Optional<VisitMedicineOverwrite> existing = visitMedicineOverwriteRepository.findById(id);
+                        VisitMedicineOverwrite medicine;
+                        
+                        if (existing.isPresent()) {
+                            // UPDATE
+                            medicine = existing.get();
+                        } else {
+                            // INSERT
+                            medicine = new VisitMedicineOverwrite();
+                            medicine.setVisitDate(visitDate);
+                            medicine.setPatientVisitNo(patientVisitNo);
+                            medicine.setShiftId(shiftId);
+                            medicine.setClinicId(clinicId);
+                            medicine.setDoctorId(doctorId);
+                            medicine.setPatientId(patientId);
+                            medicine.setShortDescription(toStringSafe(row.get("short_description"), ""));
+                            medicine.setCreatedOn(now);
+                            medicine.setCreatedbyName(userId);
+                        }
+                        
+                        // Set/update fields
+                        medicine.setMedicineDescription(toStringSafe(row.get("medicine_description"), ""));
+                        medicine.setMorning(toDoubleSafe(row.get("morning")));
+                        medicine.setAfternoon(toDoubleSafe(row.get("afternoon")));
+                        medicine.setNight(toDoubleSafe(row.get("night")));
+                        medicine.setNoOfDays(toIntegerSafe(row.get("no_of_days")));
+                        medicine.setInstruction(toStringSafe(row.get("instruction"), ""));
+                        medicine.setModifiedOn(now);
+                        medicine.setModifiedbyName(userId);
+                        medicine.setDeleteIndicator(false);
+                        
+                        visitMedicineOverwriteRepository.save(medicine);
+                    }
+                }
+            }
+            
+            // 2. MERGE prescription data into visit_prescription_overwrite
+            if (prescriptionRows != null) {
+                // Get next sequence ID
+                Optional<Integer> nextSeqOpt = visitPrescriptionOverwriteRepository.getNextSequenceId();
+                int nextSequenceId = nextSeqOpt.orElse(1);
+                
+                for (Map<String, Object> row : prescriptionRows) {
+                    Boolean deleteIndicator = toBooleanSafe(row.get("delete"), false);
+                    
+                    if (Boolean.TRUE.equals(deleteIndicator)) {
+                        // Delete the record
+                        MedicineId id = new MedicineId(
+                            doctorId, clinicId, shiftId, patientId, patientVisitNo, visitDate,
+                            toStringSafe(row.get("brand_name"), ""),
+                            toStringSafe(row.get("medicine_name"), ""),
+                            toStringSafe(row.get("catsub_description"), ""),
+                            toStringSafe(row.get("cat_short_name"), "")
+                        );
+                        visitPrescriptionOverwriteRepository.deleteById(id);
+                    } else {
+                        // MERGE (insert or update)
+                        MedicineId id = new MedicineId(
+                            doctorId, clinicId, shiftId, patientId, patientVisitNo, visitDate,
+                            toStringSafe(row.get("brand_name"), ""),
+                            toStringSafe(row.get("medicine_name"), ""),
+                            toStringSafe(row.get("catsub_description"), ""),
+                            toStringSafe(row.get("cat_short_name"), "")
+                        );
+                        
+                        Optional<Medicine> existing = visitPrescriptionOverwriteRepository.findById(id);
+                        Medicine prescription;
+                        
+                        if (existing.isPresent()) {
+                            // UPDATE
+                            prescription = existing.get();
+                        } else {
+                            // INSERT
+                            prescription = new Medicine();
+                            prescription.setDoctorId(doctorId);
+                            prescription.setClinicId(clinicId);
+                            prescription.setShiftId(shiftId);
+                            prescription.setPatientId(patientId);
+                            prescription.setPatientVisitNo(patientVisitNo);
+                            prescription.setVisitDate(visitDate);
+                            prescription.setBrandName(toStringSafe(row.get("brand_name"), ""));
+                            prescription.setMedicineName(toStringSafe(row.get("medicine_name"), ""));
+                            prescription.setCatsubDescription(toStringSafe(row.get("catsub_description"), ""));
+                            prescription.setCatShortName(toStringSafe(row.get("cat_short_name"), ""));
+                            prescription.setCreatedOn(now);
+                            prescription.setCreatedbyName(userId);
+                            prescription.setSequenceId(nextSequenceId++);
+                        }
+                        
+                        // Set/update fields
+                        prescription.setMarketedBy(toStringSafe(row.get("marketed_by"), ""));
+                        prescription.setMorning(toDoubleSafe(row.get("morning")));
+                        prescription.setAfternoon(toDoubleSafe(row.get("afternoon")));
+                        prescription.setNight(toDoubleSafe(row.get("night")));
+                        prescription.setNoOfDays(toIntegerSafe(row.get("no_of_days")));
+                        prescription.setInstruction(toStringSafe(row.get("instruction"), ""));
+                        prescription.setModifiedOn(now);
+                        prescription.setModifiedbyName(userId);
+                        prescription.setDeleteIndicator(false);
+                        
+                        visitPrescriptionOverwriteRepository.save(prescription);
+                    }
+                }
+            }
+            
+            // 3. Update patient_visits table
+            PatientVisitId visitId = new PatientVisitId(doctorId, clinicId, shiftId, patientId, patientVisitNo, visitDate);
+            Optional<PatientVisit> visitOpt = patientVisitRepository.findById(visitId);
+            
+            if (visitOpt.isPresent()) {
+                PatientVisit visit = visitOpt.get();
+                
+                // Check if fees_collected > 0 (from stored procedure logic)
+                if (visit.getFeesCollected() != null && visit.getFeesCollected().compareTo(BigDecimal.ZERO) > 0) {
+                    // Only update status and clinical fields
+                    visit.setStatusId(statusId);
+                    visit.setBloodPressure(bloodPressure);
+                    visit.setAllergyDtls(allergyDetails);
+                    visit.setHabitsComments(habitDetails);
+                    visit.setModifiedOn(now);
+                    visit.setModifiedbyName(userId);
+                } else {
+                    // Update all fields including payment
+                    visit.setFeesCollected(feesCollected);
+                    visit.setFeesToCollect(feesToCollect);
+                    visit.setStatusId(statusId);
+                    visit.setBloodPressure(bloodPressure);
+                    visit.setAllergyDtls(allergyDetails);
+                    visit.setHabitsComments(habitDetails);
+                    visit.setComment(comment);
+                    visit.setPaymentById(paymentById);
+                    visit.setPaymentRemark(paymentRemark);
+                    visit.setModifiedOn(now);
+                    visit.setModifiedbyName(userId);
+                    visit.setDiscount(discount);
+                }
+                
+                patientVisitRepository.save(visit);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Medicine and prescription data saved successfully");
+            return response;
+            
+        } catch (Exception e) {
+            logger.error("Error saving medicine overwrite data", e);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Error saving medicine overwrite data: " + e.getMessage());
+            return response;
+        }
+    }
+    
+    // Helper methods
+    private String toStringSafe(Object value, String defaultValue) {
+        if (value == null) return defaultValue;
+        return value.toString().trim();
+    }
+    
+    private Double toDoubleSafe(Object value) {
+        if (value == null) return null;
+        if (value instanceof Double) return (Double) value;
+        if (value instanceof Number) return ((Number) value).doubleValue();
+        try {
+            return Double.parseDouble(value.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    private Integer toIntegerSafe(Object value) {
+        if (value == null) return null;
+        if (value instanceof Integer) return (Integer) value;
+        if (value instanceof Number) return ((Number) value).intValue();
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (Exception e) {
+            return null;
+        }
+    }
+    
+    private Boolean toBooleanSafe(Object value, Boolean defaultValue) {
+        if (value == null) return defaultValue;
+        if (value instanceof Boolean) return (Boolean) value;
+        if (value instanceof Number) return ((Number) value).intValue() != 0;
+        String str = value.toString().trim().toLowerCase();
+        return str.equals("true") || str.equals("1") || str.equals("yes");
     }
     
 }

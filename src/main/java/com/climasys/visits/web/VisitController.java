@@ -1705,4 +1705,56 @@ public class VisitController {
             return new java.util.ArrayList<>();
         }
     }
+
+    /**
+     * Save medicine and prescription data to overwrite tables and update visit payment details
+     * This endpoint replicates the functionality of USP_Insert_MedicineDataOverwrite stored procedure
+     * Used by the Receive Payment submit functionality
+     * 
+     * @param request - Request body containing medicine and prescription data
+     * @return ResponseEntity with success status and message
+     */
+    @PostMapping("/save-medicine-overwrite")
+    public ResponseEntity<?> saveMedicineOverwrite(@RequestBody SaveMedicineOverwriteRequest request) {
+        try {
+            // Parse visit date from string
+            LocalDateTime visitDate = parseDateTime(request.visitDate());
+            
+            // Call service method
+            Map<String, Object> result = visitJpaService.saveMedicineOverwrite(
+                visitDate,
+                request.patientVisitNo(),
+                request.shiftId(),
+                request.clinicId(),
+                request.doctorId(),
+                request.patientId(),
+                request.medicineRows(),
+                request.prescriptionRows(),
+                request.feesToCollect(),
+                request.feesCollected(),
+                request.userId(),
+                request.statusId(),
+                request.bloodPressure(),
+                request.allergyDetails(),
+                request.habitDetails(),
+                request.comment(),
+                request.paymentById(),
+                request.paymentRemark(),
+                request.discount()
+            );
+            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error in saveMedicineOverwrite endpoint", e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Error processing request: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
 }
