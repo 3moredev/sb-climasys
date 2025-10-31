@@ -41,7 +41,7 @@ public interface AppointmentRepository extends JpaRepository<PatientVisit, Long>
            "WHERE pv.deleteFlag = false " +
            "AND pv.clinicId = :clinicId " +
            "AND pv.visitDate >= :futureDate " +
-           "AND pv.statusId NOT IN (CAST(1 AS short), CAST(2 AS short), CAST(4 AS short), CAST(5 AS short)) " +
+           "AND pv.statusId NOT IN (CAST(1 AS short), CAST(2 AS short), CAST(4 AS short)) " +
            "AND gt.languageId = :languageId " +
            "ORDER BY pv.visitDate ASC, pv.visitTime ASC")
     List<PatientVisit> getFutureAppointmentsAllNew(@Param("clinicId") String clinicId, 
@@ -59,7 +59,7 @@ public interface AppointmentRepository extends JpaRepository<PatientVisit, Long>
            "AND pv.doctorId = :doctorId " +
            "AND pv.clinicId = :clinicId " +
            "AND pv.visitDate = :futureDate " +
-           "AND pv.statusId NOT IN (CAST(1 AS short), CAST(2 AS short), CAST(4 AS short), CAST(5 AS short)) " +
+           "AND pv.statusId NOT IN (CAST(1 AS short), CAST(2 AS short), CAST(4 AS short)) " +
            "AND gt.languageId = :languageId " +
            "ORDER BY pv.visitTime ASC")
     List<PatientVisit> getFutureAppointmentsForGivenDate(@Param("doctorId") String doctorId,
@@ -78,7 +78,7 @@ public interface AppointmentRepository extends JpaRepository<PatientVisit, Long>
            "AND pv.doctorId = :doctorId " +
            "AND pv.clinicId = :clinicId " +
            "AND pv.visitDate = :visitDate " +
-           "AND pv.statusId NOT IN (CAST(1 AS short), CAST(2 AS short), CAST(4 AS short), CAST(5 AS short)) " +
+           "AND pv.statusId NOT IN (CAST(1 AS short), CAST(2 AS short), CAST(4 AS short)) " +
            "AND gt.languageId = :languageId " +
            "ORDER BY pv.visitTime ASC")
     List<PatientVisit> getTodaysAppointmentsForGivenDate(@Param("doctorId") String doctorId,
