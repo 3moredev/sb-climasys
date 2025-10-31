@@ -602,8 +602,7 @@ public class VisitController {
             }
             
             // Create service request
-            VisitJpaService.ComprehensiveVisitRequest serviceRequest = 
-                new VisitJpaService.ComprehensiveVisitRequest(
+            VisitJpaService.ComprehensiveVisitRequest serviceRequest = new VisitJpaService.ComprehensiveVisitRequest(
                     // Composite Key Fields
                     req.patientId(),
                     req.doctorId(),
@@ -678,7 +677,7 @@ public class VisitController {
                     req.originalDiscount(),
                     
                     // Status and User
-                    req.statusId() != null ? req.statusId().shortValue() : null,
+                    req.statusId(),
                     req.userId(),
                     req.isSubmitPatientVisitDetails(),
                     
@@ -1443,7 +1442,7 @@ public class VisitController {
                 "WHERE PV.delete_flag = false " +
                 "AND PV.doctor_id = ? " +
                 "AND PV.visit_date::date = ? " +
-                "AND PV.status_id NOT IN (4, 5, 12) " +
+                "AND PV.status_id NOT IN (5, 11, 12) " +
                 "AND GT.language_id = ? " +
                 "ORDER BY PV.status_id ASC, PV.visit_time ASC";
         
@@ -1523,7 +1522,7 @@ public class VisitController {
                 "LEFT JOIN follow_up_type FU ON FU.id = PV.follow_up_type " +
                 "WHERE PV.delete_flag = false " +
                 "AND PV.visit_date > CURRENT_DATE " +
-                "AND PV.status_id NOT IN (4, 5, 11, 12) " +
+                "AND PV.status_id NOT IN (5, 11, 12) " +
                 "AND GT.language_id = ? " +
                 "ORDER BY PV.visit_time ASC";
         
@@ -1583,7 +1582,7 @@ public class VisitController {
                 "WHERE PV.delete_flag = false " +
                 "AND PV.doctor_id = ? " +
                 "AND PV.visit_date >= CURRENT_DATE " +
-                "AND PV.status_id NOT IN (4, 5, 12) " +
+                "AND PV.status_id NOT IN (4, 5, 11, 12) " +
                 "AND GT.language_id = ? " +
                 "ORDER BY PV.visit_date ASC, PV.visit_time ASC";
         
@@ -1643,7 +1642,7 @@ public class VisitController {
                 "LEFT JOIN follow_up_type FU ON FU.id = PV.follow_up_type " +
                 "WHERE PV.delete_flag = false " +
                 "AND PV.visit_date::date = ? " +
-                "AND PV.status_id NOT IN (4, 5, 11, 12) " +
+                "AND PV.status_id NOT IN (5, 11, 12) " +
                 "AND GT.language_id = ? " +
                 "ORDER BY PV.visit_date ASC, PV.visit_time ASC";
         
