@@ -28,6 +28,26 @@ public class PatientProfileRefDataController {
             @RequestParam String clinicId) {
         return ResponseEntity.ok(refDataService.getRefData(doctorId, clinicId));
     }
+
+    /**
+     * JPA equivalent to USP_Search_PrescriptionForPatientProfile
+     * Searches prescriptions matching the stored procedure logic exactly.
+     * Returns two result sets: one filtered by doctor_id/clinic_id and one with all active prescriptions for clinic.
+     * 
+     * Note: Added clinic_id parameter for multi-clinic support (stored procedure doesn't use it, but table has clinic_id column)
+     * 
+     * @param prefixText Search text (can be partial medicine name or brand name)
+     * @param doctorId Doctor ID for filtering
+     * @param clinicId Clinic ID for filtering (required for multi-clinic support)
+     * @return Map containing resultSet1 (doctor/clinic-filtered) and resultSet2 (all active for clinic)
+     */
+    @GetMapping("/prescription-search")
+    public ResponseEntity<Map<String, Object>> searchPrescriptionForPatientProfile(
+            @RequestParam String prefixText,
+            @RequestParam String doctorId,
+            @RequestParam String clinicId) {
+        return ResponseEntity.ok(refDataService.searchPrescriptionForPatientProfile(prefixText, doctorId, clinicId));
+    }
 }
 
 

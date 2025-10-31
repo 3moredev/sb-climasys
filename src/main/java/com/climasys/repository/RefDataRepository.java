@@ -67,6 +67,47 @@ public interface RefDataRepository extends JpaRepository<com.climasys.entity.Pat
             + "ORDER BY priority_value, medicine_name ASC", nativeQuery = true)
     List<String> buildPrescriptionSearch(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
 
+    /**
+     * JPA equivalent to USP_Search_PrescriptionForPatientProfile
+     * First result set: Filtered by doctor_id and clinic_id
+     * Note: The searchStr parameter is expected to already contain % wildcards (matching WebService preprocessing)
+     * The stored procedure doesn't use clinic_id, but we add it for multi-clinic support and consistency with other methods
+     */
+    @Query(value = "SELECT COALESCE(medicine_name,'') || '        |        ' || COALESCE(brand_name,'') || '        |        ' ||\n"
+            + "       COALESCE(CAST(morning AS varchar(10)), '') || '-' || COALESCE(CAST(afternoon AS varchar(10)), '') || '-' || COALESCE(CAST(night AS varchar(10)), '') ||\n"
+            + "       '        |       ' || COALESCE(CAST(no_of_days AS varchar(10)), '') || '        |        ' || COALESCE(instruction,'') AS search_value\n"
+            + "FROM prescription_medicines p\n"
+            + "WHERE (\n"
+            + "    p.medicine_name LIKE '%' || :searchStr || '%'\n"
+            + "    OR p.brand_name LIKE '%' || :searchStr || '%'\n"
+            + "    OR (COALESCE(p.brand_name,'') || '        |        ' || COALESCE(p.medicine_name,'')) LIKE '%' || :searchStr || '%'\n"
+            + ")\n"
+            + "AND p.active = true\n"
+            + "AND p.doctor_id = :doctorId\n"
+            + "AND p.clinic_id = :clinicId\n"
+            + "ORDER BY p.priority_value, p.medicine_name ASC", nativeQuery = true)
+    List<String> searchPrescriptionForPatientProfileWithDoctor(@Param("searchStr") String searchStr, @Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
+
+    /**
+     * JPA equivalent to USP_Search_PrescriptionForPatientProfile
+     * Second result set: All active prescriptions (without doctor filter, but with clinic filter for multi-clinic support)
+     * Note: The searchStr parameter is expected to already contain % wildcards (matching WebService preprocessing)
+     * Added clinic_id filter for consistency with other methods and proper multi-clinic support
+     */
+    @Query(value = "SELECT COALESCE(medicine_name,'') || '        |        ' || COALESCE(brand_name,'') || '        |        ' ||\n"
+            + "       COALESCE(CAST(morning AS varchar(10)), '') || '-' || COALESCE(CAST(afternoon AS varchar(10)), '') || '-' || COALESCE(CAST(night AS varchar(10)), '') ||\n"
+            + "       '        |        ' || COALESCE(CAST(no_of_days AS varchar(10)), '') || '        |        ' || COALESCE(instruction,'') AS search_value\n"
+            + "FROM prescription_medicines p\n"
+            + "WHERE (\n"
+            + "    p.medicine_name LIKE '%' || :searchStr || '%'\n"
+            + "    OR p.brand_name LIKE '%' || :searchStr || '%'\n"
+            + "    OR (COALESCE(p.brand_name,'') || '        |        ' || COALESCE(p.medicine_name,'')) LIKE '%' || :searchStr || '%'\n"
+            + ")\n"
+            + "AND p.active = true\n"
+            + "AND p.clinic_id = :clinicId\n"
+            + "ORDER BY p.priority_value, p.medicine_name ASC", nativeQuery = true)
+    List<String> searchPrescriptionForPatientProfileAll(@Param("searchStr") String searchStr, @Param("clinicId") String clinicId);
+
     // For USP_Get_SymptomData billing details
     @Query(value = "SELECT bdm.billing_details, bdm.billing_group_name, bdm.billing_subgroup_name, bdm.default_fees,\n"
             + "       bdm.visit_type, bvt.billing_visittype_description, bvt.billing_visittype_id,\n"

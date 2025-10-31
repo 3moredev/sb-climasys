@@ -49,6 +49,43 @@ public class PatientProfileRefDataService {
         return result;
     }
 
+    /**
+     * JPA equivalent to USP_Search_PrescriptionForPatientProfile
+     * Matches the stored procedure logic exactly:
+     * - Processes search string (adds % wildcards around words, matching original WebService behavior)
+     * - Returns two result sets: filtered by doctor/clinic and all active prescriptions for clinic
+     * - Added clinic_id filter for multi-clinic support (stored procedure doesn't use it, but table has it)
+     */
+    public Map<String, Object> searchPrescriptionForPatientProfile(String prefixText, String doctorId, String clinicId) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        
+        // Process search string: match original WebService logic exactly
+        // Original code: if (prefixText.Split(' ').Length > 0) - always processes (array always has at least 1 element)
+        String searchStr = prefixText;
+        if (prefixText != null && !prefixText.trim().isEmpty()) {
+            String[] words = prefixText.trim().split("\\s+");
+            StringBuilder filter = new StringBuilder();
+            for (String word : words) {
+                filter.append("%").append(word).append("%");
+            }
+            searchStr = filter.toString();
+        }
+        
+        // Get first result set: filtered by doctor_id and clinic_id
+        List<String> resultSet1 = refDataRepository.searchPrescriptionForPatientProfileWithDoctor(searchStr, doctorId, clinicId);
+        
+        // Get second result set: all active prescriptions for clinic (no doctor filter)
+        List<String> resultSet2 = refDataRepository.searchPrescriptionForPatientProfileAll(searchStr, clinicId);
+        
+        // Match the stored procedure response structure
+        // The original returns two result sets, but for API we'll combine them
+        result.put("resultSet1", resultSet1);
+        result.put("resultSet2", resultSet2);
+        result.put("success", true);
+        
+        return result;
+    }
+
     private List<Map<String, Object>> mapRows(List<Object[]> rows, String... keys) {
         List<Map<String, Object>> list = new ArrayList<>();
         for (Object[] r : rows) {
