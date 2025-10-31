@@ -15,14 +15,14 @@ import java.util.List;
 public interface TitleMasterRepository extends JpaRepository<TitleMaster, Integer> {
     
     /**
-     * Find all active titles ordered by ID
-     * @return List of active titles
+     * Find all titles ordered by ID
+     * @return List of all titles
      */
-    @Query("SELECT tm FROM TitleMaster tm WHERE (tm.deleteFlag = false OR tm.deleteFlag IS NULL) ORDER BY tm.id")
+    @Query("SELECT tm FROM TitleMaster tm ORDER BY tm.id")
     List<TitleMaster> findAllActiveOrdered();
     
     /**
-     * Find all titles ordered by ID (including inactive)
+     * Find all titles ordered by ID
      * @return List of all titles
      */
     @Query("SELECT tm FROM TitleMaster tm ORDER BY tm.id")

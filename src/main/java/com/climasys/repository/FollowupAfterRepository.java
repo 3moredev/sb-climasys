@@ -16,14 +16,14 @@ import java.util.List;
 public interface FollowupAfterRepository extends JpaRepository<FollowupAfter, Integer> {
     
     /**
-     * Find all active follow-up after periods ordered by ID
-     * @return List of active follow-up after periods
+     * Find all follow-up after periods ordered by ID
+     * @return List of all follow-up after periods
      */
-    @Query("SELECT fa FROM FollowupAfter fa WHERE (fa.deleteFlag = false OR fa.deleteFlag IS NULL) ORDER BY fa.id")
+    @Query("SELECT fa FROM FollowupAfter fa ORDER BY fa.id")
     List<FollowupAfter> findAllActiveOrdered();
     
     /**
-     * Find all follow-up after periods ordered by ID (including inactive)
+     * Find all follow-up after periods ordered by ID
      * @return List of all follow-up after periods
      */
     @Query("SELECT fa FROM FollowupAfter fa ORDER BY fa.id")

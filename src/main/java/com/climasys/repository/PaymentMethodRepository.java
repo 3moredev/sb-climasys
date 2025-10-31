@@ -15,14 +15,14 @@ import java.util.List;
 public interface PaymentMethodRepository extends JpaRepository<PaymentMethod, Integer> {
     
     /**
-     * Find all active payment methods ordered by ID
-     * @return List of active payment methods
+     * Find all payment methods ordered by ID
+     * @return List of all payment methods
      */
-    @Query("SELECT pm FROM PaymentMethod pm WHERE (pm.deleteFlag = false OR pm.deleteFlag IS NULL) ORDER BY pm.id")
+    @Query("SELECT pm FROM PaymentMethod pm ORDER BY pm.id")
     List<PaymentMethod> findAllActiveOrdered();
     
     /**
-     * Find all payment methods ordered by ID (including inactive)
+     * Find all payment methods ordered by ID
      * @return List of all payment methods
      */
     @Query("SELECT pm FROM PaymentMethod pm ORDER BY pm.id")
