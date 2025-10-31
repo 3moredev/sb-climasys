@@ -1,12 +1,14 @@
 package com.climasys.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.Arrays;
@@ -17,6 +19,9 @@ import java.util.List;
  */
 @Configuration
 public class CorsConfig implements WebMvcConfigurer {
+
+    @Autowired
+    private SessionActivityInterceptor sessionActivityInterceptor;
 
     @Value("${climasys.cors.allowed-origins}")
     private String allowedOrigins;
@@ -29,6 +34,19 @@ public class CorsConfig implements WebMvcConfigurer {
 
     @Value("${climasys.cors.allow-credentials}")
     private boolean allowCredentials;
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(sessionActivityInterceptor)
+                .addPathPatterns("/api/**")
+                .excludePathPatterns(
+                    "/api/auth/login",
+                    "/api/auth/logout",
+                    "/api/auth/session/logout",
+                    "/api-docs/**",
+                    "/swagger-ui/**"
+                );
+    }
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {

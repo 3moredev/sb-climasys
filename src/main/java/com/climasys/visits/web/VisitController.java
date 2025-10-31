@@ -677,7 +677,7 @@ public class VisitController {
                     req.originalDiscount(),
                     
                     // Status and User
-                    req.statusId(),
+                    req.statusId() != null ? req.statusId().shortValue() : null,
                     req.userId(),
                     req.isSubmitPatientVisitDetails(),
                     
