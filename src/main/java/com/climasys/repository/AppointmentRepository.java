@@ -36,7 +36,7 @@ public interface AppointmentRepository extends JpaRepository<PatientVisit, Long>
            "INNER JOIN Patient pm ON pv.patientId = pm.id " +
            "INNER JOIN DoctorMaster dm ON pv.doctorId = dm.doctorId " +
            "INNER JOIN GenderTranslations gt ON CAST(pm.genderId AS short) = gt.genderId " +
-           "INNER JOIN StatusRef sr ON pv.statusId = sr.id AND pv.clinicId = sr.clinicId " +
+           "LEFT JOIN StatusRef sr ON pv.statusId = sr.id AND pv.clinicId = sr.clinicId " +
            "LEFT JOIN FollowUpType fu ON pv.followUpType = fu.id " +
            "WHERE pv.deleteFlag = false " +
            "AND pv.clinicId = :clinicId " +
@@ -53,7 +53,7 @@ public interface AppointmentRepository extends JpaRepository<PatientVisit, Long>
            "INNER JOIN Patient pm ON pv.patientId = pm.id " +
            "INNER JOIN DoctorMaster dm ON pv.doctorId = dm.doctorId " +
            "INNER JOIN GenderTranslations gt ON CAST(pm.genderId AS short) = gt.genderId " +
-           "INNER JOIN StatusRef sr ON pv.statusId = sr.id AND pv.clinicId = sr.clinicId " +
+           "LEFT JOIN StatusRef sr ON pv.statusId = sr.id AND pv.clinicId = sr.clinicId " +
            "LEFT JOIN FollowUpType fu ON pv.followUpType = fu.id " +
            "WHERE pv.deleteFlag = false " +
            "AND pv.doctorId = :doctorId " +
@@ -72,7 +72,7 @@ public interface AppointmentRepository extends JpaRepository<PatientVisit, Long>
            "INNER JOIN Patient pm ON pv.patientId = pm.id " +
            "INNER JOIN DoctorMaster dm ON pv.doctorId = dm.doctorId " +
            "INNER JOIN GenderTranslations gt ON CAST(pm.genderId AS short) = gt.genderId " +
-           "INNER JOIN StatusRef sr ON pv.statusId = sr.id AND pv.clinicId = sr.clinicId " +
+           "LEFT JOIN StatusRef sr ON pv.statusId = sr.id AND pv.clinicId = sr.clinicId " +
            "LEFT JOIN FollowUpType fu ON pv.followUpType = fu.id " +
            "WHERE pv.deleteFlag = false " +
            "AND pv.doctorId = :doctorId " +

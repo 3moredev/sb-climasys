@@ -1426,8 +1426,8 @@ public class VisitController {
                 "PV.clinic_id, " +
                 "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
                 "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS \"Online_Appointment_Time\", " +
-                "SR.status_description, " +
-                "SR.id AS Status_ID, " +
+                "COALESCE(SR.status_description, 'SUBMITTED') AS status_description, " +
+                "COALESCE(SR.id, PV.status_id) AS Status_ID, " +
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
@@ -1438,7 +1438,7 @@ public class VisitController {
                 "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
                 "INNER JOIN doctor_master DM ON PV.doctor_id = DM.doctor_id " +
                 "INNER JOIN gender_translations GT ON PM.gender_id = GT.gender_id " +
-                "INNER JOIN status_ref SR ON PV.status_id = SR.id AND PV.clinic_id = SR.clinic_id " +
+                "LEFT JOIN status_ref SR ON PV.status_id = SR.id AND PV.clinic_id = SR.clinic_id " +
                 "LEFT JOIN follow_up_type FU ON FU.id = PV.follow_up_type " +
                 "WHERE PV.delete_flag = false " +
                 "AND PV.doctor_id = ? " +
@@ -1509,16 +1509,17 @@ public class VisitController {
                 "PV.clinic_id, " +
                 "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
                 "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS \"Online_Appointment_Time\", " +
-                "SR.status_description, " +
-                "SR.id AS Status_ID, " +
+                "COALESCE(SR.status_description, 'SUBMITTED') AS status_description, " +
+                "COALESCE(SR.id, PV.status_id) AS Status_ID, " +
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
                 "FU.followup_description AS follow_up_type, " +
-                "PV.is_submit_patient_labtest AS isSubmitPatientLabtest " +
+                "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
+                "COALESCE(PV.is_submit_patient_visit_details, false) AS Is_Submit_Patient_Visit_Details " +
                 "FROM patient_visits PV " +
                 "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
                 "INNER JOIN doctor_master DM ON PV.doctor_id = DM.doctor_id " +
                 "INNER JOIN gender_translations GT ON PM.gender_id = GT.gender_id " +
-                "INNER JOIN status_ref SR ON PV.status_id = SR.id AND PV.clinic_id = SR.clinic_id " +
+                "LEFT JOIN status_ref SR ON PV.status_id = SR.id AND PV.clinic_id = SR.clinic_id " +
                 "LEFT JOIN follow_up_type FU ON FU.id = PV.follow_up_type " +
                 "WHERE PV.delete_flag = false " +
                 "AND PV.visit_date > CURRENT_DATE " +
@@ -1563,8 +1564,8 @@ public class VisitController {
                 "PV.clinic_id, " +
                 "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
                 "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS \"Online_Appointment_Time\", " +
-                "SR.status_description, " +
-                "SR.id AS Status_ID, " +
+                "COALESCE(SR.status_description, 'SUBMITTED') AS status_description, " +
+                "COALESCE(SR.id, PV.status_id) AS Status_ID, " +
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
                 "PV.visit_date as fulldate, " +
                 "PV.visit_time::time as full_time, " +
@@ -1577,7 +1578,7 @@ public class VisitController {
                 "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
                 "INNER JOIN doctor_master DM ON PV.doctor_id = DM.doctor_id " +
                 "INNER JOIN gender_translations GT ON PM.gender_id = GT.gender_id " +
-                "INNER JOIN status_ref SR ON PV.status_id = SR.id AND PV.clinic_id = SR.clinic_id " +
+                "LEFT JOIN status_ref SR ON PV.status_id = SR.id AND PV.clinic_id = SR.clinic_id " +
                 "LEFT JOIN follow_up_type FU ON FU.id = PV.follow_up_type " +
                 "WHERE PV.delete_flag = false " +
                 "AND PV.doctor_id = ? " +
@@ -1624,8 +1625,8 @@ public class VisitController {
                 "PV.clinic_id, " +
                 "CASE WHEN TO_CHAR(PV.online_appointment_time, 'HH24:MI') = '00:00' THEN NULL " +
                 "ELSE TO_CHAR(PV.online_appointment_time, 'HH24:MI') END AS \"Online_Appointment_Time\", " +
-                "SR.status_description, " +
-                "SR.id AS Status_ID, " +
+                "COALESCE(SR.status_description, 'SUBMITTED') AS status_description, " +
+                "COALESCE(SR.id, PV.status_id) AS Status_ID, " +
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
                 "PV.visit_date as fulldate, " +
                 "PV.visit_time::time as full_time, " +
@@ -1638,7 +1639,7 @@ public class VisitController {
                 "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
                 "INNER JOIN doctor_master DM ON PV.doctor_id = DM.doctor_id " +
                 "INNER JOIN gender_translations GT ON PM.gender_id = GT.gender_id " +
-                "INNER JOIN status_ref SR ON PV.status_id = SR.id AND PV.clinic_id = SR.clinic_id " +
+                "LEFT JOIN status_ref SR ON PV.status_id = SR.id AND PV.clinic_id = SR.clinic_id " +
                 "LEFT JOIN follow_up_type FU ON FU.id = PV.follow_up_type " +
                 "WHERE PV.delete_flag = false " +
                 "AND PV.visit_date::date = ? " +
