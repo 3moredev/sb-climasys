@@ -43,7 +43,53 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
     );
 
     /**
-     * Previously selected service line-items for a given services visit.
+     * Check if service visit billing info exists in overwrite table.
+     * Matches stored procedure logic: checks Patient_ID, Clinic_ID, Patient_Visit_No only.
+     * Uses EXISTS for efficient boolean check.
+     */
+    @Query(value = """
+            SELECT EXISTS(
+                SELECT 1
+                FROM patient_visit_services_billinginfooverwrite
+                WHERE patient_id = :patientId
+                  AND clinic_id = :clinicId
+                  AND patient_visit_no = :visitNo
+            )
+            """, nativeQuery = true)
+    boolean existsInBillingInfoOverwrite(
+            @Param("patientId") String patientId,
+            @Param("clinicId") String clinicId,
+            @Param("visitNo") Integer visitNo
+    );
+
+    /**
+     * Previously selected service line-items from OVERWRITE table.
+     * Matches stored procedure: uses Patient_ID, Clinic_ID, Patient_Visit_No, Delete_Flag.
+     * Returns group, subgroup, details, default_fees, collected_fees.
+     */
+    @Query(value = """
+            SELECT billing_group_name,
+                   billing_subgroup_name,
+                   billing_details,
+                   COALESCE(collected_fees, default_fees) AS amount,
+                   default_fees,
+                   collected_fees
+            FROM patient_visit_services_billinginfooverwrite
+            WHERE patient_id = :patientId
+              AND clinic_id = :clinicId
+              AND patient_visit_no = :visitNo
+              AND (delete_flag IS NULL OR delete_flag = false)
+            ORDER BY billing_group_name, billing_subgroup_name, billing_details
+            """, nativeQuery = true)
+    List<Object[]> findServiceVisitLineItemsFromOverwrite(
+            @Param("patientId") String patientId,
+            @Param("clinicId") String clinicId,
+            @Param("visitNo") Integer visitNo
+    );
+
+    /**
+     * Previously selected service line-items from BASE table (fallback).
+     * Matches stored procedure: uses Patient_ID, Clinic_ID, Patient_Visit_No only.
      * Returns group, subgroup, details, default_fees, collected_fees.
      */
     @Query(value = """
@@ -55,21 +101,14 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
                    collected_fees
             FROM patient_visit_services_billinginfo
             WHERE patient_id = :patientId
-              AND doctor_id = :doctorId
               AND clinic_id = :clinicId
-              AND shift_id = :shiftId
               AND patient_visit_no = :visitNo
-              AND CAST(visit_date AS date) = CAST(:visitDate AS date)
-              AND COALESCE(delete_flag, false) = false
             ORDER BY billing_group_name, billing_subgroup_name, billing_details
             """, nativeQuery = true)
-    List<Object[]> findServiceVisitLineItems(
+    List<Object[]> findServiceVisitLineItemsFromBase(
             @Param("patientId") String patientId,
-            @Param("doctorId") String doctorId,
             @Param("clinicId") String clinicId,
-            @Param("shiftId") Short shiftId,
-            @Param("visitNo") Integer visitNo,
-            @Param("visitDate") LocalDate visitDate
+            @Param("visitNo") Integer visitNo
     );
 }
 
