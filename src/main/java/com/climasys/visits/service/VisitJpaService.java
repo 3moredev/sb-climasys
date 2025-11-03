@@ -365,11 +365,21 @@ public class VisitJpaService {
             
             PatientVisit visit = visitOptional.get();
             
+            // Extract visit parameters for fetching associated data
+            Short shiftId = visit.getShiftId();
+            String doctorId = visit.getDoctorId();
+            LocalDate visitDate = visit.getVisitDate().toLocalDate();
+            
             // Calculate PLR indicators
             String plrIndicators = calculatePlrIndicators(visit);
             
             // Map visit to detailed response
             Map<String, Object> visitData = mapVisitToResponseWithPlr(visit, plrIndicators);
+            
+            // Fetch associated table data
+            Map<String, Object> associatedData = fetchAssociatedVisitData(
+                patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            visitData.putAll(associatedData);
             
             // Build response structure matching the stored procedure format
             response.put("success", true);
@@ -381,7 +391,7 @@ public class VisitJpaService {
             response.put("visitNo", patientVisitNo);
             response.put("languageId", languageId);
             
-            logger.info("Successfully retrieved appointment details for patient: {}", patientId);
+            logger.info("Successfully retrieved appointment details with associated data for patient: {}", patientId);
             
         } catch (Exception e) {
             logger.error("Error getting appointment details for patient {}: {}", patientId, e.getMessage(), e);
@@ -390,6 +400,173 @@ public class VisitJpaService {
         }
         
         return response;
+    }
+    
+    /**
+     * Fetch associated visit data (diagnosis, medicines, prescriptions, investigations, complaints, dressing, billing)
+     */
+    private Map<String, Object> fetchAssociatedVisitData(
+            String patientId, Short shiftId, String clinicId, String doctorId, 
+            LocalDate visitDate, Integer patientVisitNo) {
+        Map<String, Object> associatedData = new HashMap<>();
+        
+        try {
+            logger.debug("Fetching associated data for visit: patientId={}, visitDate={}, visitNo={}", 
+                patientId, visitDate, patientVisitNo);
+            
+            // 1) Complaints
+            String complaintsSql = """
+                SELECT short_description || '*' || complaint_description AS id,
+                       short_description || ' : ' || complaint_description AS symptoms_description,
+                       complaint_description, COALESCE(complaint_comment,'') AS complaint_comment
+                FROM visit_complaints vc
+                WHERE vc.patient_id = ? AND vc.shift_id = ? AND vc.clinic_id = ? AND vc.doctor_id = ?
+                  AND DATE(vc.visit_date) = DATE(?::date) AND vc.patient_visit_no = ? 
+                  AND (vc.delete_flag IS NULL OR vc.delete_flag = false)
+            """;
+            List<Map<String, Object>> complaints = jdbcTemplate.queryForList(
+                complaintsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            associatedData.put("complaints", complaints);
+            
+            // 2) Diagnosis
+            String diagnosisSql = """
+                SELECT short_description || '*' || desease_description AS id,
+                       short_description || ' : ' || desease_description AS diagnosis_description,
+                       desease_description
+                FROM visit_diagnosis vd
+                WHERE vd.patient_id = ? AND vd.shift_id = ? AND vd.clinic_id = ? AND vd.doctor_id = ?
+                  AND DATE(vd.visit_date) = DATE(?::date) AND vd.patient_visit_no = ? 
+                  AND (vd.delete_flag IS NULL OR vd.delete_flag = false)
+            """;
+            List<Map<String, Object>> diagnosis = jdbcTemplate.queryForList(
+                diagnosisSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            associatedData.put("diagnosis", diagnosis);
+            
+            // 3) Dressing
+            String dressingSql = """
+                SELECT dressing_description AS dressing_description,
+                       dressing_description AS short_description,
+                       dressing_description AS longdressing_description
+                FROM visit_dressing dd
+                WHERE dd.patient_id = ? AND dd.shift_id = ? AND dd.clinic_id = ? AND dd.doctor_id = ?
+                  AND DATE(dd.visit_date) = DATE(?::date) AND dd.patient_visit_no = ? 
+                  AND (dd.delete_flag IS NULL OR dd.delete_flag = false)
+            """;
+            List<Map<String, Object>> dressing = jdbcTemplate.queryForList(
+                dressingSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            associatedData.put("dressing", dressing);
+            
+            // 4) Medicines - prefer overwrite
+            String medicineOverwriteSql = """
+                SELECT vm.short_description || '*' || vm.medicine_description AS id,
+                       vm.short_description AS short_description,
+                       vm.medicine_description,
+                       vm.morning, vm.afternoon, vm.night, vm.no_of_days, vm.instruction
+                FROM visit_medicine_overwrite vm
+                WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? AND vm.doctor_id = ?
+                  AND DATE(vm.visit_date) = DATE(?::date) AND vm.patient_visit_no = ?
+                  AND (vm.delete_indicator IS NULL OR vm.delete_indicator = false) 
+                  AND (vm.delete_flag IS NULL OR vm.delete_flag = false)
+            """;
+            List<Map<String, Object>> medicines = jdbcTemplate.queryForList(
+                medicineOverwriteSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            if (medicines.isEmpty()) {
+                String medicineSql = """
+                    SELECT vm.short_description || '*' || vm.medicine_description AS id,
+                           vm.short_description AS short_description,
+                           vm.medicine_description,
+                           vm.morning, vm.afternoon, vm.night, vm.no_of_days, vm.instruction
+                    FROM visit_medicine vm
+                    WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? AND vm.doctor_id = ?
+                      AND DATE(vm.visit_date) = DATE(?::date) AND vm.patient_visit_no = ?
+                      AND (vm.delete_flag IS NULL OR vm.delete_flag = false)
+                """;
+                medicines = jdbcTemplate.queryForList(
+                    medicineSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            }
+            associatedData.put("medicines", medicines);
+            
+            // 5) Prescriptions - prefer overwrite
+            String prescriptionOverwriteSql = """
+                SELECT vp.medicine_name AS medicine_name,
+                       vp.brand_name AS brand_name,
+                       vp.medicine_name || '*' || vp.brand_name || '*' || vp.cat_short_name || '*' || vp.catsub_description AS id,
+                       vp.morning, vp.afternoon, vp.night, vp.no_of_days, vp.instruction, vp.sequence_id
+                FROM visit_prescription_overwrite vp
+                WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? AND vp.doctor_id = ?
+                  AND DATE(vp.visit_date) = DATE(?::date) AND vp.patient_visit_no = ?
+                  AND (vp.delete_indicator IS NULL OR vp.delete_indicator = false) 
+                  AND (vp.delete_flag IS NULL OR vp.delete_flag = false)
+                ORDER BY vp.sequence_id
+            """;
+            List<Map<String, Object>> prescriptions = jdbcTemplate.queryForList(
+                prescriptionOverwriteSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            if (prescriptions.isEmpty()) {
+                String prescriptionSql = """
+                    SELECT vp.medicine_name AS medicine_name,
+                           vp.brand_name AS brand_name,
+                           vp.medicine_name || '*' || vp.brand_name || '*' || vp.cat_short_name || '*' || vp.catsub_description AS id,
+                           vp.morning, vp.afternoon, vp.night, vp.no_of_days, vp.instruction, vp.sequence_id
+                    FROM visit_prescription vp
+                    WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? AND vp.doctor_id = ?
+                      AND DATE(vp.visit_date) = DATE(?::date) AND vp.patient_visit_no = ?
+                      AND (vp.delete_flag IS NULL OR vp.delete_flag = false)
+                    ORDER BY vp.sequence_id
+                """;
+                prescriptions = jdbcTemplate.queryForList(
+                    prescriptionSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            }
+            associatedData.put("prescriptions", prescriptions);
+            
+            // 6) Investigations/Lab tests
+            String labsSql = """
+                SELECT lab_test_description AS id
+                FROM patient_visit_labtestasked pvla
+                WHERE pvla.patient_id = ? AND pvla.shift_id = ? AND pvla.clinic_id = ? AND pvla.doctor_id = ?
+                  AND DATE(pvla.visit_date) = DATE(?::date) AND pvla.patient_visit_no = ? 
+                  AND (pvla.delete_flag IS NULL OR pvla.delete_flag = false)
+            """;
+            List<Map<String, Object>> labTests = jdbcTemplate.queryForList(
+                labsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            associatedData.put("investigations", labTests);
+            associatedData.put("labTests", labTests); // Alias for compatibility
+            
+            // 7) Billing - prefer overwrite
+            String billingOverwriteSql = """
+                SELECT billing_details, billing_group_name, billing_subgroup_name,
+                       default_fees, collected_fees,
+                       billing_group_name || '*' || billing_subgroup_name || '*' || billing_details AS billing_id
+                FROM patient_visit_billinginfooverwrite pvb
+                WHERE pvb.patient_id = ? AND pvb.clinic_id = ? AND pvb.doctor_id = ?
+                  AND pvb.patient_visit_no = ? 
+                  AND (pvb.delete_flag IS NULL OR pvb.delete_flag = false)
+            """;
+            List<Map<String, Object>> billing = jdbcTemplate.queryForList(
+                billingOverwriteSql, patientId, clinicId, doctorId, patientVisitNo);
+            if (billing.isEmpty()) {
+                String billingSql = """
+                    SELECT billing_details, billing_group_name, billing_subgroup_name,
+                           default_fees, collected_fees,
+                           billing_group_name || '*' || billing_subgroup_name || '*' || billing_details AS billing_id
+                    FROM patient_visit_billinginfo pvb
+                    WHERE pvb.patient_id = ? AND pvb.clinic_id = ? AND pvb.doctor_id = ?
+                      AND pvb.patient_visit_no = ?
+                """;
+                billing = jdbcTemplate.queryForList(
+                    billingSql, patientId, clinicId, doctorId, patientVisitNo);
+            }
+            associatedData.put("billing", billing);
+            
+            logger.debug("Fetched associated data: complaints={}, diagnosis={}, medicines={}, prescriptions={}, investigations={}, billing={}", 
+                complaints.size(), diagnosis.size(), medicines.size(), prescriptions.size(), labTests.size(), billing.size());
+            
+        } catch (Exception e) {
+            logger.error("Error fetching associated visit data: {}", e.getMessage(), e);
+            // Don't fail the whole request, just log the error
+            associatedData.put("error", "Failed to fetch some associated data: " + e.getMessage());
+        }
+        
+        return associatedData;
     }
     
     /**
