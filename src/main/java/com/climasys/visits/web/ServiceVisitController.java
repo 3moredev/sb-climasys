@@ -1,6 +1,8 @@
 package com.climasys.visits.web;
 
 import com.climasys.visits.service.ServiceVisitService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,6 +16,7 @@ import java.util.Map;
 @RequestMapping("/api/services")
 public class ServiceVisitController {
 
+    private static final Logger logger = LoggerFactory.getLogger(ServiceVisitController.class);
     private final ServiceVisitService serviceVisitService;
 
     public ServiceVisitController(ServiceVisitService serviceVisitService) {
@@ -43,11 +46,29 @@ public class ServiceVisitController {
             @RequestParam Integer visitNo,
             @RequestParam String visitDate
     ) {
-        LocalDate vDate = LocalDate.parse(visitDate);
-        Map<String, Object> result = serviceVisitService.getPreviousServiceVisitLineItems(
-                patientId, doctorId, clinicId, shiftId, visitNo, vDate);
-        boolean ok = Boolean.TRUE.equals(result.get("success"));
-        return ok ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
+        logger.info("Received request for previous-visit-items with params: patientId={}, doctorId={}, clinicId={}, shiftId={}, visitNo={}, visitDate={}", 
+            patientId, doctorId, clinicId, shiftId, visitNo, visitDate);
+        try {
+            LocalDate vDate = LocalDate.parse(visitDate);
+            Map<String, Object> result = serviceVisitService.getPreviousServiceVisitLineItems(
+                    patientId, doctorId, clinicId, shiftId, visitNo, vDate);
+            boolean ok = Boolean.TRUE.equals(result.get("success"));
+            
+            if (ok) {
+                logger.info("Successfully returning {} items for previous-visit-items", 
+                    result.get("items") != null ? ((java.util.List<?>) result.get("items")).size() : 0);
+            } else {
+                logger.warn("Failed to fetch previous-visit-items: {}", result.get("error"));
+            }
+            
+            return ok ? ResponseEntity.ok(result) : ResponseEntity.badRequest().body(result);
+        } catch (Exception e) {
+            logger.error("Error processing previous-visit-items request: {}", e.getMessage(), e);
+            Map<String, Object> errorResult = new java.util.HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("error", "Failed to parse request: " + e.getMessage());
+            return ResponseEntity.badRequest().body(errorResult);
+        }
     }
 }
 

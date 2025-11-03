@@ -83,6 +83,15 @@ public class VisitController {
             return 0;
         }
     }
+
+    private Double parseDoubleSafe(String val) {
+        try {
+            if (val == null || val.trim().isEmpty()) return 0.0;
+            return Double.parseDouble(val.trim());
+        } catch (Exception e) {
+            return 0.0;
+        }
+    }
     
     
     // Convert timezone in Java for time fields
@@ -277,7 +286,8 @@ public class VisitController {
             // Optional treatment arrays
             java.util.List<Map<String, Object>> diagnosisRows,
             java.util.List<Map<String, Object>> medicineRows,
-            java.util.List<Map<String, Object>> prescriptionRows
+            java.util.List<Map<String, Object>> prescriptionRows,
+            java.util.List<Map<String, Object>> investigationRows
     ) {}
 
     @PostMapping
@@ -594,6 +604,9 @@ public class VisitController {
             if (req.statusId() == null) {
                 throw new IllegalArgumentException("Status ID is required");
             }
+            if (req.statusId() != null && req.statusId() <= 0) {
+                throw new IllegalArgumentException("Status ID must be greater than 0. Valid status IDs are 6 (Submit) or 9 (Save)");
+            }
             if (req.userId() == null || req.userId().trim().isEmpty()) {
                 throw new IllegalArgumentException("User ID is required");
             }
@@ -712,6 +725,7 @@ public class VisitController {
                     String patientId = req.patientId();
                     String doctorId = req.doctorId();
                     String clinicId = req.clinicId();
+                    String userIdVal = req.userId();
                     Short shiftIdVal = shiftId;
                     Integer patientVisitNoVal = patientVisitNo;
                     java.sql.Timestamp visitDateTs = java.sql.Timestamp.valueOf(visitDate);
@@ -751,9 +765,157 @@ public class VisitController {
                             }
                         }
                     }
+
+                    // Prescriptions
+                    if (req.prescriptionRows() != null && !req.prescriptionRows().isEmpty()) {
+                        String delPres = "DELETE FROM visit_prescription_overwrite WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
+                        jdbcTemplate.update(delPres, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, visitDateTs);
+
+                        // Get next sequence ID for prescriptions
+                        Integer nextSequenceId = 1;
+                        try {
+                            String maxSeqSql = "SELECT COALESCE(MAX(sequence_id), 0) + 1 FROM visit_prescription_overwrite WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
+                            List<Integer> maxSeq = jdbcTemplate.queryForList(maxSeqSql, Integer.class, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, visitDateTs);
+                            if (maxSeq != null && !maxSeq.isEmpty() && maxSeq.get(0) != null) {
+                                nextSequenceId = maxSeq.get(0);
+                            }
+                        } catch (Exception e) {
+                            logger.warn("Failed to get next sequence ID for prescriptions, using default: {}", e.getMessage());
+                        }
+
+                        String insPres = "INSERT INTO visit_prescription_overwrite (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, brand_name, medicine_name, catsub_description, cat_short_name, marketed_by, morning, afternoon, night, no_of_days, instruction, sequence_id, created_on, createdby_name, modified_on, modifiedby_name, delete_indicator) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                        LocalDateTime now = LocalDateTime.now();
+                        for (Map<String, Object> row : req.prescriptionRows()) {
+                            String prescription = String.valueOf(row.getOrDefault("prescription", ""));
+                            String b = String.valueOf(row.getOrDefault("b", ""));
+                            String l = String.valueOf(row.getOrDefault("l", ""));
+                            String d = String.valueOf(row.getOrDefault("d", ""));
+                            String days = String.valueOf(row.getOrDefault("days", ""));
+                            String instruction = String.valueOf(row.getOrDefault("instruction", ""));
+
+                            // Parse prescription: expected format "Brand Name (Generic Name)" or just the name
+                            String brandName = prescription;
+                            String medicineName = "";
+                            if (prescription.contains("(") && prescription.contains(")")) {
+                                int openParen = prescription.indexOf('(');
+                                int closeParen = prescription.lastIndexOf(')');
+                                if (openParen > 0 && closeParen > openParen) {
+                                    brandName = prescription.substring(0, openParen).trim();
+                                    medicineName = prescription.substring(openParen + 1, closeParen).trim();
+                                }
+                            }
+
+                            if ((brandName != null && !brandName.isEmpty()) || (medicineName != null && !medicineName.isEmpty())) {
+                                Double morning = parseDoubleSafe(b.isEmpty() ? "0" : b);
+                                Double afternoon = parseDoubleSafe(l.isEmpty() ? "0" : l);
+                                Double night = parseDoubleSafe(d.isEmpty() ? "0" : d);
+                                Integer noOfDays = toIntSafe(days.isEmpty() ? null : days);
+
+                                jdbcTemplate.update(insPres, patientId, visitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
+                                        brandName, medicineName, "", "", "", morning, afternoon, night, noOfDays, instruction,
+                                        nextSequenceId++, now, userIdVal, now, userIdVal, 0);
+                            }
+                        }
+                    }
+
+                    // Investigations
+                    if (req.investigationRows() != null && !req.investigationRows().isEmpty()) {
+                        String delInv = "DELETE FROM patient_visit_labtestasked WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
+                        jdbcTemplate.update(delInv, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, visitDateTs);
+
+                        String insInv = "INSERT INTO patient_visit_labtestasked (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, lab_test_description, delete_flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                        for (Map<String, Object> row : req.investigationRows()) {
+                            String investigation = String.valueOf(row.getOrDefault("investigation", ""));
+                            if (investigation != null && !investigation.isEmpty()) {
+                                jdbcTemplate.update(insInv, patientId, visitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
+                                        investigation, false);
+                            }
+                        }
+                    }
                 } catch (Exception persistEx) {
-                    logger.warn("Failed to persist treatment arrays (diagnosis/medicines): {}", persistEx.getMessage());
+                    logger.warn("Failed to persist treatment arrays (diagnosis/medicines/prescriptions/investigations): {}", persistEx.getMessage());
                 }
+                
+                // Add the saved arrays to the response for confirmation
+                if (req.diagnosisRows() != null) {
+                    result.put("diagnosisRows", req.diagnosisRows());
+                    result.put("diagnosisRowsCount", req.diagnosisRows().size());
+                }
+                if (req.medicineRows() != null) {
+                    result.put("medicineRows", req.medicineRows());
+                    result.put("medicineRowsCount", req.medicineRows().size());
+                }
+                if (req.prescriptionRows() != null) {
+                    result.put("prescriptionRows", req.prescriptionRows());
+                    result.put("prescriptionRowsCount", req.prescriptionRows().size());
+                }
+                if (req.investigationRows() != null) {
+                    result.put("investigationRows", req.investigationRows());
+                    result.put("investigationRowsCount", req.investigationRows().size());
+                }
+                
+                // Add key missing fields from the request
+                result.put("shiftId", shiftId);
+                result.put("statusId", req.statusId());
+                result.put("userId", req.userId());
+                result.put("isSubmitPatientVisitDetails", req.isSubmitPatientVisitDetails());
+                
+                // Financial fields
+                result.put("feesToCollect", req.feesToCollect());
+                result.put("feesPaid", req.feesPaid());
+                result.put("discount", req.discount());
+                result.put("originalDiscount", req.originalDiscount());
+                
+                // Patient vitals
+                result.put("pulse", req.pulse());
+                result.put("heightInCms", req.heightInCms());
+                result.put("weightInKgs", req.weightInKgs());
+                result.put("bloodPressure", req.bloodPressure());
+                result.put("sugar", req.sugar());
+                result.put("tft", req.tft());
+                result.put("pallor", req.pallor());
+                
+                // Follow-up information
+                result.put("followUp", req.followUp());
+                result.put("followUpType", req.followUpType());
+                result.put("followUpFlag", req.followUpFlag());
+                result.put("followUpComment", req.followUpComment());
+                result.put("followUpDate", req.followUpDate());
+                
+                // Medical conditions
+                result.put("hypertension", req.hypertension());
+                result.put("diabetes", req.diabetes());
+                result.put("cholestrol", req.cholestrol());
+                result.put("ihd", req.ihd());
+                result.put("th", req.th());
+                result.put("asthama", req.asthama());
+                result.put("smoking", req.smoking());
+                result.put("tobaco", req.tobaco());
+                result.put("alchohol", req.alchohol());
+                result.put("inPerson", req.inPerson());
+                
+                // Additional medical fields
+                result.put("allergyDetails", req.allergyDetails());
+                result.put("habitDetails", req.habitDetails());
+                result.put("observation", req.observation());
+                result.put("importantFindings", req.importantFindings());
+                result.put("additionalComments", req.additionalComments());
+                result.put("symptomComment", req.symptomComment());
+                result.put("impression", req.impression());
+                result.put("currentComplaint", req.currentComplaint());
+                result.put("chiefComplaint", req.chiefComplaint());
+                result.put("visitComments", req.visitComments());
+                result.put("currentMedicines", req.currentMedicines());
+                result.put("pastSurgicalHistory", req.pastSurgicalHistory());
+                result.put("surgicalHistory", req.surgicalHistory());
+                
+                // Referral information
+                result.put("referBy", req.referBy());
+                result.put("referralName", req.referralName());
+                result.put("referralContact", req.referralContact());
+                result.put("referralEmail", req.referralEmail());
+                result.put("referralAddress", req.referralAddress());
+                
                 return ResponseEntity.ok(result);
             } else {
                 return ResponseEntity.badRequest().body(result);

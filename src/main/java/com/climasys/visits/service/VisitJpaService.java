@@ -1402,9 +1402,11 @@ public class VisitJpaService {
         visit.setSymptomComment(req.symptomComment());
         visit.setImpression(req.impression());
         visit.setAttendedBy(req.attendedBy());
-        visit.setPaymentById(req.paymentById() != null ? req.paymentById().shortValue() : null);
+        // Set paymentById to null if it's 0 or null (0 doesn't exist in payment_type_master)
+        visit.setPaymentById(req.paymentById() != null && req.paymentById() > 0 ? req.paymentById().shortValue() : null);
         visit.setPaymentRemark(req.paymentRemark());
-        visit.setAttendedById(req.attendedById());
+        // Set attendedById to null if it's 0 or null (to avoid foreign key constraint issues)
+        visit.setAttendedById(req.attendedById() != null && req.attendedById() > 0 ? req.attendedById() : null);
         visit.setFollowUp(req.followUp());
         visit.setIsFollowUp(req.followUpFlag());
         visit.setCurrentMedicines(req.currentMedicines());
@@ -1440,7 +1442,11 @@ public class VisitJpaService {
         visit.setOriginalDiscount(req.originalDiscount());
         
         // Status and submission flags
-        visit.setStatusId(req.statusId());
+        // Validate statusId is not 0 (0 doesn't exist in status_ref table)
+        if (req.statusId() != null && req.statusId() <= 0) {
+            throw new IllegalArgumentException("Status ID must be greater than 0. Valid status IDs are 6 (Submit) or 9 (Save). Received: " + req.statusId());
+        }
+        visit.setStatusId(req.statusId() != null ? req.statusId().shortValue() : null);
         visit.setIsSubmitPatientVisitDetails(req.isSubmitPatientVisitDetails());
         
         // Treatment fields
@@ -1834,7 +1840,8 @@ public class VisitJpaService {
                     visit.setAllergyDtls(allergyDetails);
                     visit.setHabitsComments(habitDetails);
                     visit.setComment(comment);
-                    visit.setPaymentById(paymentById);
+                    // Set paymentById to null if it's 0 (0 doesn't exist in payment_type_master)
+                    visit.setPaymentById(paymentById != null && paymentById > 0 ? paymentById : null);
                     visit.setPaymentRemark(paymentRemark);
                     visit.setModifiedOn(now);
                     visit.setModifiedbyName(userId);
