@@ -1442,7 +1442,7 @@ public class VisitJpaService {
         visit.setOriginalDiscount(req.originalDiscount());
         
 		// Status and submission flags
-		visit.setStatusId(req.statusId() == null ? null : req.statusId().intValue());
+		visit.setStatusId(req.statusId());
         visit.setIsSubmitPatientVisitDetails(req.isSubmitPatientVisitDetails());
         
         // Treatment fields
@@ -1854,7 +1854,7 @@ public class VisitJpaService {
                 // Check if fees_collected > 0 (from stored procedure logic)
                 if (visit.getFeesCollected() != null && visit.getFeesCollected().compareTo(BigDecimal.ZERO) > 0) {
 					// Only update status and clinical fields
-					visit.setStatusId(statusId == null ? null : statusId.intValue());
+					visit.setStatusId(statusId);
                     visit.setBloodPressure(bloodPressure);
                     visit.setAllergyDtls(allergyDetails);
                     visit.setHabitsComments(habitDetails);
@@ -1864,7 +1864,7 @@ public class VisitJpaService {
 					// Update all fields including payment
                     visit.setFeesCollected(feesCollected);
                     visit.setFeesToCollect(feesToCollect);
-					visit.setStatusId(statusId == null ? null : statusId.intValue());
+					visit.setStatusId(statusId);
                     visit.setBloodPressure(bloodPressure);
                     visit.setAllergyDtls(allergyDetails);
                     visit.setHabitsComments(habitDetails);

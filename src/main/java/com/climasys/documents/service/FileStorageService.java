@@ -156,50 +156,17 @@ public class FileStorageService {
                     logger.info("Retry attempt {} for file deletion: {}", attempt, relativePath);
                 }
                 
-                // Try multiple path resolution strategies
-                Path[] possiblePaths = {
-                    // Strategy 1: Direct path
-                    Paths.get(relativePath),
-                    // Strategy 2: Relative to current working directory
-                    Paths.get(System.getProperty("user.dir"), relativePath),
-                    // Strategy 3: Relative to parent directory (for sb-climasys subdirectory structure)
-                    Paths.get(System.getProperty("user.dir"), "..", relativePath),
-                    // Strategy 4: Relative to upload folder path if configured
-                    uploadFolderPath != null ? Paths.get(uploadFolderPath, relativePath) : null,
-                    // Strategy 5: Remove leading slash if present
-                    relativePath.startsWith("/") ? Paths.get(relativePath.substring(1)) : null,
-                    // Strategy 6: Try with uploads prefix
-                    Paths.get("uploads", relativePath),
-                    // Strategy 7: Try with uploads prefix and remove leading slash
-                    relativePath.startsWith("/") ? Paths.get("uploads", relativePath.substring(1)) : null,
-                    // Strategy 8: Map patient-documents to PatientUploads (based on actual file structure)
-                    relativePath.replace("/patient-documents/", "PatientUploads/").startsWith("/") ? 
-                        Paths.get(relativePath.replace("/patient-documents/", "PatientUploads/").substring(1)) : 
-                        Paths.get(relativePath.replace("/patient-documents/", "PatientUploads/")),
-                    // Strategy 9: Map patient-documents to PatientUploads with leading slash removed
-                    relativePath.startsWith("/patient-documents/") ? 
-                        Paths.get(relativePath.replace("/patient-documents/", "PatientUploads/").substring(1)) : null,
-                    // Strategy 10: Parent directory + PatientUploads mapping
-                    relativePath.startsWith("/patient-documents/") ? 
-                        Paths.get(System.getProperty("user.dir"), "..", relativePath.replace("/patient-documents/", "PatientUploads/").substring(1)) : null
-                };
+                // Use the same path resolution logic as getFileBytes and fileExists
+                Path resolvedPath = resolveFilePath(relativePath);
                 
-                for (Path filePath : possiblePaths) {
-                    if (filePath == null) continue;
-                    
-                    if (detailedLogging) {
-                        logger.debug("Checking file existence at: {}", filePath.toAbsolutePath());
-                    }
-                    
-                    if (Files.exists(filePath)) {
-                        Files.delete(filePath);
-                        logger.info("File deleted successfully: {}", filePath.toAbsolutePath());
-                        return true;
-                    }
+                if (resolvedPath != null && Files.exists(resolvedPath)) {
+                    Files.delete(resolvedPath);
+                    logger.info("File deleted successfully: {}", resolvedPath.toAbsolutePath());
+                    return true;
                 }
                 
                 if (attempt == retryAttempts) {
-                    logger.warn("File not found for deletion at any of the attempted paths after {} attempts. Original path: {}", retryAttempts, relativePath);
+                    logger.warn("File not found for deletion after {} attempts. Original path: {}", retryAttempts, relativePath);
                 }
                 
             } catch (IOException e) {
@@ -228,8 +195,8 @@ public class FileStorageService {
      */
     public boolean fileExists(String relativePath) {
         try {
-            Path filePath = Paths.get(relativePath);
-            return Files.exists(filePath);
+            Path resolvedPath = resolveFilePath(relativePath);
+            return resolvedPath != null && Files.exists(resolvedPath);
         } catch (Exception e) {
             logger.error("Error checking file existence: {}", relativePath, e);
             return false;
@@ -244,13 +211,84 @@ public class FileStorageService {
      * @return File contents as byte array
      */
     public byte[] getFileBytes(String relativePath) throws IOException {
-        Path filePath = Paths.get(relativePath);
+        Path resolvedPath = resolveFilePath(relativePath);
         
-        if (!Files.exists(filePath)) {
-            throw new IOException("File not found: " + relativePath);
+        if (resolvedPath == null || !Files.exists(resolvedPath)) {
+            String resolvedStr = resolvedPath != null ? resolvedPath.toAbsolutePath().toString() : "null";
+            throw new IOException("File not found: " + relativePath + " (resolved to: " + resolvedStr + ")");
         }
 
-        return Files.readAllBytes(filePath);
+        logger.debug("Reading file from: {}", resolvedPath.toAbsolutePath());
+        return Files.readAllBytes(resolvedPath);
+    }
+
+    /**
+     * Resolve a relative path stored in the database to the actual file system path
+     * Maps database paths like /patient-documents/ to actual folder structure like PatientUploads/
+     *
+     * @param relativePath Relative path from database
+     * @return Resolved Path object, or null if not found
+     */
+    private Path resolveFilePath(String relativePath) {
+        if (relativePath == null || relativePath.isEmpty()) {
+            return null;
+        }
+        
+        // Try multiple path resolution strategies (same as deleteFile)
+        Path[] possiblePaths = {
+            // Strategy 1: Direct path
+            Paths.get(relativePath),
+            // Strategy 2: Relative to current working directory
+            Paths.get(System.getProperty("user.dir"), relativePath),
+            // Strategy 3: Relative to parent directory (for sb-climasys subdirectory structure)
+            Paths.get(System.getProperty("user.dir"), "..", relativePath),
+            // Strategy 4: Relative to upload folder path if configured
+            uploadFolderPath != null ? Paths.get(uploadFolderPath, relativePath) : null,
+            // Strategy 5: Remove leading slash if present
+            relativePath.startsWith("/") ? Paths.get(relativePath.substring(1)) : null,
+            // Strategy 6: Try with uploads prefix
+            Paths.get("uploads", relativePath),
+            // Strategy 7: Try with uploads prefix and remove leading slash
+            relativePath.startsWith("/") ? Paths.get("uploads", relativePath.substring(1)) : null,
+            // Strategy 8: Map patient-documents to PatientUploads (based on actual file structure)
+            relativePath.contains("/patient-documents/") ? 
+                Paths.get(relativePath.replace("/patient-documents/", "PatientUploads/").replaceFirst("^/", "")) : null,
+            // Strategy 9: Map patient-documents to PatientUploads with absolute path from working dir
+            relativePath.startsWith("/patient-documents/") ? 
+                Paths.get(System.getProperty("user.dir"), relativePath.replace("/patient-documents/", "PatientUploads/").substring(1)) : null,
+            // Strategy 10: Use configured upload-patient path + relative path (remove /patient-documents/ prefix)
+            relativePath.startsWith("/patient-documents/") ? 
+                Paths.get(uploadPatient, relativePath.substring("/patient-documents/".length())) : null
+        };
+        
+        // Find the first path that exists
+        for (Path filePath : possiblePaths) {
+            if (filePath != null && Files.exists(filePath)) {
+                if (detailedLogging) {
+                    logger.debug("Resolved path {} to {}", relativePath, filePath.toAbsolutePath());
+                }
+                return filePath;
+            }
+        }
+        
+        // If no existing path found, return the most likely candidate (Strategy 10)
+        if (relativePath.startsWith("/patient-documents/")) {
+            // Most likely: map to PatientUploads using configured upload-patient path
+            Path mappedPath = Paths.get(uploadPatient, relativePath.substring("/patient-documents/".length()));
+            if (detailedLogging) {
+                logger.debug("No existing path found, using mapped path: {}", mappedPath.toAbsolutePath());
+            }
+            return mappedPath;
+        }
+        
+        // Fallback: relative to working directory without leading slash
+        Path fallbackPath = relativePath.startsWith("/") ? 
+            Paths.get(relativePath.substring(1)) : 
+            Paths.get(relativePath);
+        if (detailedLogging) {
+            logger.debug("Using fallback path: {}", fallbackPath.toAbsolutePath());
+        }
+        return fallbackPath;
     }
 
     /**
