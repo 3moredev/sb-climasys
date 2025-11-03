@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.web.bind.annotation.*;
@@ -576,16 +578,33 @@ public class VisitController {
     @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> saveComprehensiveVisitDataJpa(@RequestBody ComprehensiveVisitDataRequest req) {
         try {
+            logger.info("Received comprehensive-save-jpa request - PatientId: {}, DoctorId: {}, ClinicId: {}, ShiftId: {}, VisitNo: {}, StatusId: {}", 
+                req.patientId(), req.doctorId(), req.clinicId(), req.shiftId(), req.patientVisitNo(), req.statusId());
+            
             // Validate and parse required fields
             if (req.shiftId() == null || req.shiftId().trim().isEmpty()) {
+                logger.warn("Shift ID validation failed - received: {}", req.shiftId());
                 throw new IllegalArgumentException("Shift ID is required");
             }
-            Short shiftId = Short.parseShort(req.shiftId());
+            Short shiftId;
+            try {
+                shiftId = Short.parseShort(req.shiftId());
+            } catch (NumberFormatException e) {
+                logger.warn("Shift ID parse error - received: {}", req.shiftId());
+                throw new IllegalArgumentException("Shift ID must be a valid number: " + req.shiftId());
+            }
             
             if (req.patientVisitNo() == null || req.patientVisitNo().trim().isEmpty()) {
+                logger.warn("Patient Visit No validation failed - received: {}", req.patientVisitNo());
                 throw new IllegalArgumentException("Patient Visit Number is required");
             }
-            Integer patientVisitNo = Integer.parseInt(req.patientVisitNo());
+            Integer patientVisitNo;
+            try {
+                patientVisitNo = Integer.parseInt(req.patientVisitNo());
+            } catch (NumberFormatException e) {
+                logger.warn("Patient Visit No parse error - received: {}", req.patientVisitNo());
+                throw new IllegalArgumentException("Patient Visit Number must be a valid number: " + req.patientVisitNo());
+            }
             
             if (req.visitDate() == null || req.visitDate().trim().isEmpty()) {
                 throw new IllegalArgumentException("Visit Date is required");
@@ -796,7 +815,7 @@ public class VisitController {
                         int deletedCount = jdbcTemplate.update(delDiag, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
                         logger.info("Deleted {} existing diagnosis records", deletedCount);
 
-                        LocalDateTime now = LocalDateTime.now();
+                        LocalDateTime now = timezoneUtils.convertTargetTimezoneToUtc(LocalDateTime.now());
                         String insDiag = "INSERT INTO visit_diagnosis (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, short_description, desease_description, delete_flag, created_on, createdby_name, modified_on, modifiedby_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
                         int insertedCount = 0;
                         for (Map<String, Object> row : req.diagnosisRows()) {
@@ -854,36 +873,94 @@ public class VisitController {
 
                     // Medicines
                     if (req.medicineRows() != null && !req.medicineRows().isEmpty()) {
+                        logger.info("Processing {} medicine rows for patient: {}, visit: {}", req.medicineRows().size(), patientId, patientVisitNoVal);
+                        
+                        // CRITICAL: Query the EXACT visit_date from patient_visits to ensure foreign key matches
+                        String getExactVisitDateSql = "SELECT visit_date FROM patient_visits WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND delete_flag = false ORDER BY visit_date DESC LIMIT 1";
+                        List<java.sql.Timestamp> exactVisitDates = jdbcTemplate.queryForList(getExactVisitDateSql, java.sql.Timestamp.class, 
+                            patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal);
+                        
+                        java.sql.Timestamp exactVisitDateTs = visitDateTs;
+                        if (exactVisitDates != null && !exactVisitDates.isEmpty() && exactVisitDates.get(0) != null) {
+                            exactVisitDateTs = exactVisitDates.get(0);
+                            logger.info("Retrieved EXACT visit_date from patient_visits for medicines: {} (was using: {})", exactVisitDateTs, visitDateTs);
+                        } else {
+                            logger.error("CRITICAL: Could not find saved visit in patient_visits! Cannot insert medicines without parent record.");
+                            result.put("medicineInsertError", "Parent visit not found in patient_visits table");
+                            throw new IllegalStateException("Parent visit not found: Cannot insert medicines without matching patient_visits record");
+                        }
+                        
                         String delMed = "DELETE FROM visit_medicine WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
-                        jdbcTemplate.update(delMed, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, visitDateTs);
+                        int deletedCount = jdbcTemplate.update(delMed, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
+                        logger.info("Deleted {} existing medicine records", deletedCount);
 
-                        LocalDateTime now = LocalDateTime.now();
+                        LocalDateTime now = timezoneUtils.convertTargetTimezoneToUtc(LocalDateTime.now());
                         String insMed = "INSERT INTO visit_medicine (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, short_description, medicine_description, morning, afternoon, night, no_of_days, instruction, delete_flag, created_on, createdby_name, modified_on, modifiedby_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                        int insertedCount = 0;
                         for (Map<String, Object> row : req.medicineRows()) {
                             String shortDesc = String.valueOf(row.getOrDefault("short_description", ""));
                             String medicine = String.valueOf(row.getOrDefault("medicine", ""));
                             Integer morning = toIntSafe(row.get("morning"));
                             Integer afternoon = toIntSafe(row.get("afternoon"));
                             Integer night = toIntSafe(row.get("night"));
-                            String days = String.valueOf(row.getOrDefault("days", ""));
+                            Integer noOfDays = toIntSafe(row.get("days"));
                             String instruction = String.valueOf(row.getOrDefault("instruction", ""));
                             if ((shortDesc != null && !shortDesc.isEmpty()) || (medicine != null && !medicine.isEmpty())) {
-                                jdbcTemplate.update(insMed, patientId, visitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
-                                        shortDesc, medicine, morning, afternoon, night, days, instruction, false, now, userIdVal, now, userIdVal);
+                                try {
+                                    logger.info("Attempting INSERT with exact visit_date: {} for medicine: {}", exactVisitDateTs, medicine);
+                                    int rowsAffected = jdbcTemplate.update(insMed, patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
+                                            shortDesc, medicine, morning, afternoon, night, noOfDays, instruction, false, now, userIdVal, now, userIdVal);
+                                    if (rowsAffected > 0) {
+                                        insertedCount++;
+                                        logger.info("✓ Successfully inserted medicine row {}: short_description='{}', medicine_description='{}', visitDate={}", 
+                                            insertedCount, shortDesc, medicine, exactVisitDateTs);
+                                    } else {
+                                        logger.error("✗ INSERT statement returned 0 rows affected for medicine: short_description='{}', medicine_description='{}'", shortDesc, medicine);
+                                        result.put("medicineInsertWarning", "Some medicine rows may not have been inserted");
+                                    }
+                                } catch (Exception insertEx) {
+                                    logger.error("✗ Error inserting medicine row: short_description='{}', medicine_description='{}', error: {}", 
+                                        shortDesc, medicine, insertEx.getMessage(), insertEx);
+                                    logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
+                                        patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
+                                    throw insertEx; // Re-throw to be caught by outer catch
+                                }
+                            } else {
+                                logger.warn("Skipping empty medicine row: {}", row);
                             }
                         }
+                        logger.info("Successfully inserted {} medicine records for patient: {}, visit: {}", insertedCount, patientId, patientVisitNoVal);
+                        result.put("medicineInsertedCount", insertedCount);
                     }
 
                     // Prescriptions
                     if (req.prescriptionRows() != null && !req.prescriptionRows().isEmpty()) {
+                        logger.info("Processing {} prescription rows for patient: {}, visit: {}", req.prescriptionRows().size(), patientId, patientVisitNoVal);
+                        
+                        // CRITICAL: Query the EXACT visit_date from patient_visits to ensure foreign key matches
+                        String getExactVisitDateSql = "SELECT visit_date FROM patient_visits WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND delete_flag = false ORDER BY visit_date DESC LIMIT 1";
+                        List<java.sql.Timestamp> exactVisitDates = jdbcTemplate.queryForList(getExactVisitDateSql, java.sql.Timestamp.class, 
+                            patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal);
+                        
+                        java.sql.Timestamp exactVisitDateTs = visitDateTs;
+                        if (exactVisitDates != null && !exactVisitDates.isEmpty() && exactVisitDates.get(0) != null) {
+                            exactVisitDateTs = exactVisitDates.get(0);
+                            logger.info("Retrieved EXACT visit_date from patient_visits for prescriptions: {} (was using: {})", exactVisitDateTs, visitDateTs);
+                        } else {
+                            logger.error("CRITICAL: Could not find saved visit in patient_visits! Cannot insert prescriptions without parent record.");
+                            result.put("prescriptionInsertError", "Parent visit not found in patient_visits table");
+                            throw new IllegalStateException("Parent visit not found: Cannot insert prescriptions without matching patient_visits record");
+                        }
+                        
                         String delPres = "DELETE FROM visit_prescription_overwrite WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
-                        jdbcTemplate.update(delPres, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, visitDateTs);
+                        int deletedCount = jdbcTemplate.update(delPres, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
+                        logger.info("Deleted {} existing prescription records", deletedCount);
 
                         // Get next sequence ID for prescriptions
                         Integer nextSequenceId = 1;
                         try {
                             String maxSeqSql = "SELECT COALESCE(MAX(sequence_id), 0) + 1 FROM visit_prescription_overwrite WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
-                            List<Integer> maxSeq = jdbcTemplate.queryForList(maxSeqSql, Integer.class, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, visitDateTs);
+                            List<Integer> maxSeq = jdbcTemplate.queryForList(maxSeqSql, Integer.class, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
                             if (maxSeq != null && !maxSeq.isEmpty() && maxSeq.get(0) != null) {
                                 nextSequenceId = maxSeq.get(0);
                             }
@@ -892,7 +969,8 @@ public class VisitController {
                         }
 
                         String insPres = "INSERT INTO visit_prescription_overwrite (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, brand_name, medicine_name, catsub_description, cat_short_name, marketed_by, morning, afternoon, night, no_of_days, instruction, sequence_id, created_on, createdby_name, modified_on, modifiedby_name, delete_indicator) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                        LocalDateTime now = LocalDateTime.now();
+                        LocalDateTime now = timezoneUtils.convertTargetTimezoneToUtc(LocalDateTime.now());
+                        int insertedCount = 0;
                         for (Map<String, Object> row : req.prescriptionRows()) {
                             String prescription = String.valueOf(row.getOrDefault("prescription", ""));
                             String b = String.valueOf(row.getOrDefault("b", ""));
@@ -919,26 +997,87 @@ public class VisitController {
                                 Double night = parseDoubleSafe(d.isEmpty() ? "0" : d);
                                 Integer noOfDays = toIntSafe(days.isEmpty() ? null : days);
 
-                                jdbcTemplate.update(insPres, patientId, visitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
-                                        brandName, medicineName, "", "", "", morning, afternoon, night, noOfDays, instruction,
-                                        nextSequenceId++, now, userIdVal, now, userIdVal, 0);
+                                try {
+                                    logger.info("Attempting INSERT with exact visit_date: {} for prescription: {}", exactVisitDateTs, prescription);
+                                    int rowsAffected = jdbcTemplate.update(insPres, patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
+                                            brandName, medicineName, "", "", "", morning, afternoon, night, noOfDays, instruction,
+                                            nextSequenceId++, now, userIdVal, now, userIdVal, false);
+                                    if (rowsAffected > 0) {
+                                        insertedCount++;
+                                        logger.info("✓ Successfully inserted prescription row {}: brand_name='{}', medicine_name='{}', visitDate={}", 
+                                            insertedCount, brandName, medicineName, exactVisitDateTs);
+                                    } else {
+                                        logger.error("✗ INSERT statement returned 0 rows affected for prescription: brand_name='{}', medicine_name='{}'", brandName, medicineName);
+                                        result.put("prescriptionInsertWarning", "Some prescription rows may not have been inserted");
+                                    }
+                                } catch (Exception insertEx) {
+                                    logger.error("✗ Error inserting prescription row: brand_name='{}', medicine_name='{}', error: {}", 
+                                        brandName, medicineName, insertEx.getMessage(), insertEx);
+                                    logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
+                                        patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
+                                    throw insertEx; // Re-throw to be caught by outer catch
+                                }
+                            } else {
+                                logger.warn("Skipping empty prescription row: {}", row);
                             }
                         }
+                        logger.info("Successfully inserted {} prescription records for patient: {}, visit: {}", insertedCount, patientId, patientVisitNoVal);
+                        result.put("prescriptionInsertedCount", insertedCount);
                     }
 
                     // Investigations
                     if (req.investigationRows() != null && !req.investigationRows().isEmpty()) {
+                        logger.info("Processing {} investigation rows for patient: {}, visit: {}", req.investigationRows().size(), patientId, patientVisitNoVal);
+                        
+                        // CRITICAL: Query the EXACT visit_date from patient_visits to ensure foreign key matches
+                        String getExactVisitDateSql = "SELECT visit_date FROM patient_visits WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND delete_flag = false ORDER BY visit_date DESC LIMIT 1";
+                        List<java.sql.Timestamp> exactVisitDates = jdbcTemplate.queryForList(getExactVisitDateSql, java.sql.Timestamp.class, 
+                            patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal);
+                        
+                        java.sql.Timestamp exactVisitDateTs = visitDateTs;
+                        if (exactVisitDates != null && !exactVisitDates.isEmpty() && exactVisitDates.get(0) != null) {
+                            exactVisitDateTs = exactVisitDates.get(0);
+                            logger.info("Retrieved EXACT visit_date from patient_visits for investigations: {} (was using: {})", exactVisitDateTs, visitDateTs);
+                        } else {
+                            logger.error("CRITICAL: Could not find saved visit in patient_visits! Cannot insert investigations without parent record.");
+                            result.put("investigationInsertError", "Parent visit not found in patient_visits table");
+                            throw new IllegalStateException("Parent visit not found: Cannot insert investigations without matching patient_visits record");
+                        }
+                        
                         String delInv = "DELETE FROM patient_visit_labtestasked WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
-                        jdbcTemplate.update(delInv, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, visitDateTs);
+                        int deletedCount = jdbcTemplate.update(delInv, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
+                        logger.info("Deleted {} existing investigation records", deletedCount);
 
                         String insInv = "INSERT INTO patient_visit_labtestasked (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, lab_test_description, delete_flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                        int insertedCount = 0;
                         for (Map<String, Object> row : req.investigationRows()) {
                             String investigation = String.valueOf(row.getOrDefault("investigation", ""));
                             if (investigation != null && !investigation.isEmpty()) {
-                                jdbcTemplate.update(insInv, patientId, visitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
-                                        investigation, false);
+                                try {
+                                    logger.info("Attempting INSERT with exact visit_date: {} for investigation: {}", exactVisitDateTs, investigation);
+                                    int rowsAffected = jdbcTemplate.update(insInv, patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
+                                            investigation, false);
+                                    if (rowsAffected > 0) {
+                                        insertedCount++;
+                                        logger.info("✓ Successfully inserted investigation row {}: lab_test_description='{}', visitDate={}", 
+                                            insertedCount, investigation, exactVisitDateTs);
+                                    } else {
+                                        logger.error("✗ INSERT statement returned 0 rows affected for investigation: lab_test_description='{}'", investigation);
+                                        result.put("investigationInsertWarning", "Some investigation rows may not have been inserted");
+                                    }
+                                } catch (Exception insertEx) {
+                                    logger.error("✗ Error inserting investigation row: lab_test_description='{}', error: {}", 
+                                        investigation, insertEx.getMessage(), insertEx);
+                                    logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
+                                        patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
+                                    throw insertEx; // Re-throw to be caught by outer catch
+                                }
+                            } else {
+                                logger.warn("Skipping empty investigation row: {}", row);
                             }
                         }
+                        logger.info("Successfully inserted {} investigation records for patient: {}, visit: {}", insertedCount, patientId, patientVisitNoVal);
+                        result.put("investigationInsertedCount", insertedCount);
                     }
                 } catch (Exception persistEx) {
                     logger.error("Failed to persist treatment arrays (diagnosis/medicines/prescriptions/investigations) for patient: {}, visit: {}", 
@@ -2125,4 +2264,56 @@ public class VisitController {
         Integer patientVisitNo,
         String userId
     ) {}
+    
+    /**
+     * Exception handler for JSON parsing errors
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<?> handleJsonParseError(HttpMessageNotReadableException ex) {
+        logger.error("JSON parsing error: {}", ex.getMessage(), ex);
+        Map<String, Object> error = new HashMap<>();
+        error.put("success", false);
+        error.put("error", "Invalid JSON format. Please check your request body.");
+        error.put("errorType", "JSON_PARSING_ERROR");
+        
+        String details = ex.getMessage() != null ? ex.getMessage() : "Unknown JSON parsing error";
+        error.put("details", details);
+        
+        // Add helpful hints for common JSON errors
+        String hints = "";
+        if (details.contains("trailing comma") || details.contains("Unexpected character") && details.contains("}")) {
+            hints = "Common issue: Trailing comma before closing brace '}' or bracket ']'. Remove any comma before the last item in arrays or objects.";
+        } else if (details.contains("Unterminated string")) {
+            hints = "Common issue: Missing closing quote in a string value.";
+        } else if (details.contains("Expected a value")) {
+            hints = "Common issue: Missing value after a colon ':' or trailing comma.";
+        }
+        if (!hints.isEmpty()) {
+            error.put("hint", hints);
+        }
+        
+        return ResponseEntity.badRequest().body(error);
+    }
+    
+    /**
+     * Exception handler for validation errors (from @NotBlank, etc.)
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<?> handleValidationError(MethodArgumentNotValidException ex) {
+        logger.error("Validation error: {}", ex.getMessage(), ex);
+        Map<String, Object> error = new HashMap<>();
+        error.put("success", false);
+        error.put("error", "Validation failed. Please check your request data.");
+        error.put("errorType", "VALIDATION_ERROR");
+        
+        // Collect all field errors
+        Map<String, String> fieldErrors = new HashMap<>();
+        ex.getBindingResult().getFieldErrors().forEach(fieldError -> {
+            fieldErrors.put(fieldError.getField(), fieldError.getDefaultMessage());
+        });
+        error.put("fieldErrors", fieldErrors);
+        error.put("details", ex.getMessage());
+        
+        return ResponseEntity.badRequest().body(error);
+    }
 }
