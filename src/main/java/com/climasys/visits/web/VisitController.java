@@ -1919,4 +1919,83 @@ public class VisitController {
             return ResponseEntity.internalServerError().body(errorResponse);
         }
     }
+    
+    /**
+     * Update addendum for a patient visit
+     * This endpoint replicates the functionality of USP_Update_Addendum stored procedure
+     * 
+     * @param request - Request body containing addendum text and visit identifiers
+     * @return ResponseEntity with success status and message
+     */
+    @PostMapping("/update-addendum")
+    public ResponseEntity<?> updateAddendum(@RequestBody UpdateAddendumRequest request) {
+        try {
+            logger.info("Received update addendum request for patient: {}, visitNo: {}", 
+                request.patientId(), request.patientVisitNo());
+            
+            // Validate required fields
+            if (request.patientId() == null || request.patientId().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Patient ID is required"
+                ));
+            }
+            if (request.visitDate() == null || request.visitDate().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Visit date is required"
+                ));
+            }
+            if (request.patientVisitNo() == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "Patient visit number is required"
+                ));
+            }
+            if (request.userId() == null || request.userId().trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", "User ID is required"
+                ));
+            }
+            
+            // Create service request
+            VisitJpaService.UpdateAddendumRequest serviceRequest = 
+                new VisitJpaService.UpdateAddendumRequest(
+                    request.addendum(),
+                    request.visitDate(),
+                    request.patientId(),
+                    request.patientVisitNo(),
+                    request.userId()
+                );
+            
+            // Call service method
+            Map<String, Object> result = visitJpaService.updateAddendum(serviceRequest);
+            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            logger.error("Error in updateAddendum endpoint", e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Error processing request: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+    
+    /**
+     * Request record for updating addendum
+     * Matches the USP_Update_Addendum stored procedure parameters
+     */
+    public record UpdateAddendumRequest(
+        String addendum,
+        String visitDate,
+        String patientId,
+        Integer patientVisitNo,
+        String userId
+    ) {}
 }

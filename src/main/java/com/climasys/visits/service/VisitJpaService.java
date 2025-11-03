@@ -1534,6 +1534,18 @@ public class VisitJpaService {
     }
     
     /**
+     * Request record for updating addendum
+     * Matches the USP_Update_Addendum stored procedure parameters
+     */
+    public record UpdateAddendumRequest(
+        String addendum,
+        String visitDate,
+        String patientId,
+        Integer patientVisitNo,
+        String userId
+    ) {}
+    
+    /**
      * Request record for comprehensive visit data
      */
     public record ComprehensiveVisitRequest(
@@ -1861,6 +1873,101 @@ public class VisitJpaService {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", "Error saving medicine overwrite data: " + e.getMessage());
+            return response;
+        }
+    }
+    
+    /**
+     * Update addendum for a patient visit
+     * This method replicates the functionality of USP_Update_Addendum stored procedure
+     * 
+     * @param request - Request containing addendum text and visit identifiers
+     * @return Map with success status and message
+     */
+    @Transactional
+    public Map<String, Object> updateAddendum(UpdateAddendumRequest request) {
+        logger.info("Updating addendum for patient: {}, visitNo: {}, visitDate: {}", 
+            request.patientId(), request.patientVisitNo(), request.visitDate());
+        
+        try {
+            // Validate required fields
+            if (request.patientId() == null || request.patientId().trim().isEmpty()) {
+                throw new IllegalArgumentException("Patient ID is required");
+            }
+            if (request.visitDate() == null || request.visitDate().trim().isEmpty()) {
+                throw new IllegalArgumentException("Visit date is required");
+            }
+            if (request.patientVisitNo() == null) {
+                throw new IllegalArgumentException("Patient visit number is required");
+            }
+            if (request.userId() == null || request.userId().trim().isEmpty()) {
+                throw new IllegalArgumentException("User ID is required");
+            }
+            
+            // Parse visit date
+            java.time.LocalDate visitDate;
+            try {
+                visitDate = java.time.LocalDate.parse(request.visitDate());
+            } catch (Exception e) {
+                // Try parsing with time and extract date
+                try {
+                    LocalDateTime dateTime = LocalDateTime.parse(request.visitDate());
+                    visitDate = dateTime.toLocalDate();
+                } catch (Exception e2) {
+                    throw new IllegalArgumentException("Invalid visit date format. Expected format: yyyy-MM-dd or yyyy-MM-ddTHH:mm:ss", e);
+                }
+            }
+            
+            // Find visits matching the criteria (same as stored procedure)
+            List<PatientVisit> visits = patientVisitRepository.findByPatientIdAndVisitDateAndPatientVisitNo(
+                request.patientId(),
+                visitDate,
+                request.patientVisitNo()
+            );
+            
+            if (visits.isEmpty()) {
+                logger.warn("No visit found for patient: {}, visitNo: {}, visitDate: {}", 
+                    request.patientId(), request.patientVisitNo(), visitDate);
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", false);
+                response.put("message", "Visit not found for the specified criteria");
+                return response;
+            }
+            
+            // Update all matching visits (stored procedure updates all matching rows)
+            LocalDateTime now = LocalDateTime.now();
+            int updatedCount = 0;
+            for (PatientVisit visit : visits) {
+                visit.setAddendum(request.addendum() != null ? request.addendum() : "");
+                visit.setModifiedOn(now);
+                visit.setModifiedbyName(request.userId());
+                patientVisitRepository.save(visit);
+                updatedCount++;
+            }
+            
+            logger.info("Successfully updated addendum for {} visit(s)", updatedCount);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Addendum updated successfully");
+            response.put("updatedCount", updatedCount);
+            response.put("patientId", request.patientId());
+            response.put("patientVisitNo", request.patientVisitNo());
+            response.put("visitDate", visitDate.toString());
+            
+            return response;
+            
+        } catch (IllegalArgumentException e) {
+            logger.error("Validation error updating addendum: {}", e.getMessage());
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Validation error: " + e.getMessage());
+            return response;
+        } catch (Exception e) {
+            logger.error("Error updating addendum", e);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Error updating addendum: " + e.getMessage());
             return response;
         }
     }

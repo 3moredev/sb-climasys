@@ -480,5 +480,21 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
         @Param("doctorId") String doctorId,
         @Param("clinicId") String clinicId
     );
+    
+    /**
+     * Find visits by patient ID, visit date (date only), and patient visit number
+     * This matches the USP_Update_Addendum stored procedure logic
+     * which uses Visit_Date (date), Patient_ID, and Patient_Visit_No
+     */
+    @Query("SELECT pv FROM PatientVisit pv WHERE pv.patientId = :patientId " +
+           "AND CAST(pv.visitDate AS date) = :visitDate " +
+           "AND pv.patientVisitNo = :patientVisitNo " +
+           "AND pv.deleteFlag = false " +
+           "ORDER BY pv.visitDate DESC")
+    List<PatientVisit> findByPatientIdAndVisitDateAndPatientVisitNo(
+        @Param("patientId") String patientId,
+        @Param("visitDate") java.time.LocalDate visitDate,
+        @Param("patientVisitNo") Integer patientVisitNo
+    );
 }
 
