@@ -1441,12 +1441,8 @@ public class VisitJpaService {
         visit.setDiscount(req.discount());
         visit.setOriginalDiscount(req.originalDiscount());
         
-        // Status and submission flags
-        // Validate statusId is not 0 (0 doesn't exist in status_ref table)
-        if (req.statusId() != null && req.statusId() <= 0) {
-            throw new IllegalArgumentException("Status ID must be greater than 0. Valid status IDs are 6 (Submit) or 9 (Save). Received: " + req.statusId());
-        }
-        visit.setStatusId(req.statusId() != null ? req.statusId().shortValue() : null);
+		// Status and submission flags
+		visit.setStatusId(req.statusId() == null ? null : req.statusId().intValue());
         visit.setIsSubmitPatientVisitDetails(req.isSubmitPatientVisitDetails());
         
         // Treatment fields
@@ -1702,6 +1698,27 @@ public class VisitJpaService {
         
         try {
             LocalDateTime now = LocalDateTime.now();
+			// Resolve the exact visitDate from DB to satisfy FK constraints on overwrite tables
+			LocalDateTime effectiveVisitDate = visitDate;
+			PatientVisitId initialVisitId = new PatientVisitId(doctorId, clinicId, shiftId, patientId, patientVisitNo, visitDate);
+			Optional<PatientVisit> parentVisitOpt = patientVisitRepository.findById(initialVisitId);
+			if (parentVisitOpt.isPresent()) {
+				effectiveVisitDate = parentVisitOpt.get().getVisitDate();
+			} else {
+				// Fallback: match by same keys but only by date part (ignore time discrepancies)
+				Optional<PatientVisit> parentByDateOpt = patientVisitRepository.findByCompositeKeyAndDate(
+					patientId, doctorId, clinicId, shiftId, patientVisitNo, visitDate.toLocalDate()
+				);
+				if (parentByDateOpt.isPresent()) {
+					effectiveVisitDate = parentByDateOpt.get().getVisitDate();
+					parentVisitOpt = parentByDateOpt;
+				} else {
+					Map<String, Object> response = new HashMap<>();
+					response.put("success", false);
+					response.put("message", "Parent visit not found for given identifiers; cannot save overwrite data.");
+					return response;
+				}
+			}
             
             // 1. MERGE medicine data into visit_medicine_overwrite
             if (medicineRows != null) {
@@ -1710,15 +1727,15 @@ public class VisitJpaService {
                     
                     if (Boolean.TRUE.equals(deleteIndicator)) {
                         // Delete the record
-                        VisitMedicineOverwriteId id = new VisitMedicineOverwriteId(
-                            visitDate, patientVisitNo, shiftId, clinicId, doctorId, patientId,
+					VisitMedicineOverwriteId id = new VisitMedicineOverwriteId(
+						effectiveVisitDate, patientVisitNo, shiftId, clinicId, doctorId, patientId,
                             toStringSafe(row.get("short_description"), "")
                         );
                         visitMedicineOverwriteRepository.deleteById(id);
                     } else {
                         // MERGE (insert or update)
-                        VisitMedicineOverwriteId id = new VisitMedicineOverwriteId(
-                            visitDate, patientVisitNo, shiftId, clinicId, doctorId, patientId,
+					VisitMedicineOverwriteId id = new VisitMedicineOverwriteId(
+						effectiveVisitDate, patientVisitNo, shiftId, clinicId, doctorId, patientId,
                             toStringSafe(row.get("short_description"), "")
                         );
                         
@@ -1731,7 +1748,7 @@ public class VisitJpaService {
                         } else {
                             // INSERT
                             medicine = new VisitMedicineOverwrite();
-                            medicine.setVisitDate(visitDate);
+						medicine.setVisitDate(effectiveVisitDate);
                             medicine.setPatientVisitNo(patientVisitNo);
                             medicine.setShiftId(shiftId);
                             medicine.setClinicId(clinicId);
@@ -1769,8 +1786,8 @@ public class VisitJpaService {
                     
                     if (Boolean.TRUE.equals(deleteIndicator)) {
                         // Delete the record
-                        MedicineId id = new MedicineId(
-                            doctorId, clinicId, shiftId, patientId, patientVisitNo, visitDate,
+					MedicineId id = new MedicineId(
+						doctorId, clinicId, shiftId, patientId, patientVisitNo, effectiveVisitDate,
                             toStringSafe(row.get("brand_name"), ""),
                             toStringSafe(row.get("medicine_name"), ""),
                             toStringSafe(row.get("catsub_description"), ""),
@@ -1779,8 +1796,8 @@ public class VisitJpaService {
                         visitPrescriptionOverwriteRepository.deleteById(id);
                     } else {
                         // MERGE (insert or update)
-                        MedicineId id = new MedicineId(
-                            doctorId, clinicId, shiftId, patientId, patientVisitNo, visitDate,
+					MedicineId id = new MedicineId(
+						doctorId, clinicId, shiftId, patientId, patientVisitNo, effectiveVisitDate,
                             toStringSafe(row.get("brand_name"), ""),
                             toStringSafe(row.get("medicine_name"), ""),
                             toStringSafe(row.get("catsub_description"), ""),
@@ -1800,8 +1817,8 @@ public class VisitJpaService {
                             prescription.setClinicId(clinicId);
                             prescription.setShiftId(shiftId);
                             prescription.setPatientId(patientId);
-                            prescription.setPatientVisitNo(patientVisitNo);
-                            prescription.setVisitDate(visitDate);
+						prescription.setPatientVisitNo(patientVisitNo);
+						prescription.setVisitDate(effectiveVisitDate);
                             prescription.setBrandName(toStringSafe(row.get("brand_name"), ""));
                             prescription.setMedicineName(toStringSafe(row.get("medicine_name"), ""));
                             prescription.setCatsubDescription(toStringSafe(row.get("catsub_description"), ""));
@@ -1827,27 +1844,27 @@ public class VisitJpaService {
                 }
             }
             
-            // 3. Update patient_visits table
-            PatientVisitId visitId = new PatientVisitId(doctorId, clinicId, shiftId, patientId, patientVisitNo, visitDate);
-            Optional<PatientVisit> visitOpt = patientVisitRepository.findById(visitId);
+		// 3. Update patient_visits table
+		PatientVisitId visitId = new PatientVisitId(doctorId, clinicId, shiftId, patientId, patientVisitNo, effectiveVisitDate);
+		Optional<PatientVisit> visitOpt = Optional.of(parentVisitOpt.get());
             
             if (visitOpt.isPresent()) {
                 PatientVisit visit = visitOpt.get();
                 
                 // Check if fees_collected > 0 (from stored procedure logic)
                 if (visit.getFeesCollected() != null && visit.getFeesCollected().compareTo(BigDecimal.ZERO) > 0) {
-                    // Only update status and clinical fields
-                    visit.setStatusId(statusId);
+					// Only update status and clinical fields
+					visit.setStatusId(statusId == null ? null : statusId.intValue());
                     visit.setBloodPressure(bloodPressure);
                     visit.setAllergyDtls(allergyDetails);
                     visit.setHabitsComments(habitDetails);
                     visit.setModifiedOn(now);
                     visit.setModifiedbyName(userId);
                 } else {
-                    // Update all fields including payment
+					// Update all fields including payment
                     visit.setFeesCollected(feesCollected);
                     visit.setFeesToCollect(feesToCollect);
-                    visit.setStatusId(statusId);
+					visit.setStatusId(statusId == null ? null : statusId.intValue());
                     visit.setBloodPressure(bloodPressure);
                     visit.setAllergyDtls(allergyDetails);
                     visit.setHabitsComments(habitDetails);
