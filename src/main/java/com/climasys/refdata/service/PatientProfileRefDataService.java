@@ -35,8 +35,7 @@ public class PatientProfileRefDataService {
         result.put("procedures", mapRows(refDataRepository.findProcedures(doctorId, clinicId),
                 "procedure_description", "priority_value"));
 
-        result.put("instructionGroups", mapRows(refDataRepository.findInstructionGroups(doctorId, clinicId),
-                "group_description", "priority_value"));
+        result.put("instructionGroups", mapInstructionGroups(refDataRepository.findInstructionGroups(doctorId, clinicId)));
 
         result.put("operatorComplaints", mapRows(refDataRepository.findOperatorComplaints(doctorId, clinicId),
                 "short_description", "complaint_description", "priority_value"));
@@ -84,6 +83,39 @@ public class PatientProfileRefDataService {
         result.put("success", true);
         
         return result;
+    }
+
+    /**
+     * Map instruction groups with their instructions
+     * Groups multiple instructions under each group_description
+     */
+    private List<Map<String, Object>> mapInstructionGroups(List<Object[]> rows) {
+        // Group by group_description to combine multiple instructions
+        Map<String, Map<String, Object>> grouped = new LinkedHashMap<>();
+        
+        for (Object[] r : rows) {
+            String groupDescription = (String) r[0];
+            Integer priorityValue = (Integer) r[1];
+            String instructionsDescription = (String) r[2];
+            
+            // Get or create the group map
+            Map<String, Object> groupMap = grouped.computeIfAbsent(groupDescription, k -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("group_description", groupDescription);
+                m.put("priority_value", priorityValue);
+                m.put("instructions_description", new ArrayList<String>());
+                return m;
+            });
+            
+            // Add instruction to the list if it exists
+            if (instructionsDescription != null) {
+                @SuppressWarnings("unchecked")
+                List<String> instructions = (List<String>) groupMap.get("instructions_description");
+                instructions.add(instructionsDescription);
+            }
+        }
+        
+        return new ArrayList<>(grouped.values());
     }
 
     private List<Map<String, Object>> mapRows(List<Object[]> rows, String... keys) {

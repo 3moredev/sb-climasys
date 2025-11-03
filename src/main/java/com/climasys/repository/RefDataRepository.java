@@ -47,10 +47,11 @@ public interface RefDataRepository extends JpaRepository<com.climasys.entity.Pat
             + "ORDER BY dpm.priority_value, dpm.procedure_description ASC", nativeQuery = true)
     List<Object[]> findProcedures(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
 
-    @Query(value = "SELECT group_description, priority_value\n"
-            + "FROM instructions_group_master\n"
-            + "WHERE doctor_id = :doctorId AND clinic_id = :clinicId\n"
-            + "ORDER BY priority_value, group_description ASC", nativeQuery = true)
+    @Query(value = "SELECT igm.group_description, igm.priority_value, gi.instructions_description\n"
+            + "FROM instructions_group_master igm\n"
+            + "LEFT JOIN group_instructions gi ON igm.doctor_id = gi.doctor_id AND igm.group_description = gi.group_description\n"
+            + "WHERE igm.doctor_id = :doctorId AND igm.clinic_id = :clinicId\n"
+            + "ORDER BY igm.priority_value, igm.group_description ASC, COALESCE(gi.sequence_no, 999999) ASC, gi.instructions_description ASC", nativeQuery = true)
     List<Object[]> findInstructionGroups(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
 
     @Query(value = "SELECT short_description, complaint_description, priority_value\n"
