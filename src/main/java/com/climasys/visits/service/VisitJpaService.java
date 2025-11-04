@@ -369,6 +369,7 @@ public class VisitJpaService {
             Short shiftId = visit.getShiftId();
             String doctorId = visit.getDoctorId();
             LocalDate visitDate = visit.getVisitDate().toLocalDate();
+            LocalDateTime exactVisitDate = visit.getVisitDate(); // Exact timestamp for instruction groups matching
             
             // Calculate PLR indicators
             String plrIndicators = calculatePlrIndicators(visit);
@@ -376,10 +377,17 @@ public class VisitJpaService {
             // Map visit to detailed response
             Map<String, Object> visitData = mapVisitToResponseWithPlr(visit, plrIndicators);
             
-            // Fetch associated table data
+            // Fetch associated table data (including instruction groups)
             Map<String, Object> associatedData = fetchAssociatedVisitData(
-                patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                patientId, shiftId, clinicId, doctorId, visitDate, exactVisitDate, patientVisitNo);
             visitData.putAll(associatedData);
+            
+            // Log instruction groups presence in visitData
+            Object instructionGroupsInData = visitData.get("instructionGroups");
+            Object instructionsInData = visitData.get("instructions");
+            logger.info("Instruction groups in visitData - instructionGroups: {}, instructions: {}", 
+                instructionGroupsInData != null ? (instructionGroupsInData instanceof List ? ((List<?>) instructionGroupsInData).size() : instructionGroupsInData) : "null",
+                instructionsInData != null ? (instructionsInData instanceof List ? ((List<?>) instructionsInData).size() : instructionsInData) : "null");
             
             // Build response structure matching the stored procedure format
             response.put("success", true);
@@ -403,11 +411,11 @@ public class VisitJpaService {
     }
     
     /**
-     * Fetch associated visit data (diagnosis, medicines, prescriptions, investigations, complaints, dressing, billing)
+     * Fetch associated visit data (diagnosis, medicines, prescriptions, investigations, complaints, dressing, billing, instruction groups)
      */
     private Map<String, Object> fetchAssociatedVisitData(
             String patientId, Short shiftId, String clinicId, String doctorId, 
-            LocalDate visitDate, Integer patientVisitNo) {
+            LocalDate visitDate, LocalDateTime exactVisitDate, Integer patientVisitNo) {
         Map<String, Object> associatedData = new HashMap<>();
         
         try {
@@ -557,8 +565,169 @@ public class VisitJpaService {
             }
             associatedData.put("billing", billing);
             
-            logger.debug("Fetched associated data: complaints={}, diagnosis={}, medicines={}, prescriptions={}, investigations={}, billing={}", 
-                complaints.size(), diagnosis.size(), medicines.size(), prescriptions.size(), labTests.size(), billing.size());
+            // 8) Instruction Groups - Fetch from visit_groups_instructions table (matching stored procedure logic)
+            // Use date-only comparison (DATE(visit_date) = DATE(?)) to match stored procedure behavior
+            // and be consistent with how other tables (complaints, diagnosis, medicines, etc.) are fetched
+            try {
+                logger.info("Fetching instruction groups for visit: patientId={}, shiftId={}, clinicId={}, doctorId={}, visitDate={}, patientVisitNo={}", 
+                    patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                
+                // First, try date-only comparison (primary method)
+                String instructionGroupsSql = """
+                    SELECT doctor_id, clinic_id, shift_id, patient_id, patient_visit_no, visit_date,
+                           group_description, instructions_description, sequence_no,
+                           created_on, createdby_name, modified_on, modifiedby_name
+                    FROM visit_groups_instructions vgi
+                    WHERE vgi.patient_id = ? AND vgi.shift_id = ? AND vgi.clinic_id = ? AND vgi.doctor_id = ?
+                      AND DATE(vgi.visit_date) = DATE(?::date) AND vgi.patient_visit_no = ?
+                    ORDER BY vgi.group_description ASC, vgi.sequence_no ASC
+                """;
+                List<Map<String, Object>> instructionGroupsRaw = jdbcTemplate.queryForList(
+                    instructionGroupsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                
+                logger.info("Found {} raw instruction group records from database using date-only comparison", instructionGroupsRaw.size());
+                
+                // If no results found with date-only comparison, try exact timestamp matching
+                // (instruction groups are saved with exact visit_date timestamp from patient_visits)
+                if (instructionGroupsRaw.isEmpty() && exactVisitDate != null) {
+                    logger.info("Trying exact timestamp match for instruction groups: {}", exactVisitDate);
+                    String exactMatchSql = """
+                        SELECT doctor_id, clinic_id, shift_id, patient_id, patient_visit_no, visit_date,
+                               group_description, instructions_description, sequence_no,
+                               created_on, createdby_name, modified_on, modifiedby_name
+                        FROM visit_groups_instructions vgi
+                        WHERE vgi.patient_id = ? AND vgi.shift_id = ? AND vgi.clinic_id = ? AND vgi.doctor_id = ?
+                          AND vgi.visit_date = ? AND vgi.patient_visit_no = ?
+                        ORDER BY vgi.group_description ASC, vgi.sequence_no ASC
+                    """;
+                    instructionGroupsRaw = jdbcTemplate.queryForList(
+                        exactMatchSql, patientId, shiftId, clinicId, doctorId, exactVisitDate, patientVisitNo);
+                    logger.info("Found {} raw instruction group records using exact timestamp match", instructionGroupsRaw.size());
+                }
+                
+                // If still no results, try to find any records for this composite key to help debug
+                if (instructionGroupsRaw.isEmpty()) {
+                    String debugSql = """
+                        SELECT COUNT(*) as count, 
+                               MIN(visit_date) as min_date, 
+                               MAX(visit_date) as max_date,
+                               STRING_AGG(DISTINCT visit_date::text, ', ') as all_dates
+                        FROM visit_groups_instructions vgi
+                        WHERE vgi.patient_id = ? AND vgi.shift_id = ? AND vgi.clinic_id = ? 
+                          AND vgi.doctor_id = ? AND vgi.patient_visit_no = ?
+                    """;
+                    List<Map<String, Object>> debugInfo = jdbcTemplate.queryForList(
+                        debugSql, patientId, shiftId, clinicId, doctorId, patientVisitNo);
+                    if (!debugInfo.isEmpty() && debugInfo.get(0).get("count") != null) {
+                        Long count = ((Number) debugInfo.get(0).get("count")).longValue();
+                        if (count > 0) {
+                            logger.warn("Found {} instruction group records for composite key but date mismatch! Query date: {}, Exact date: {}, DB dates: {}", 
+                                count, visitDate, exactVisitDate, debugInfo.get(0).get("all_dates"));
+                        } else {
+                            logger.info("No instruction group records found in database for this composite key");
+                        }
+                    }
+                }
+                
+                // Convert to VisitGroupsInstructions-like structure for processing
+                // Deduplicate based on composite key: group_description + instructions_description + sequence_no
+                java.util.Set<String> seenInstructions = new java.util.LinkedHashSet<>();
+                List<Map<String, Object>> visitInstructionsList = new ArrayList<>();
+                
+                for (Map<String, Object> row : instructionGroupsRaw) {
+                    String groupDesc = row.get("group_description") != null ? ((String) row.get("group_description")).trim() : "";
+                    String instructionDesc = row.get("instructions_description") != null ? ((String) row.get("instructions_description")).trim() : "";
+                    Object seqNoObj = row.get("sequence_no");
+                    Integer sequenceNo = seqNoObj != null ? 
+                        (seqNoObj instanceof Integer ? (Integer) seqNoObj : Integer.valueOf(seqNoObj.toString())) : 0;
+                    
+                    // Create a unique key for deduplication: group_description + instructions_description + sequence_no
+                    String uniqueKey = (groupDesc + "|||" + instructionDesc + "|||" + sequenceNo).toLowerCase();
+                    
+                    // Only add if we haven't seen this exact instruction before
+                    if (!seenInstructions.contains(uniqueKey)) {
+                        seenInstructions.add(uniqueKey);
+                        visitInstructionsList.add(row);
+                    } else {
+                        logger.debug("Skipping duplicate instruction: group={}, instruction={}, sequence={}", 
+                            groupDesc, instructionDesc, sequenceNo);
+                    }
+                }
+                
+                if (instructionGroupsRaw.size() > visitInstructionsList.size()) {
+                    logger.info("Processed {} unique instruction records (removed {} duplicates from {} total)", 
+                        visitInstructionsList.size(), instructionGroupsRaw.size() - visitInstructionsList.size(), instructionGroupsRaw.size());
+                }
+                
+                if (!visitInstructionsList.isEmpty()) {
+                    // Format instruction groups according to stored procedure logic
+                    // Group by group_description and create separate lists for groups and instructions
+                    List<Map<String, Object>> instructionGroups = new ArrayList<>();
+                    List<Map<String, Object>> instructionDetails = new ArrayList<>();
+                    
+                    // Track unique groups
+                    java.util.Set<String> uniqueGroups = new java.util.HashSet<>();
+                    
+                    for (Map<String, Object> instructionRow : visitInstructionsList) {
+                        String groupDesc = (String) instructionRow.get("group_description");
+                        String instructionDesc = (String) instructionRow.get("instructions_description");
+                        Object seqNoObj = instructionRow.get("sequence_no");
+                        Integer sequenceNo = seqNoObj != null ? 
+                            (seqNoObj instanceof Integer ? (Integer) seqNoObj : Integer.valueOf(seqNoObj.toString())) : 0;
+                        
+                        // Add to groups list if not already added
+                        if (!uniqueGroups.contains(groupDesc)) {
+                            Map<String, Object> group = new HashMap<>();
+                            group.put("group_description", groupDesc);
+                            group.put("Group_Description", groupDesc); // Alias for compatibility
+                            instructionGroups.add(group);
+                            uniqueGroups.add(groupDesc);
+                        }
+                        
+                        // Add to instructions list (already deduplicated above)
+                        Map<String, Object> instructionDetail = new HashMap<>();
+                        instructionDetail.put("group_description", groupDesc);
+                        instructionDetail.put("Group_Description", groupDesc); // Alias for compatibility
+                        instructionDetail.put("instructions_description", instructionDesc);
+                        instructionDetail.put("Instructions_Description", instructionDesc); // Alias for compatibility
+                        instructionDetail.put("sequence_no", sequenceNo);
+                        instructionDetail.put("Sequence_No", sequenceNo); // Alias for compatibility
+                        instructionDetails.add(instructionDetail);
+                    }
+                    
+                    // Store both for backward compatibility with stored procedure format
+                    // instructionGroups: unique group descriptions (Tables[2] in stored procedure)
+                    // instructions: all instruction details with group info (Tables[3] in stored procedure)
+                    associatedData.put("instructionGroups", instructionGroups);
+                    associatedData.put("instructions", instructionDetails);
+                    
+                    // Also create a nested structure for easier frontend consumption
+                    // Group instructions by group_description
+                    Map<String, List<Map<String, Object>>> instructionsByGroup = new HashMap<>();
+                    for (Map<String, Object> instructionDetail : instructionDetails) {
+                        String groupDesc = (String) instructionDetail.get("group_description");
+                        instructionsByGroup.computeIfAbsent(groupDesc, k -> new ArrayList<>()).add(instructionDetail);
+                    }
+                    associatedData.put("instructionGroupsWithDetails", instructionsByGroup);
+                    
+                    logger.info("Successfully fetched {} instruction groups with {} instruction details for visit", 
+                        instructionGroups.size(), instructionDetails.size());
+                } else {
+                    logger.info("No instruction groups found for visit: patientId={}, visitNo={}", patientId, patientVisitNo);
+                    associatedData.put("instructionGroups", new ArrayList<>());
+                    associatedData.put("instructions", new ArrayList<>());
+                }
+            } catch (Exception instructionEx) {
+                logger.error("Error fetching instruction groups for visit: patientId={}, visitNo={}, error: {}", 
+                    patientId, patientVisitNo, instructionEx.getMessage(), instructionEx);
+                // Don't fail the whole request, just log the error
+                associatedData.put("instructionGroups", new ArrayList<>());
+                associatedData.put("instructions", new ArrayList<>());
+            }
+            
+            logger.debug("Fetched associated data: complaints={}, diagnosis={}, medicines={}, prescriptions={}, investigations={}, billing={}, instructionGroups={}", 
+                complaints.size(), diagnosis.size(), medicines.size(), prescriptions.size(), labTests.size(), billing.size(),
+                associatedData.get("instructionGroups") != null ? ((List<?>) associatedData.get("instructionGroups")).size() : 0);
             
         } catch (Exception e) {
             logger.error("Error fetching associated visit data: {}", e.getMessage(), e);

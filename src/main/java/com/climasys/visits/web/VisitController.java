@@ -1163,10 +1163,33 @@ public class VisitController {
                         logger.info("Processing {} instruction group items for patient: {}, visit: {}", req.instructionGroups().size(), patientId, patientVisitNoVal);
                         
                         try {
+                            // CRITICAL: Query the EXACT visit_date from patient_visits to ensure foreign key matches
+                            // This ensures the visit_date used matches exactly what was saved in patient_visits table
+                            String getExactVisitDateSql = "SELECT visit_date FROM patient_visits WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND delete_flag = false ORDER BY visit_date DESC LIMIT 1";
+                            List<java.sql.Timestamp> exactVisitDates = jdbcTemplate.queryForList(getExactVisitDateSql, java.sql.Timestamp.class, 
+                                patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal);
+                            
+                            LocalDateTime exactVisitDateForInstructions = actualVisitDate;
+                            if (exactVisitDates != null && !exactVisitDates.isEmpty() && exactVisitDates.get(0) != null) {
+                                // CRITICAL: Convert Timestamp to LocalDateTime treating it as UTC
+                                // The Timestamp from PostgreSQL is in UTC, so we need to ensure LocalDateTime is also in UTC context
+                                java.sql.Timestamp timestamp = exactVisitDates.get(0);
+                                // Convert Timestamp to Instant (which is always UTC), then to LocalDateTime
+                                exactVisitDateForInstructions = timestamp.toInstant()
+                                    .atZone(java.time.ZoneId.of("UTC"))
+                                    .toLocalDateTime();
+                                logger.info("Retrieved EXACT visit_date from patient_visits for instruction groups: {} (Timestamp: {}, was using: {})", 
+                                    exactVisitDateForInstructions, timestamp, actualVisitDate);
+                            } else {
+                                logger.error("CRITICAL: Could not find saved visit in patient_visits! Cannot insert instruction groups without parent record.");
+                                result.put("instructionGroupsInsertError", "Parent visit not found in patient_visits table");
+                                throw new IllegalStateException("Parent visit not found: Cannot insert instruction groups without matching patient_visits record");
+                            }
+                            
                             // Delete existing instruction groups for this visit (matching stored procedure logic)
                             visitGroupsInstructionsRepository.deleteByVisit(
-                                doctorId, clinicId, shiftIdVal, patientId, patientVisitNoVal, actualVisitDate);
-                            logger.info("Deleted existing instruction groups for visit");
+                                doctorId, clinicId, shiftIdVal, patientId, patientVisitNoVal, exactVisitDateForInstructions);
+                            logger.info("Deleted existing instruction groups for visit using exact visit_date: {}", exactVisitDateForInstructions);
                             
                             // Create new instruction group entries
                             List<VisitGroupsInstructions> visitInstructions = new ArrayList<>();
@@ -1186,7 +1209,7 @@ public class VisitController {
                                     visitInstruction.setShiftId(shiftIdVal);
                                     visitInstruction.setPatientId(patientId);
                                     visitInstruction.setPatientVisitNo(patientVisitNoVal);
-                                    visitInstruction.setVisitDate(actualVisitDate);
+                                    visitInstruction.setVisitDate(exactVisitDateForInstructions);
                                     visitInstruction.setGroupDescription(groupDescription.trim());
                                     visitInstruction.setInstructionsDescription(instructionsDescription.trim());
                                     visitInstruction.setSequenceNo(sequenceNo != null ? sequenceNo : 0);
