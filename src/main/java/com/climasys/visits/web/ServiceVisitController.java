@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 
 @RestController
@@ -49,7 +52,22 @@ public class ServiceVisitController {
         logger.info("Received request for previous-visit-items with params: patientId={}, doctorId={}, clinicId={}, shiftId={}, visitNo={}, visitDate={}", 
             patientId, doctorId, clinicId, shiftId, visitNo, visitDate);
         try {
-            LocalDate vDate = LocalDate.parse(visitDate);
+            // Parse visitDate - handle both date-only (2025-10-23) and date-time (2025-10-23 00:00:00) formats
+            LocalDate vDate;
+            try {
+                // Try parsing as date-only first
+                vDate = LocalDate.parse(visitDate);
+            } catch (DateTimeParseException e) {
+                // If that fails, try parsing as date-time and extract the date part
+                try {
+                    LocalDateTime dateTime = LocalDateTime.parse(visitDate, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    vDate = dateTime.toLocalDate();
+                } catch (DateTimeParseException e2) {
+                    // Try ISO date-time format as fallback
+                    LocalDateTime dateTime = LocalDateTime.parse(visitDate);
+                    vDate = dateTime.toLocalDate();
+                }
+            }
             Map<String, Object> result = serviceVisitService.getPreviousServiceVisitLineItems(
                     patientId, doctorId, clinicId, shiftId, visitNo, vDate);
             boolean ok = Boolean.TRUE.equals(result.get("success"));

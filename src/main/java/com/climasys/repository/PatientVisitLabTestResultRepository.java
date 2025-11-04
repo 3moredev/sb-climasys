@@ -20,7 +20,7 @@ import java.util.List;
 public interface PatientVisitLabTestResultRepository extends JpaRepository<PatientVisitLabTestResult, PatientVisitLabTestResultId> {
 
     /**
-     * Find lab test results for a specific patient visit
+     * Find lab test results for a specific patient visit (exact date match)
      */
     @Query("SELECT p FROM PatientVisitLabTestResult p WHERE " +
            "p.patientId = :patientId AND " +
@@ -31,6 +31,46 @@ public interface PatientVisitLabTestResultRepository extends JpaRepository<Patie
            "p.visitDate = :visitDate AND " +
            "p.deleteFlag = false")
     List<PatientVisitLabTestResult> findByPatientVisit(
+            @Param("patientId") String patientId,
+            @Param("patientVisitNo") Integer patientVisitNo,
+            @Param("shiftId") Short shiftId,
+            @Param("clinicId") String clinicId,
+            @Param("doctorId") String doctorId,
+            @Param("visitDate") LocalDateTime visitDate);
+    
+    /**
+     * Find lab test results for a patient visit by composite key without exact date match
+     * Used when lab test date may differ from visit date - returns results for the most recent visit matching the composite key
+     */
+    @Query("SELECT p FROM PatientVisitLabTestResult p WHERE " +
+           "p.patientId = :patientId AND " +
+           "p.patientVisitNo = :patientVisitNo AND " +
+           "p.shiftId = :shiftId AND " +
+           "p.clinicId = :clinicId AND " +
+           "p.doctorId = :doctorId AND " +
+           "p.deleteFlag = false " +
+           "ORDER BY p.visitDate DESC")
+    List<PatientVisitLabTestResult> findByPatientVisitWithoutExactDate(
+            @Param("patientId") String patientId,
+            @Param("patientVisitNo") Integer patientVisitNo,
+            @Param("shiftId") Short shiftId,
+            @Param("clinicId") String clinicId,
+            @Param("doctorId") String doctorId);
+    
+    /**
+     * Find lab test results using date comparison (native query for better date matching)
+     * Uses CAST to compare dates at the database level, which handles timestamp precision issues
+     */
+    @Query(value = "SELECT * FROM patient_visit_labtestresults p WHERE " +
+           "p.patient_id = :patientId AND " +
+           "p.patient_visit_no = :patientVisitNo AND " +
+           "p.shift_id = :shiftId AND " +
+           "p.clinic_id = :clinicId AND " +
+           "p.doctor_id = :doctorId AND " +
+           "CAST(p.visit_date AS DATE) = CAST(:visitDate AS DATE) AND " +
+           "p.delete_flag = false " +
+           "ORDER BY p.lab_test_description, p.parameter_name", nativeQuery = true)
+    List<PatientVisitLabTestResult> findByPatientVisitByDateOnly(
             @Param("patientId") String patientId,
             @Param("patientVisitNo") Integer patientVisitNo,
             @Param("shiftId") Short shiftId,

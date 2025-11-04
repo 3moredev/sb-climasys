@@ -106,12 +106,43 @@ public class LabTestResultController {
             @Parameter(description = "Doctor ID", required = true, example = "D001")
             @RequestParam String doctorId,
             
-            @Parameter(description = "Visit Date", required = true, example = "2024-01-15T10:30:00")
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime visitDate) {
+            @Parameter(description = "Visit Date (supports multiple formats: ISO date-time or YYYY-MM-DD HH:mm:ss). Will be used to find the actual visit and match exact visit date.", required = true, example = "2024-01-15T10:30:00")
+            @RequestParam String visitDateStr) {
         
         try {
-            List<PatientVisitLabTestResult> results = labTestResultService.getLabTestResults(
-                    patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate);
+            // Parse visit date - handle multiple formats
+            // Note: URL encoding may convert spaces to + signs, so we need to handle that
+            String visitDateStrDecoded = visitDateStr != null ? visitDateStr.replace("+", " ") : null;
+            LocalDateTime providedVisitDate = null;
+            if (visitDateStrDecoded != null && !visitDateStrDecoded.trim().isEmpty()) {
+                try {
+                    // Try ISO format first (YYYY-MM-DDTHH:mm:ss) - preferred format
+                    providedVisitDate = LocalDateTime.parse(visitDateStrDecoded);
+                } catch (Exception e1) {
+                    try {
+                        // Try with space separator converted to ISO (YYYY-MM-DD HH:mm:ss -> YYYY-MM-DDTHH:mm:ss)
+                        providedVisitDate = LocalDateTime.parse(visitDateStrDecoded.replace(" ", "T"));
+                    } catch (Exception e2) {
+                        try {
+                            // Try with custom format (YYYY-MM-DD HH:mm:ss)
+                            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+                            providedVisitDate = LocalDateTime.parse(visitDateStrDecoded, formatter);
+                        } catch (Exception e3) {
+                            return ResponseEntity.badRequest().body(
+                                LabTestResultResponse.error("Invalid visit date format. Expected: yyyy-MM-ddTHH:mm:ss or yyyy-MM-dd HH:mm:ss. Received: " + visitDateStr));
+                        }
+                    }
+                }
+            } else {
+                return ResponseEntity.badRequest().body(
+                    LabTestResultResponse.error("Visit date is required"));
+            }
+            
+            // CRITICAL: Find the actual visit first to get the exact visit date used when saving
+            // This ensures we match the exact visit date (which may differ from the provided date)
+            // and handles UTC conversion correctly
+            List<PatientVisitLabTestResult> results = labTestResultService.getLabTestResultsWithExactVisitDate(
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId, providedVisitDate);
             
             if (results.isEmpty()) {
                 return ResponseEntity.notFound().build();

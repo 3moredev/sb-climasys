@@ -195,6 +195,25 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
     );
     
     /**
+     * Find a patient visit by composite key without date (for lab test results where lab test date may differ from visit date)
+     * Returns the most recent visit matching the composite key
+     */
+    @Query("SELECT pv FROM PatientVisit pv WHERE pv.patientId = :patientId " +
+           "AND pv.doctorId = :doctorId " +
+           "AND pv.clinicId = :clinicId " +
+           "AND pv.shiftId = :shiftId " +
+           "AND pv.patientVisitNo = :patientVisitNo " +
+           "AND pv.deleteFlag = false " +
+           "ORDER BY pv.visitDate DESC")
+    Optional<PatientVisit> findFirstByCompositeKeyWithoutDate(
+        @Param("patientId") String patientId,
+        @Param("doctorId") String doctorId,
+        @Param("clinicId") String clinicId,
+        @Param("shiftId") Short shiftId,
+        @Param("patientVisitNo") Integer patientVisitNo
+    );
+    
+    /**
      * Find patient visits with comprehensive data including prescriptions, complaints, diagnosis
      * This replicates the USP_Get_Patient_Previous_Visits stored procedure logic
      */

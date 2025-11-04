@@ -13,7 +13,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -64,33 +63,32 @@ public class LabTestResultService {
             // Process each test parameter
             for (LabTestResultRequest.LabTestParameterData testData : request.testReportData()) {
                 try {
-                    LocalDateTime paramVisitDate = parseVisitDate(testData.visitDate());
-                    
-                    // Check if the patient visit exists before attempting to insert lab test results
-                    // Compare by date only to avoid time mismatches
-                    LocalDate paramVisitLocalDate = paramVisitDate.toLocalDate();
+                    // Note: Lab test date can be different from visit date
+                    // Find the visit using composite key (excluding date) to get the actual visit date for FK
                     var visitOptional = patientVisitRepository
-                            .findByCompositeKeyAndDate(
+                            .findFirstByCompositeKeyWithoutDate(
                                     testData.patientId(),
                                     testData.doctorId(),
                                     testData.clinicId(),
                                     testData.shiftId(),
-                                    testData.patientVisitNo(),
-                                    paramVisitLocalDate
+                                    testData.patientVisitNo()
                             );
                     boolean visitExists = visitOptional.isPresent();
                     
                     if (!visitExists) {
-                        String errorMsg = String.format("Patient visit does not exist for patient: %s, visit: %s, doctor: %s, clinic: %s, shift: %s, date: %s", 
+                        String errorMsg = String.format("Patient visit does not exist for patient: %s, visit: %s, doctor: %s, clinic: %s, shift: %s", 
                                 testData.patientId(), testData.patientVisitNo(), testData.doctorId(), 
-                                testData.clinicId(), testData.shiftId(), paramVisitDate);
+                                testData.clinicId(), testData.shiftId());
                         errors.add(errorMsg);
                         logger.error(errorMsg);
                         continue; // Skip this test parameter and continue with the next one
                     }
                     
-                    // Use the exact visitDate from patient_visits to satisfy FK (avoid time mismatches)
+                    // Use the exact visitDate from patient_visits to satisfy FK constraint
+                    // The lab test date (testData.visitDate()) may be different, but we must use the visit's actual date for FK
                     LocalDateTime exactVisitDate = visitOptional.get().getVisitDate();
+                    logger.debug("Lab test date from request: {}, Using actual visit date for FK: {}", 
+                            testData.visitDate(), exactVisitDate);
 
                     // Create composite key
                     PatientVisitLabTestResultId id = new PatientVisitLabTestResultId(
@@ -188,13 +186,144 @@ public class LabTestResultService {
     
     /**
      * Get lab test results for a specific patient visit
+     * First finds the actual visit to get the exact visit date used when saving,
+     * then queries lab test results using that exact date for correct appointment matching
+     */
+    public List<PatientVisitLabTestResult> getLabTestResultsWithExactVisitDate(String patientId, Integer patientVisitNo, 
+                                                           Short shiftId, String clinicId, String doctorId, 
+                                                           LocalDateTime providedVisitDate) {
+        logger.info("Getting lab test results for patient: {}, visit: {}, provided date: {}", 
+                patientId, patientVisitNo, providedVisitDate);
+        
+        // Strategy: Match stored procedure USP_Get_PreviousLabReports behavior
+        // The stored procedure uses DATE comparison (date-only, ignoring time)
+        // So we should prioritize date-only comparison over exact timestamp matching
+        
+        // First attempt: Try date-only comparison with provided date (matches stored procedure logic)
+        // This is the primary method as it matches USP_Get_PreviousLabReports behavior
+        List<PatientVisitLabTestResult> results = repository.findByPatientVisitByDateOnly(
+                patientId, patientVisitNo, shiftId, clinicId, doctorId, providedVisitDate);
+        
+        if (!results.isEmpty()) {
+            logger.info("Found {} lab test results using date-only comparison (provided date): {}", results.size(), providedVisitDate);
+            return results;
+        }
+        
+        logger.debug("No results found with provided date (date-only), trying to find visit and use its exact date...");
+        
+        // Second attempt: Find the actual visit to get the exact visit date used when saving
+        var visitOptional = patientVisitRepository.findFirstByCompositeKeyWithoutDate(
+                patientId, doctorId, clinicId, shiftId, patientVisitNo);
+        
+        if (!visitOptional.isPresent()) {
+            logger.warn("Patient visit not found for patient: {}, visit: {}, doctor: {}, clinic: {}, shift: {}", 
+                    patientId, patientVisitNo, doctorId, clinicId, shiftId);
+            
+            // Last attempt: Try without exact date to see if any results exist
+            List<PatientVisitLabTestResult> allResults = repository.findByPatientVisitWithoutExactDate(
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId);
+            if (!allResults.isEmpty()) {
+                logger.error("Visit not found but {} lab test results exist for this composite key! This indicates data inconsistency.", 
+                        allResults.size());
+                logger.error("Results found with dates: {}", allResults.stream()
+                        .map(r -> r.getVisitDate().toString())
+                        .distinct()
+                        .collect(java.util.stream.Collectors.joining(", ")));
+            }
+            return new ArrayList<>();
+        }
+        
+        // Get the exact visit date from the visit record (this is what was used when saving)
+        LocalDateTime exactVisitDate = visitOptional.get().getVisitDate();
+        logger.info("Found visit with exact date: {} (provided date: {})", exactVisitDate, providedVisitDate);
+        
+        // Third attempt: Try date-only comparison with exact visit date (matches stored procedure)
+        results = repository.findByPatientVisitByDateOnly(
+                patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate);
+        
+        if (!results.isEmpty()) {
+            logger.info("Found {} lab test results using date-only comparison (exact visit date): {}", results.size(), exactVisitDate);
+            return results;
+        }
+        
+        // Fourth attempt: Try exact timestamp match with exact visit date (for precision)
+        logger.debug("No results found with date-only comparison, trying exact timestamp match...");
+        results = repository.findByPatientVisit(
+                patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate);
+        
+        if (!results.isEmpty()) {
+            logger.info("Found {} lab test results using exact timestamp match: {}", results.size(), exactVisitDate);
+            return results;
+        }
+        
+        // Debug: If still no results found, check what dates exist in the database
+        logger.warn("No results found with any date matching method. Checking database directly...");
+        logger.warn("Query parameters - patientId: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}, visitDate: {}", 
+                patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate);
+        
+        // Try to find any results for this composite key without date restriction
+        List<PatientVisitLabTestResult> allResults = repository.findByPatientVisitWithoutExactDate(
+                patientId, patientVisitNo, shiftId, clinicId, doctorId);
+        logger.warn("Found {} total lab test results for this composite key (without date restriction): {}", 
+                allResults.size(), allResults.stream()
+                    .map(r -> "date=" + r.getVisitDate() + ", test=" + r.getLabTestDescription())
+                    .collect(java.util.stream.Collectors.joining("; ")));
+        
+        if (!allResults.isEmpty()) {
+            LocalDateTime firstResultDate = allResults.get(0).getVisitDate();
+            long diffMs = java.time.Duration.between(exactVisitDate, firstResultDate).toMillis();
+            logger.error("DATE MISMATCH DETECTED! Visit date: {}, First result date: {}, Difference: {}ms", 
+                    exactVisitDate, firstResultDate, diffMs);
+            
+            // Last resort: Try date-only comparison with result's date
+            results = repository.findByPatientVisitByDateOnly(
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId, firstResultDate);
+            if (!results.isEmpty()) {
+                logger.info("Found {} results using date-only comparison with result date: {}", results.size(), firstResultDate);
+            }
+        }
+        
+        return results;
+    }
+    
+    /**
+     * Get lab test results for a specific patient visit (legacy method - kept for backward compatibility)
+     * Note: This method tries exact date match first, then falls back to composite key lookup
+     * For correct appointment matching, use getLabTestResultsWithExactVisitDate instead
      */
     public List<PatientVisitLabTestResult> getLabTestResults(String patientId, Integer patientVisitNo, 
                                                            Short shiftId, String clinicId, String doctorId, 
                                                            LocalDateTime visitDate) {
-        logger.info("Getting lab test results for patient: {}, visit: {}", patientId, patientVisitNo);
+        logger.info("Getting lab test results for patient: {}, visit: {}, date: {}", patientId, patientVisitNo, visitDate);
         
-        return repository.findByPatientVisit(patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate);
+        // First try exact date match
+        List<PatientVisitLabTestResult> results = repository.findByPatientVisit(
+                patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate);
+        
+        // If not found with exact date, try without exact date (fallback - not recommended for production)
+        if (results.isEmpty()) {
+            logger.debug("No results found with exact date match, trying without exact date for patient: {}, visit: {}", 
+                    patientId, patientVisitNo);
+            results = repository.findByPatientVisitWithoutExactDate(
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId);
+            if (!results.isEmpty()) {
+                logger.info("Found {} lab test results using composite key (without exact date match)", results.size());
+            }
+        }
+        
+        return results;
+    }
+    
+    /**
+     * Get lab test results by composite key without exact date (for cases where date may differ)
+     */
+    public List<PatientVisitLabTestResult> getLabTestResultsByCompositeKey(String patientId, Integer patientVisitNo, 
+                                                           Short shiftId, String clinicId, String doctorId) {
+        logger.info("Getting lab test results by composite key (without exact date) for patient: {}, visit: {}", 
+                patientId, patientVisitNo);
+        
+        return repository.findByPatientVisitWithoutExactDate(
+                patientId, patientVisitNo, shiftId, clinicId, doctorId);
     }
     
     /**

@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 import com.climasys.utils.TimezoneUtils;
 import com.climasys.utils.CorsUtils;
 import com.climasys.visits.service.VisitJpaService;
+import com.climasys.repository.VisitGroupsInstructionsRepository;
+import com.climasys.entity.VisitGroupsInstructions;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -21,6 +23,9 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
 
 @RestController
 @RequestMapping("/api/visits")
@@ -38,6 +43,9 @@ public class VisitController {
     
     @Autowired
     private VisitJpaService visitJpaService;
+    
+    @Autowired
+    private VisitGroupsInstructionsRepository visitGroupsInstructionsRepository;
 
     public VisitController(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -93,6 +101,39 @@ public class VisitController {
         } catch (Exception e) {
             return 0.0;
         }
+    }
+    
+    /**
+     * Helper method to extract string value from Map with multiple possible key names
+     */
+    private String getStringValue(Map<String, Object> map, String... keys) {
+        for (String key : keys) {
+            Object value = map.get(key);
+            if (value != null) {
+                return value.toString().trim();
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Helper method to extract integer value from Map with multiple possible key names
+     */
+    private Integer getIntegerValue(Map<String, Object> map, String... keys) {
+        for (String key : keys) {
+            Object value = map.get(key);
+            if (value != null) {
+                if (value instanceof Number) {
+                    return ((Number) value).intValue();
+                }
+                try {
+                    return Integer.parseInt(value.toString().trim());
+                } catch (NumberFormatException e) {
+                    // Try next key
+                }
+            }
+        }
+        return null;
     }
     
     
@@ -283,8 +324,15 @@ public class VisitController {
             // Status and User
             Integer statusId,
             String userId,
-            Boolean isSubmitPatientVisitDetails
-            ,
+            Boolean isSubmitPatientVisitDetails,
+            
+            // Instructions
+            String instructions,
+            
+            // Instruction Groups (structured instruction data)
+            // Each item should have: groupDescription, instructionsDescription, sequenceNo
+            java.util.List<Map<String, Object>> instructionGroups,
+            
             // Optional treatment arrays
             java.util.List<Map<String, Object>> diagnosisRows,
             java.util.List<Map<String, Object>> medicineRows,
@@ -556,8 +604,10 @@ public class VisitController {
             parameters.put("p_var_Insert_PatientInstructionData", null);
             parameters.put("p_var_Insert_AbdominalData", null);
             
+            // Instructions field - use value from request or default to empty string
+            parameters.put("p_var_Instructions", req.instructions() != null ? req.instructions() : "");
+            
             // Additional required fields with defaults
-            parameters.put("p_var_Instructions", "");
             parameters.put("p_var_offline_reason", "");
             parameters.put("p_bit_offlineflag", false);
 
@@ -609,7 +659,11 @@ public class VisitController {
             if (req.visitDate() == null || req.visitDate().trim().isEmpty()) {
                 throw new IllegalArgumentException("Visit Date is required");
             }
-            LocalDateTime visitDate = parseDateTime(req.visitDate());
+            // Parse the visit date and convert to UTC (database stores in UTC)
+            LocalDateTime parsedVisitDate = parseDateTime(req.visitDate());
+            LocalDateTime visitDate = timezoneUtils.convertTargetTimezoneToUtc(parsedVisitDate);
+            logger.info("Visit date conversion - Original: {} (target timezone), Converted to UTC: {}", 
+                parsedVisitDate, visitDate);
             
             // Validate other required fields
             if (req.patientId() == null || req.patientId().trim().isEmpty()) {
@@ -729,8 +783,8 @@ public class VisitController {
                     req.referralContact(),
                     req.referralEmail(),
                     
-                    // Additional fields (not in current request, set to defaults)
-                    "", // instructions
+                    // Additional fields - use value from request or default to empty string
+                    req.instructions() != null ? req.instructions() : "", // instructions
                     "", // offlineReason
                     false // offlineFlag
                 );
@@ -1044,15 +1098,25 @@ public class VisitController {
                             throw new IllegalStateException("Parent visit not found: Cannot insert investigations without matching patient_visits record");
                         }
                         
-                        String delInv = "DELETE FROM patient_visit_labtestasked WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
+                        // Delete existing investigation records for this visit (using exact visit_date to match foreign key)
+                        String delInv = "DELETE FROM patient_visit_labtestasked WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND visit_date = ?";
                         int deletedCount = jdbcTemplate.update(delInv, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
                         logger.info("Deleted {} existing investigation records", deletedCount);
 
                         String insInv = "INSERT INTO patient_visit_labtestasked (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, lab_test_description, delete_flag) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
                         int insertedCount = 0;
+                        Set<String> processedInvestigations = new HashSet<>(); // Track duplicates
+                        
                         for (Map<String, Object> row : req.investigationRows()) {
-                            String investigation = String.valueOf(row.getOrDefault("investigation", ""));
-                            if (investigation != null && !investigation.isEmpty()) {
+                            String investigation = String.valueOf(row.getOrDefault("investigation", "")).trim();
+                            if (investigation != null && !investigation.isEmpty() && !investigation.equals("null")) {
+                                // Check for duplicate lab tests in the same request to avoid primary key violations
+                                if (processedInvestigations.contains(investigation)) {
+                                    logger.warn("Skipping duplicate investigation in request: '{}'", investigation);
+                                    continue;
+                                }
+                                processedInvestigations.add(investigation);
+                                
                                 try {
                                     logger.info("Attempting INSERT with exact visit_date: {} for investigation: {}", exactVisitDateTs, investigation);
                                     int rowsAffected = jdbcTemplate.update(insInv, patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId,
@@ -1066,11 +1130,25 @@ public class VisitController {
                                         result.put("investigationInsertWarning", "Some investigation rows may not have been inserted");
                                     }
                                 } catch (Exception insertEx) {
-                                    logger.error("✗ Error inserting investigation row: lab_test_description='{}', error: {}", 
-                                        investigation, insertEx.getMessage(), insertEx);
-                                    logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
-                                        patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
-                                    throw insertEx; // Re-throw to be caught by outer catch
+                                    String errorMsg = insertEx.getMessage();
+                                    // Check for specific error types
+                                    if (errorMsg != null && errorMsg.contains("duplicate key")) {
+                                        logger.warn("Duplicate key violation for investigation '{}' - may already exist in database, skipping", investigation);
+                                        // Don't fail the entire request, just log and continue
+                                    } else if (errorMsg != null && errorMsg.contains("foreign key constraint")) {
+                                        logger.error("✗ Foreign key constraint violation for investigation: '{}' - visit may not exist with exact visit_date: {}", 
+                                            investigation, exactVisitDateTs);
+                                        logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
+                                            patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
+                                        result.put("investigationInsertError", "Foreign key constraint violation - visit may not exist");
+                                        throw insertEx; // Re-throw foreign key errors as they indicate a serious issue
+                                    } else {
+                                        logger.error("✗ Error inserting investigation row: lab_test_description='{}', error: {}", 
+                                            investigation, insertEx.getMessage(), insertEx);
+                                        logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
+                                            patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
+                                        throw insertEx; // Re-throw to be caught by outer catch
+                                    }
                                 }
                             } else {
                                 logger.warn("Skipping empty investigation row: {}", row);
@@ -1079,8 +1157,65 @@ public class VisitController {
                         logger.info("Successfully inserted {} investigation records for patient: {}, visit: {}", insertedCount, patientId, patientVisitNoVal);
                         result.put("investigationInsertedCount", insertedCount);
                     }
+                    
+                    // Instruction Groups - Save using JPA (matching stored procedure logic)
+                    if (req.instructionGroups() != null && !req.instructionGroups().isEmpty()) {
+                        logger.info("Processing {} instruction group items for patient: {}, visit: {}", req.instructionGroups().size(), patientId, patientVisitNoVal);
+                        
+                        try {
+                            // Delete existing instruction groups for this visit (matching stored procedure logic)
+                            visitGroupsInstructionsRepository.deleteByVisit(
+                                doctorId, clinicId, shiftIdVal, patientId, patientVisitNoVal, actualVisitDate);
+                            logger.info("Deleted existing instruction groups for visit");
+                            
+                            // Create new instruction group entries
+                            List<VisitGroupsInstructions> visitInstructions = new ArrayList<>();
+                            LocalDateTime now = LocalDateTime.now();
+                            
+                            for (Map<String, Object> instructionItem : req.instructionGroups()) {
+                                String groupDescription = getStringValue(instructionItem, "groupDescription", "group_description");
+                                String instructionsDescription = getStringValue(instructionItem, "instructionsDescription", "instructions_description");
+                                Integer sequenceNo = getIntegerValue(instructionItem, "sequenceNo", "sequence_no");
+                                
+                                if (groupDescription != null && !groupDescription.trim().isEmpty() &&
+                                    instructionsDescription != null && !instructionsDescription.trim().isEmpty()) {
+                                    
+                                    VisitGroupsInstructions visitInstruction = new VisitGroupsInstructions();
+                                    visitInstruction.setDoctorId(doctorId);
+                                    visitInstruction.setClinicId(clinicId);
+                                    visitInstruction.setShiftId(shiftIdVal);
+                                    visitInstruction.setPatientId(patientId);
+                                    visitInstruction.setPatientVisitNo(patientVisitNoVal);
+                                    visitInstruction.setVisitDate(actualVisitDate);
+                                    visitInstruction.setGroupDescription(groupDescription.trim());
+                                    visitInstruction.setInstructionsDescription(instructionsDescription.trim());
+                                    visitInstruction.setSequenceNo(sequenceNo != null ? sequenceNo : 0);
+                                    visitInstruction.setCreatedByName(userIdVal);
+                                    visitInstruction.setCreatedOn(now);
+                                    
+                                    visitInstructions.add(visitInstruction);
+                                } else {
+                                    logger.warn("Skipping instruction group item with missing required fields: {}", instructionItem);
+                                }
+                            }
+                            
+                            if (!visitInstructions.isEmpty()) {
+                                visitGroupsInstructionsRepository.saveAll(visitInstructions);
+                                logger.info("Successfully saved {} instruction group items for patient: {}, visit: {}", 
+                                    visitInstructions.size(), patientId, patientVisitNoVal);
+                                result.put("instructionGroupsInsertedCount", visitInstructions.size());
+                            } else {
+                                logger.warn("No valid instruction group items to save after filtering");
+                            }
+                        } catch (Exception instructionEx) {
+                            logger.error("Failed to save instruction groups for patient: {}, visit: {}, error: {}", 
+                                patientId, patientVisitNoVal, instructionEx.getMessage(), instructionEx);
+                            result.put("instructionGroupsSaveError", true);
+                            result.put("instructionGroupsErrorMessage", instructionEx.getMessage());
+                        }
+                    }
                 } catch (Exception persistEx) {
-                    logger.error("Failed to persist treatment arrays (diagnosis/medicines/prescriptions/investigations) for patient: {}, visit: {}", 
+                    logger.error("Failed to persist treatment arrays (diagnosis/medicines/prescriptions/investigations/instructionGroups) for patient: {}, visit: {}", 
                         req.patientId(), patientVisitNoVal, persistEx);
                     logger.error("Exception details - Message: {}, Cause: {}", 
                         persistEx.getMessage(), persistEx.getCause(), persistEx);
@@ -1118,6 +1253,10 @@ public class VisitController {
                 if (req.investigationRows() != null) {
                     result.put("investigationRows", req.investigationRows());
                     result.put("investigationRowsCount", req.investigationRows().size());
+                }
+                if (req.instructionGroups() != null) {
+                    result.put("instructionGroups", req.instructionGroups());
+                    result.put("instructionGroupsCount", req.instructionGroups().size());
                 }
                 
                 // Add key missing fields from the request
