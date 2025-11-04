@@ -956,7 +956,63 @@ public class VisitJpaService {
                     billingSql, patientId, clinicId, doctorId, patientVisitNo);
             }
 
-            // 9) UI field mapping from vitals and receipt
+            // 9) Instruction Groups
+            String instructionGroupsSql = """
+                SELECT doctor_id, clinic_id, shift_id, patient_id, patient_visit_no, visit_date,
+                       group_description, instructions_description, sequence_no,
+                       created_on, createdby_name, modified_on, modifiedby_name
+                FROM visit_groups_instructions vgi
+                WHERE vgi.patient_id = ? AND vgi.shift_id = ? AND vgi.clinic_id = ? AND vgi.doctor_id = ?
+                  AND DATE(vgi.visit_date) = ? AND vgi.patient_visit_no = ?
+                ORDER BY vgi.group_description ASC, vgi.sequence_no ASC
+            """;
+            List<Map<String, Object>> instructionGroupsRaw = jdbcTemplate.queryForList(
+                instructionGroupsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            
+            logger.info("Found {} raw instruction group records for master-lists", instructionGroupsRaw.size());
+            
+            // Deduplicate and format instruction groups
+            List<Map<String, Object>> instructionGroups = new ArrayList<>();
+            List<Map<String, Object>> instructionDetails = new ArrayList<>();
+            java.util.Set<String> uniqueGroups = new java.util.HashSet<>();
+            java.util.Set<String> seenInstructions = new java.util.LinkedHashSet<>();
+            
+            for (Map<String, Object> row : instructionGroupsRaw) {
+                String groupDesc = row.get("group_description") != null ? ((String) row.get("group_description")).trim() : "";
+                String instructionDesc = row.get("instructions_description") != null ? ((String) row.get("instructions_description")).trim() : "";
+                Object seqNoObj = row.get("sequence_no");
+                Integer sequenceNo = seqNoObj != null ? 
+                    (seqNoObj instanceof Integer ? (Integer) seqNoObj : Integer.valueOf(seqNoObj.toString())) : 0;
+                
+                // Create a unique key for deduplication
+                String uniqueKey = (groupDesc + "|||" + instructionDesc + "|||" + sequenceNo).toLowerCase();
+                
+                // Only process if we haven't seen this exact instruction before
+                if (!seenInstructions.contains(uniqueKey)) {
+                    seenInstructions.add(uniqueKey);
+                    
+                    // Add to groups list if not already added
+                    if (!uniqueGroups.contains(groupDesc)) {
+                        Map<String, Object> group = new HashMap<>();
+                        group.put("group_description", groupDesc);
+                        group.put("Group_Description", groupDesc); // Alias for compatibility
+                        instructionGroups.add(group);
+                        uniqueGroups.add(groupDesc);
+                    }
+                    
+                    // Add to instructions list
+                    Map<String, Object> instructionDetail = new HashMap<>();
+                    instructionDetail.put("group_description", groupDesc);
+                    instructionDetail.put("Group_Description", groupDesc); // Alias for compatibility
+                    instructionDetail.put("instructions_description", instructionDesc);
+                    instructionDetail.put("Instructions_Description", instructionDesc); // Alias for compatibility
+                    instructionDetail.put("sequence_no", sequenceNo);
+                    instructionDetail.put("Sequence_No", sequenceNo); // Alias for compatibility
+                    instructionDetails.add(instructionDetail);
+                }
+            }
+
+            // 10) UI field mapping from vitals and receipt
             Map<String, Object> uiFields = new HashMap<>();
             if (!vitals.isEmpty()) {
                 Map<String, Object> v = vitals.get(0);
@@ -1031,6 +1087,8 @@ public class VisitJpaService {
             data.put("prescriptions", prescriptions);
             data.put("labTestsAsked", labTests);
             data.put("billing", billing);
+            data.put("instructionGroups", instructionGroups);
+            data.put("instructions", instructionDetails);
             data.put("uiFields", uiFields);
 
             response.put("success", true);
