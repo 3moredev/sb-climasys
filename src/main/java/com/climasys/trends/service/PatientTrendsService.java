@@ -186,6 +186,20 @@ public class PatientTrendsService {
         if (value == null) return null;
         if (value instanceof LocalDate) return (LocalDate) value;
         if (value instanceof java.sql.Date) return ((java.sql.Date) value).toLocalDate();
+        if (value instanceof java.sql.Timestamp) {
+            // Convert Timestamp to LocalDate (extract date part only)
+            return ((java.sql.Timestamp) value).toLocalDateTime().toLocalDate();
+        }
+        // Try to parse as string if it's a string representation
+        if (value instanceof String) {
+            try {
+                return LocalDate.parse((String) value);
+            } catch (Exception e) {
+                logger.warn("Failed to parse date string: {}", value);
+                return null;
+            }
+        }
+        logger.warn("Unsupported date type for key '{}': {}", key, value != null ? value.getClass().getName() : "null");
         return null;
     }
     
