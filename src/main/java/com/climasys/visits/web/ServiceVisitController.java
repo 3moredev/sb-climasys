@@ -29,7 +29,7 @@ public class ServiceVisitController {
     @GetMapping("/previous-visit-dates")
     public ResponseEntity<?> getPreviousServiceVisitDates(
             @RequestParam String patientId,
-            @RequestParam String doctorId,
+            @RequestParam(required = false) String doctorId,
             @RequestParam String clinicId,
             @RequestParam(required = false) String todaysVisitDate
     ) {

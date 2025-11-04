@@ -25,7 +25,16 @@ public class ServiceVisitService {
             logger.info("Fetching previous service visit dates for patient: {}, doctor: {}, clinic: {}, today: {}", 
                 patientId, doctorId, clinicId, todaysVisitDate);
             
-            List<Object[]> rows = serviceVisitRepository.findPreviousServiceVisitDates(patientId, doctorId, clinicId, todaysVisitDate);
+            List<Object[]> rows;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                // If doctorId is provided, use the filtered query
+                rows = serviceVisitRepository.findPreviousServiceVisitDates(patientId, doctorId, clinicId, todaysVisitDate);
+            } else {
+                // If doctorId is not provided, fetch all visits for the patient and clinic (ignoring doctor)
+                rows = serviceVisitRepository.findPreviousServiceVisitDatesWithoutDoctor(patientId, clinicId, todaysVisitDate);
+                logger.info("Fetching previous service visit dates without doctor filter for patient: {}, clinic: {}", 
+                    patientId, clinicId);
+            }
             logger.info("Found {} previous service visit records for patient: {}", rows.size(), patientId);
             
             List<Map<String, Object>> visits = new ArrayList<>();

@@ -21,6 +21,7 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
      * Previous completed services visits for a patient, sorted newest first.
      * Returns rows with visit_date, shift_id, patient_visit_no.
      * Uses status_id = 8 for "Service Completed" status (consistent with FeeDetailsRepository).
+     * Requires doctorId filter.
      */
     @Query(value = """
             SELECT CAST(pvs.visit_date AS date)            AS visit_date,
@@ -38,6 +39,30 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
     List<Object[]> findPreviousServiceVisitDates(
             @Param("patientId") String patientId,
             @Param("doctorId") String doctorId,
+            @Param("clinicId") String clinicId,
+            @Param("todaysVisitDate") LocalDate todaysVisitDate
+    );
+    
+    /**
+     * Previous completed services visits for a patient without doctor filter, sorted newest first.
+     * Returns rows with visit_date, shift_id, patient_visit_no.
+     * Uses status_id = 8 for "Service Completed" status.
+     * This method is used when doctorId is not provided.
+     */
+    @Query(value = """
+            SELECT CAST(pvs.visit_date AS date)            AS visit_date,
+                   pvs.shift_id                           AS shift_id,
+                   pvs.patient_visit_no                   AS patient_visit_no
+            FROM patient_visits_services pvs
+            WHERE pvs.patient_id = :patientId
+              AND pvs.clinic_id = :clinicId
+              AND COALESCE(pvs.delete_flag, false) = false
+              AND pvs.status_id = 8
+              AND CAST(pvs.visit_date AS date) <= CAST(:todaysVisitDate AS date)
+            ORDER BY CAST(pvs.visit_date AS date) DESC, pvs.visit_time DESC
+            """, nativeQuery = true)
+    List<Object[]> findPreviousServiceVisitDatesWithoutDoctor(
+            @Param("patientId") String patientId,
             @Param("clinicId") String clinicId,
             @Param("todaysVisitDate") LocalDate todaysVisitDate
     );
