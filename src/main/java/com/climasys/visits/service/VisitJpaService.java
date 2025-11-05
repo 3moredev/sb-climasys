@@ -389,6 +389,39 @@ public class VisitJpaService {
                 instructionGroupsInData != null ? (instructionGroupsInData instanceof List ? ((List<?>) instructionGroupsInData).size() : instructionGroupsInData) : "null",
                 instructionsInData != null ? (instructionsInData instanceof List ? ((List<?>) instructionsInData).size() : instructionsInData) : "null");
             
+            // Detailed logging of instructions array content
+            if (instructionsInData instanceof List) {
+                List<?> instructionsList = (List<?>) instructionsInData;
+                logger.info("📋 Instructions array contains {} items", instructionsList.size());
+                for (int i = 0; i < instructionsList.size(); i++) {
+                    Object item = instructionsList.get(i);
+                    if (item instanceof Map) {
+                        Map<?, ?> instrMap = (Map<?, ?>) item;
+                        logger.info("   Instruction[{}]: '{}' (group: '{}', sequence: {})", 
+                            i, 
+                            instrMap.get("instructions_description"), 
+                            instrMap.get("group_description"),
+                            instrMap.get("sequence_no"));
+                    }
+                }
+                
+                // Check for duplicates within the instructions array
+                java.util.Set<String> seenInResponse = new java.util.HashSet<>();
+                for (Object item : instructionsList) {
+                    if (item instanceof Map) {
+                        Map<?, ?> instrMap = (Map<?, ?>) item;
+                        String instrText = instrMap.get("instructions_description") != null ? 
+                            ((String) instrMap.get("instructions_description")).trim().toLowerCase() : "";
+                        if (seenInResponse.contains(instrText)) {
+                            logger.error("❌ DUPLICATE FOUND IN RESPONSE! Instruction: '{}' appears multiple times!", 
+                                instrMap.get("instructions_description"));
+                        } else {
+                            seenInResponse.add(instrText);
+                        }
+                    }
+                }
+            }
+            
             // Build response structure matching the stored procedure format
             response.put("success", true);
             response.put("found", true);
@@ -573,6 +606,8 @@ public class VisitJpaService {
                     patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
                 
                 // First, try date-only comparison (primary method)
+                // Query without DISTINCT ON first to see all records, then deduplicate in code
+                // This ensures we catch all duplicates even if they have slight differences
                 String instructionGroupsSql = """
                     SELECT doctor_id, clinic_id, shift_id, patient_id, patient_visit_no, visit_date,
                            group_description, instructions_description, sequence_no,
@@ -580,12 +615,29 @@ public class VisitJpaService {
                     FROM visit_groups_instructions vgi
                     WHERE vgi.patient_id = ? AND vgi.shift_id = ? AND vgi.clinic_id = ? AND vgi.doctor_id = ?
                       AND DATE(vgi.visit_date) = DATE(?::date) AND vgi.patient_visit_no = ?
-                    ORDER BY vgi.group_description ASC, vgi.sequence_no ASC
+                    ORDER BY vgi.group_description ASC, vgi.instructions_description ASC, vgi.sequence_no ASC, vgi.visit_date DESC
                 """;
                 List<Map<String, Object>> instructionGroupsRaw = jdbcTemplate.queryForList(
                     instructionGroupsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
                 
                 logger.info("Found {} raw instruction group records from database using date-only comparison", instructionGroupsRaw.size());
+                
+                // Debug: Check for duplicates in raw results
+                if (!instructionGroupsRaw.isEmpty()) {
+                    java.util.Map<String, Integer> instructionCounts = new java.util.HashMap<>();
+                    for (Map<String, Object> rawRow : instructionGroupsRaw) {
+                        String instr = rawRow.get("instructions_description") != null ? 
+                            ((String) rawRow.get("instructions_description")).trim().toLowerCase() : "";
+                        instructionCounts.put(instr, instructionCounts.getOrDefault(instr, 0) + 1);
+                    }
+                    logger.info("Raw instruction breakdown: {} unique instruction texts from {} total records", 
+                        instructionCounts.size(), instructionGroupsRaw.size());
+                    for (java.util.Map.Entry<String, Integer> entry : instructionCounts.entrySet()) {
+                        if (entry.getValue() > 1) {
+                            logger.warn("⚠️ Found {} duplicate(s) of instruction: '{}'", entry.getValue() - 1, entry.getKey());
+                        }
+                    }
+                }
                 
                 // If no results found with date-only comparison, try exact timestamp matching
                 // (instruction groups are saved with exact visit_date timestamp from patient_visits)
@@ -598,11 +650,28 @@ public class VisitJpaService {
                         FROM visit_groups_instructions vgi
                         WHERE vgi.patient_id = ? AND vgi.shift_id = ? AND vgi.clinic_id = ? AND vgi.doctor_id = ?
                           AND vgi.visit_date = ? AND vgi.patient_visit_no = ?
-                        ORDER BY vgi.group_description ASC, vgi.sequence_no ASC
+                        ORDER BY vgi.group_description ASC, vgi.instructions_description ASC, vgi.sequence_no ASC, vgi.visit_date DESC
                     """;
                     instructionGroupsRaw = jdbcTemplate.queryForList(
                         exactMatchSql, patientId, shiftId, clinicId, doctorId, exactVisitDate, patientVisitNo);
                     logger.info("Found {} raw instruction group records using exact timestamp match", instructionGroupsRaw.size());
+                }
+                
+                // If still no results, try without DISTINCT ON as fallback (in case DISTINCT ON syntax causes issues)
+                if (instructionGroupsRaw.isEmpty() && exactVisitDate != null) {
+                    logger.info("Trying fallback query without DISTINCT ON for instruction groups");
+                    String fallbackSql = """
+                        SELECT doctor_id, clinic_id, shift_id, patient_id, patient_visit_no, visit_date,
+                               group_description, instructions_description, sequence_no,
+                               created_on, createdby_name, modified_on, modifiedby_name
+                        FROM visit_groups_instructions vgi
+                        WHERE vgi.patient_id = ? AND vgi.shift_id = ? AND vgi.clinic_id = ? AND vgi.doctor_id = ?
+                          AND DATE(vgi.visit_date) = DATE(?::date) AND vgi.patient_visit_no = ?
+                        ORDER BY vgi.group_description ASC, vgi.instructions_description ASC, vgi.sequence_no ASC
+                    """;
+                    instructionGroupsRaw = jdbcTemplate.queryForList(
+                        fallbackSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                    logger.info("Found {} raw instruction group records using fallback query (no DISTINCT ON)", instructionGroupsRaw.size());
                 }
                 
                 // If still no results, try to find any records for this composite key to help debug
@@ -621,8 +690,9 @@ public class VisitJpaService {
                     if (!debugInfo.isEmpty() && debugInfo.get(0).get("count") != null) {
                         Long count = ((Number) debugInfo.get(0).get("count")).longValue();
                         if (count > 0) {
-                            logger.warn("Found {} instruction group records for composite key but date mismatch! Query date: {}, Exact date: {}, DB dates: {}", 
+                            logger.warn("⚠️ Found {} instruction group records for composite key but date mismatch! Query date: {}, Exact date: {}, DB dates: {}", 
                                 count, visitDate, exactVisitDate, debugInfo.get(0).get("all_dates"));
+                            logger.warn("⚠️ This suggests instruction groups exist but with different visit_date. Try checking database directly.");
                         } else {
                             logger.info("No instruction group records found in database for this composite key");
                         }
@@ -630,29 +700,57 @@ public class VisitJpaService {
                 }
                 
                 // Convert to VisitGroupsInstructions-like structure for processing
-                // Deduplicate based on composite key: group_description + instructions_description + sequence_no
+                // Deduplicate aggressively: first by full composite key, then by instruction description alone
+                // This ensures we don't have duplicate instruction descriptions even with different groups/sequences
                 java.util.Set<String> seenInstructions = new java.util.LinkedHashSet<>();
+                java.util.Set<String> seenInstructionDescriptions = new java.util.LinkedHashSet<>(); // For instruction-only deduplication
                 List<Map<String, Object>> visitInstructionsList = new ArrayList<>();
                 
+                logger.info("Processing {} raw instruction records for deduplication", instructionGroupsRaw.size());
+                
+                // Log all raw records for debugging
+                for (int i = 0; i < instructionGroupsRaw.size(); i++) {
+                    Map<String, Object> rawRow = instructionGroupsRaw.get(i);
+                    logger.debug("Raw record {}: group='{}', instruction='{}', sequence={}", 
+                        i, rawRow.get("group_description"), rawRow.get("instructions_description"), rawRow.get("sequence_no"));
+                }
+                
                 for (Map<String, Object> row : instructionGroupsRaw) {
-                    String groupDesc = row.get("group_description") != null ? ((String) row.get("group_description")).trim() : "";
-                    String instructionDesc = row.get("instructions_description") != null ? ((String) row.get("instructions_description")).trim() : "";
+                    // Normalize strings: trim, lowercase, and normalize whitespace (multiple spaces to single space)
+                    String groupDesc = row.get("group_description") != null ? 
+                        ((String) row.get("group_description")).trim().replaceAll("\\s+", " ").toLowerCase() : "";
+                    String instructionDesc = row.get("instructions_description") != null ? 
+                        ((String) row.get("instructions_description")).trim().replaceAll("\\s+", " ").toLowerCase() : "";
                     Object seqNoObj = row.get("sequence_no");
                     Integer sequenceNo = seqNoObj != null ? 
                         (seqNoObj instanceof Integer ? (Integer) seqNoObj : Integer.valueOf(seqNoObj.toString())) : 0;
                     
-                    // Create a unique key for deduplication: group_description + instructions_description + sequence_no
-                    String uniqueKey = (groupDesc + "|||" + instructionDesc + "|||" + sequenceNo).toLowerCase();
+                    // Create unique keys for deduplication
+                    // 1. Full composite key: group + instruction + sequence (for exact duplicates)
+                    String compositeKey = String.format("%s|||%s|||%d", groupDesc, instructionDesc, sequenceNo);
+                    // 2. Instruction description only (to catch duplicates with different groups/sequences)
+                    // Normalize to handle any whitespace or case differences
+                    String instructionOnlyKey = instructionDesc;
                     
-                    // Only add if we haven't seen this exact instruction before
-                    if (!seenInstructions.contains(uniqueKey)) {
-                        seenInstructions.add(uniqueKey);
+                    logger.debug("Processing: instruction='{}' (normalized: '{}'), group='{}', sequence={}", 
+                        row.get("instructions_description"), instructionOnlyKey, groupDesc, sequenceNo);
+                    
+                    // Only add if we haven't seen this exact instruction description before
+                    // This ensures each instruction description appears only once, regardless of group or sequence
+                    if (!seenInstructionDescriptions.contains(instructionOnlyKey)) {
+                        seenInstructionDescriptions.add(instructionOnlyKey);
+                        seenInstructions.add(compositeKey);
                         visitInstructionsList.add(row);
+                        logger.info("✅ Added unique instruction: '{}' (group={}, sequence={})", 
+                            row.get("instructions_description"), row.get("group_description"), sequenceNo);
                     } else {
-                        logger.debug("Skipping duplicate instruction: group={}, instruction={}, sequence={}", 
-                            groupDesc, instructionDesc, sequenceNo);
+                        logger.warn("⚠️ DUPLICATE DETECTED - Skipping instruction: '{}' (group={}, sequence={}) - Already seen!", 
+                            row.get("instructions_description"), row.get("group_description"), sequenceNo);
                     }
                 }
+                
+                logger.info("Deduplication summary: {} unique instructions from {} raw records", 
+                    visitInstructionsList.size(), instructionGroupsRaw.size());
                 
                 if (instructionGroupsRaw.size() > visitInstructionsList.size()) {
                     logger.info("Processed {} unique instruction records (removed {} duplicates from {} total)", 
@@ -668,31 +766,83 @@ public class VisitJpaService {
                     // Track unique groups
                     java.util.Set<String> uniqueGroups = new java.util.HashSet<>();
                     
+                    // Final deduplication pass: ensure we only add unique instruction descriptions
+                    // Since we already deduplicated by instruction description in the first pass,
+                    // this should be redundant but serves as a safety check
+                    java.util.Set<String> seenInstructionDetails = new java.util.LinkedHashSet<>();
+                    
                     for (Map<String, Object> instructionRow : visitInstructionsList) {
-                        String groupDesc = (String) instructionRow.get("group_description");
-                        String instructionDesc = (String) instructionRow.get("instructions_description");
+                        // Normalize strings: trim and normalize whitespace
+                        String groupDesc = instructionRow.get("group_description") != null ? 
+                            ((String) instructionRow.get("group_description")).trim().replaceAll("\\s+", " ") : "";
+                        String instructionDesc = instructionRow.get("instructions_description") != null ? 
+                            ((String) instructionRow.get("instructions_description")).trim().replaceAll("\\s+", " ") : "";
                         Object seqNoObj = instructionRow.get("sequence_no");
                         Integer sequenceNo = seqNoObj != null ? 
                             (seqNoObj instanceof Integer ? (Integer) seqNoObj : Integer.valueOf(seqNoObj.toString())) : 0;
                         
                         // Add to groups list if not already added
-                        if (!uniqueGroups.contains(groupDesc)) {
+                        String groupKey = groupDesc.toLowerCase().replaceAll("\\s+", " ");
+                        if (!uniqueGroups.contains(groupKey)) {
                             Map<String, Object> group = new HashMap<>();
                             group.put("group_description", groupDesc);
                             group.put("Group_Description", groupDesc); // Alias for compatibility
                             instructionGroups.add(group);
-                            uniqueGroups.add(groupDesc);
+                            uniqueGroups.add(groupKey);
+                            logger.debug("Added instruction group: '{}'", groupDesc);
                         }
                         
-                        // Add to instructions list (already deduplicated above)
-                        Map<String, Object> instructionDetail = new HashMap<>();
-                        instructionDetail.put("group_description", groupDesc);
-                        instructionDetail.put("Group_Description", groupDesc); // Alias for compatibility
-                        instructionDetail.put("instructions_description", instructionDesc);
-                        instructionDetail.put("Instructions_Description", instructionDesc); // Alias for compatibility
-                        instructionDetail.put("sequence_no", sequenceNo);
-                        instructionDetail.put("Sequence_No", sequenceNo); // Alias for compatibility
-                        instructionDetails.add(instructionDetail);
+                        // Final check: use instruction description only as unique key (normalized)
+                        // Normalize: lowercase, trim, and collapse whitespace
+                        String instructionDetailKey = instructionDesc.toLowerCase().replaceAll("\\s+", " ");
+                        
+                        logger.debug("Final pass check: instruction='{}' (key: '{}')", instructionDesc, instructionDetailKey);
+                        
+                        // Only add if we haven't seen this exact instruction description before
+                        if (!seenInstructionDetails.contains(instructionDetailKey)) {
+                            seenInstructionDetails.add(instructionDetailKey);
+                            Map<String, Object> instructionDetail = new HashMap<>();
+                            instructionDetail.put("group_description", groupDesc);
+                            instructionDetail.put("Group_Description", groupDesc); // Alias for compatibility
+                            instructionDetail.put("instructions_description", instructionDesc);
+                            instructionDetail.put("Instructions_Description", instructionDesc); // Alias for compatibility
+                            instructionDetail.put("sequence_no", sequenceNo);
+                            instructionDetail.put("Sequence_No", sequenceNo); // Alias for compatibility
+                            instructionDetails.add(instructionDetail);
+                            logger.info("✅ Added to final instructions list: '{}'", instructionDesc);
+                        } else {
+                            logger.warn("⚠️ DUPLICATE IN FINAL PASS - Skipping: '{}' (group={}, sequence={})", 
+                                instructionDesc, groupDesc, sequenceNo);
+                        }
+                    }
+                    
+                    logger.info("Final deduplication: {} unique instruction descriptions from {} processed records", 
+                        instructionDetails.size(), visitInstructionsList.size());
+                    
+                    // Final verification: Check for any duplicates in instructionDetails before adding to response
+                    java.util.Set<String> finalCheck = new java.util.HashSet<>();
+                    List<Map<String, Object>> verifiedInstructions = new ArrayList<>();
+                    for (Map<String, Object> instr : instructionDetails) {
+                        String instrText = instr.get("instructions_description") != null ? 
+                            ((String) instr.get("instructions_description")).trim().toLowerCase().replaceAll("\\s+", " ") : "";
+                        if (!finalCheck.contains(instrText)) {
+                            finalCheck.add(instrText);
+                            verifiedInstructions.add(instr);
+                        } else {
+                            logger.error("❌ CRITICAL: Found duplicate in final instructionDetails list! Instruction: '{}'", 
+                                instr.get("instructions_description"));
+                        }
+                    }
+                    
+                    // instructionDetails will be replaced below if duplicates found
+                    
+                    if (instructionDetails.size() != verifiedInstructions.size()) {
+                        logger.info("✅ Final verified instructions count: {} (removed {} duplicates from {} original)", 
+                            verifiedInstructions.size(), instructionDetails.size() - verifiedInstructions.size(), instructionDetails.size());
+                        instructionDetails = verifiedInstructions; // Use the verified list
+                    } else {
+                        logger.info("✅ Final verified instructions count: {} (no duplicates found)", 
+                            instructionDetails.size());
                     }
                     
                     // Store both for backward compatibility with stored procedure format
@@ -700,6 +850,10 @@ public class VisitJpaService {
                     // instructions: all instruction details with group info (Tables[3] in stored procedure)
                     associatedData.put("instructionGroups", instructionGroups);
                     associatedData.put("instructions", instructionDetails);
+                    
+                    // Log final counts before returning
+                    logger.info("📊 Final counts being added to response - instructionGroups: {}, instructions: {}", 
+                        instructionGroups.size(), instructionDetails.size());
                     
                     // Also create a nested structure for easier frontend consumption
                     // Group instructions by group_description
@@ -710,16 +864,19 @@ public class VisitJpaService {
                     }
                     associatedData.put("instructionGroupsWithDetails", instructionsByGroup);
                     
-                    logger.info("Successfully fetched {} instruction groups with {} instruction details for visit", 
+                    logger.info("✅ Successfully fetched {} instruction groups with {} instruction details for visit", 
                         instructionGroups.size(), instructionDetails.size());
                 } else {
-                    logger.info("No instruction groups found for visit: patientId={}, visitNo={}", patientId, patientVisitNo);
+                    logger.warn("⚠️ No instruction groups found for visit: patientId={}, visitNo={}, visitDate={}, exactVisitDate={}", 
+                        patientId, patientVisitNo, visitDate, exactVisitDate);
+                    logger.warn("⚠️ This could mean: 1) No instruction groups were saved for this visit, 2) Date mismatch, 3) Query issue");
                     associatedData.put("instructionGroups", new ArrayList<>());
                     associatedData.put("instructions", new ArrayList<>());
                 }
             } catch (Exception instructionEx) {
-                logger.error("Error fetching instruction groups for visit: patientId={}, visitNo={}, error: {}", 
+                logger.error("❌ Error fetching instruction groups for visit: patientId={}, visitNo={}, error: {}", 
                     patientId, patientVisitNo, instructionEx.getMessage(), instructionEx);
+                logger.error("❌ Exception details: ", instructionEx);
                 // Don't fail the whole request, just log the error
                 associatedData.put("instructionGroups", new ArrayList<>());
                 associatedData.put("instructions", new ArrayList<>());

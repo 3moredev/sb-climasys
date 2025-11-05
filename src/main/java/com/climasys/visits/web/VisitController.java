@@ -333,6 +333,9 @@ public class VisitController {
             // Each item should have: groupDescription, instructionsDescription, sequenceNo
             java.util.List<Map<String, Object>> instructionGroups,
             
+            // Treatment arrays (diagnosis, medicines, prescriptions, investigations, complaints)
+            java.util.List<Map<String, Object>> complaintsRows,
+            
             // Optional treatment arrays
             java.util.List<Map<String, Object>> diagnosisRows,
             java.util.List<Map<String, Object>> medicineRows,
@@ -834,7 +837,8 @@ public class VisitController {
             logger.info("Composite key values - patientId: {}, doctorId: {}, clinicId: {}, shiftId: {}, patientVisitNo: {}", 
                 patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal);
             
-            logger.info("Preparing to persist treatment arrays - diagnosisRows: {}, medicineRows: {}, prescriptionRows: {}, investigationRows: {}", 
+            logger.info("Preparing to persist treatment arrays - complaintsRows: {}, diagnosisRows: {}, medicineRows: {}, prescriptionRows: {}, investigationRows: {}", 
+                req.complaintsRows() != null ? req.complaintsRows().size() : 0,
                 req.diagnosisRows() != null ? req.diagnosisRows().size() : 0,
                 req.medicineRows() != null ? req.medicineRows().size() : 0,
                 req.prescriptionRows() != null ? req.prescriptionRows().size() : 0,
@@ -923,6 +927,88 @@ public class VisitController {
                         }
                     } else {
                         logger.debug("No diagnosis rows to process (null or empty)");
+                    }
+
+                    // Complaints
+                    if (req.complaintsRows() != null && !req.complaintsRows().isEmpty()) {
+                        logger.info("Processing {} complaints rows for patient: {}, visit: {}", req.complaintsRows().size(), patientId, patientVisitNoVal);
+                        
+                        // CRITICAL: Query the EXACT visit_date from patient_visits to ensure foreign key matches
+                        String getExactVisitDateSql = "SELECT visit_date FROM patient_visits WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND delete_flag = false ORDER BY visit_date DESC LIMIT 1";
+                        List<java.sql.Timestamp> exactVisitDates = jdbcTemplate.queryForList(getExactVisitDateSql, java.sql.Timestamp.class, 
+                            patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal);
+                        
+                        java.sql.Timestamp exactVisitDateTs = visitDateTs;
+                        if (exactVisitDates != null && !exactVisitDates.isEmpty() && exactVisitDates.get(0) != null) {
+                            exactVisitDateTs = exactVisitDates.get(0);
+                            logger.info("Retrieved EXACT visit_date from patient_visits for complaints: {} (was using: {})", exactVisitDateTs, visitDateTs);
+                        } else {
+                            logger.error("CRITICAL: Could not find saved visit in patient_visits! Cannot insert complaints without parent record.");
+                            result.put("complaintsInsertError", "Parent visit not found in patient_visits table");
+                            throw new IllegalStateException("Parent visit not found: Cannot insert complaints without matching patient_visits record");
+                        }
+                        
+                        // Delete existing complaint records for this visit (using exact visit_date to match foreign key)
+                        String delComplaints = "DELETE FROM visit_complaints WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND DATE(visit_date) = DATE(?)";
+                        int deletedCount = jdbcTemplate.update(delComplaints, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
+                        logger.info("Deleted {} existing complaint records", deletedCount);
+
+                        LocalDateTime now = timezoneUtils.convertTargetTimezoneToUtc(LocalDateTime.now());
+                        String insComplaints = "INSERT INTO visit_complaints (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, short_description, complaint_description, complaint_comment, delete_flag, created_on, createdby_name, modified_on, modifiedby_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                        int insertedCount = 0;
+                        for (Map<String, Object> row : req.complaintsRows()) {
+                            Object shortDescObj = row.get("short_description");
+                            Object complaintDescObj = row.get("complaint_description");
+                            Object complaintCommentObj = row.get("complaint_comment");
+                            
+                            String shortDesc = (shortDescObj != null) ? shortDescObj.toString().trim() : "";
+                            String complaintDesc = (complaintDescObj != null) ? complaintDescObj.toString().trim() : "";
+                            String complaintComment = (complaintCommentObj != null) ? complaintCommentObj.toString().trim() : "";
+                            
+                            logger.debug("Processing complaint row - shortDesc: '{}', complaintDesc: '{}', complaintComment: '{}'", shortDesc, complaintDesc, complaintComment);
+                            
+                            // Insert if at least short_description has content (required field)
+                            if (!shortDesc.isEmpty()) {
+                                try {
+                                    logger.info("Attempting INSERT with exact visit_date: {} for complaint: short_description='{}', complaint_description='{}'", exactVisitDateTs, shortDesc, complaintDesc);
+                                    int rowsAffected = jdbcTemplate.update(insComplaints, patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId, shortDesc, complaintDesc, complaintComment, false, now, userIdVal, now, userIdVal);
+                                    if (rowsAffected > 0) {
+                                        insertedCount++;
+                                        logger.info("✓ Successfully inserted complaint row {}: short_description='{}', complaint_description='{}', visitDate={}", 
+                                            insertedCount, shortDesc, complaintDesc, exactVisitDateTs);
+                                    } else {
+                                        logger.error("✗ INSERT statement returned 0 rows affected for complaint: short_description='{}', complaint_description='{}'", shortDesc, complaintDesc);
+                                        result.put("complaintsInsertWarning", "Some complaint rows may not have been inserted");
+                                    }
+                                } catch (Exception insertEx) {
+                                    logger.error("✗ Error inserting complaint row: short_description='{}', complaint_description='{}', error: {}", 
+                                        shortDesc, complaintDesc, insertEx.getMessage(), insertEx);
+                                    logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
+                                        patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
+                                    throw insertEx; // Re-throw to be caught by outer catch
+                                }
+                            } else {
+                                logger.warn("Skipping complaint row with empty short_description: {}", row);
+                            }
+                        }
+                        logger.info("Successfully inserted {} complaint records for patient: {}, visit: {}", insertedCount, patientId, patientVisitNoVal);
+                        
+                        // Verify the insert worked by querying back using the exact visit_date
+                        if (insertedCount > 0) {
+                            String verifySql = "SELECT COUNT(*) FROM visit_complaints WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND visit_date = ? AND delete_flag = false";
+                            Integer actualCount = jdbcTemplate.queryForObject(verifySql, Integer.class, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
+                            logger.info("✓ Verification: Found {} complaint records in database after insert (expected: {}, visitDate: {})", actualCount, insertedCount, exactVisitDateTs);
+                            if (actualCount == null || actualCount == 0) {
+                                logger.error("✗ CRITICAL: No complaint records found in database after insert attempt! visitDate used: {}", exactVisitDateTs);
+                                result.put("complaintsInsertWarning", "Complaint rows were not saved. Check logs for details.");
+                                result.put("complaintsInsertedCount", 0);
+                            } else {
+                                result.put("complaintsInsertedCount", actualCount);
+                                logger.info("✓ Confirmed: {} complaint records are now in visit_complaints table", actualCount);
+                            }
+                        }
+                    } else {
+                        logger.debug("No complaints rows to process (null or empty)");
                     }
 
                     // Medicines
