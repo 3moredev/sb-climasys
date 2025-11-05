@@ -27,6 +27,7 @@ public class PatientTrendsService {
     private static final Logger logger = LoggerFactory.getLogger(PatientTrendsService.class);
     
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm");
     
     @Autowired
     private PatientTrendsRepository patientTrendsRepository;
@@ -99,15 +100,22 @@ public class PatientTrendsService {
         // Generate formatted display values
         String dateStr = dto.getVisitDate() != null ? 
                 dto.getVisitDate().format(DATE_FORMATTER) : "";
-        String shift = dto.getShiftDescription() != null ? dto.getShiftDescription() : "";
+        String shift = dto.getShiftDescription() != null ? dto.getShiftDescription().trim() : "";
+        String timeStr = dto.getVisitTime() != null ? 
+                dto.getVisitTime().format(TIME_FORMATTER) : "";
         
-        dto.setLastFiveBpValues(formatValue(dateStr, shift, dto.getBloodPressure()));
-        dto.setLastFiveSugarValues(formatValue(dateStr, shift, dto.getSugar()));
-        dto.setLastFiveTHValues(formatValue(dateStr, shift, dto.getThtext()));
-        dto.setLastFiveWeightValues(formatValue(dateStr, shift, 
+        // Format: Date : Shift : Time (if time is available)
+        String dateTimeStr = timeStr.isEmpty() ? 
+                (dateStr + " : " + shift) : 
+                (dateStr + " : " + shift + " : " + timeStr);
+        
+        dto.setLastFiveBpValues(formatValue(dateStr, shift, timeStr, dto.getBloodPressure()));
+        dto.setLastFiveSugarValues(formatValue(dateStr, shift, timeStr, dto.getSugar()));
+        dto.setLastFiveTHValues(formatValue(dateStr, shift, timeStr, dto.getThtext()));
+        dto.setLastFiveWeightValues(formatValue(dateStr, shift, timeStr, 
                 dto.getWeightInKgs() != null ? dto.getWeightInKgs().toString() : null));
         
-        dto.setPreDates(dateStr + " : " + shift);
+        dto.setPreDates(dateTimeStr);
         dto.setPreBp(nvl(dto.getBloodPressure()));
         dto.setPreSugar(nvl(dto.getSugar()));
         dto.setPreThtext(nvl(dto.getThtext()));
@@ -126,10 +134,14 @@ public class PatientTrendsService {
     }
     
     /**
-     * Format value for display (Date : Shift : Value)
+     * Format value for display (Date : Shift : Time : Value)
      */
-    private String formatValue(String date, String shift, String value) {
-        return date + " : " + shift + " : " + nvl(value);
+    private String formatValue(String date, String shift, String time, String value) {
+        if (time != null && !time.trim().isEmpty()) {
+            return date + " : " + shift + " : " + time + " : " + nvl(value);
+        } else {
+            return date + " : " + shift + " : " + nvl(value);
+        }
     }
     
     /**
@@ -208,6 +220,30 @@ public class PatientTrendsService {
         if (value == null) return null;
         if (value instanceof LocalTime) return (LocalTime) value;
         if (value instanceof java.sql.Time) return ((java.sql.Time) value).toLocalTime();
+        if (value instanceof java.sql.Timestamp) {
+            // Extract time from Timestamp
+            return ((java.sql.Timestamp) value).toLocalDateTime().toLocalTime();
+        }
+        // Try to parse as string if it's a string representation (HH:mm:ss or HH:mm)
+        if (value instanceof String) {
+            try {
+                String timeStr = ((String) value).trim();
+                // Handle formats like "15:41:14" or "15:41"
+                if (timeStr.contains(":")) {
+                    String[] parts = timeStr.split(":");
+                    if (parts.length >= 2) {
+                        int hour = Integer.parseInt(parts[0]);
+                        int minute = Integer.parseInt(parts[1]);
+                        return LocalTime.of(hour, minute);
+                    }
+                }
+                return LocalTime.parse(timeStr, TIME_FORMATTER);
+            } catch (Exception e) {
+                logger.warn("Failed to parse time string: {}", value);
+                return null;
+            }
+        }
+        logger.warn("Unsupported time type for key '{}': {}", key, value != null ? value.getClass().getName() : "null");
         return null;
     }
 }

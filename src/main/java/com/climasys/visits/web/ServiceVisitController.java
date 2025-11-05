@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -86,6 +87,35 @@ public class ServiceVisitController {
             errorResult.put("success", false);
             errorResult.put("error", "Failed to parse request: " + e.getMessage());
             return ResponseEntity.badRequest().body(errorResult);
+        }
+    }
+
+    /**
+     * JPA replacement for USP_Get_MasterLists_Services.
+     * Returns master lists for services visits (uses patient_visits_services table).
+     */
+    @GetMapping("/master-lists")
+    public ResponseEntity<?> getMasterListsForServices(
+            @RequestParam String patientId,
+            @RequestParam Short shiftId,
+            @RequestParam String clinicId,
+            @RequestParam String doctorId,
+            @RequestParam String visitDate, // YYYY-MM-DD
+            @RequestParam Integer patientVisitNo) {
+        try {
+            LocalDate date = LocalDate.parse(visitDate);
+            Map<String, Object> result = serviceVisitService.getMasterListsForServices(
+                patientId, shiftId, clinicId, doctorId, date, patientVisitNo);
+            if (result.get("success") != null && (Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            }
+            return ResponseEntity.badRequest().body(result);
+        } catch (Exception e) {
+            logger.error("Error processing master-lists request for services: {}", e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get master lists for services: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
         }
     }
 }
