@@ -1,12 +1,17 @@
 package com.climasys.billing.web;
 
+import com.climasys.billing.service.BillingBreakupService;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -14,9 +19,11 @@ import java.util.Map;
 public class BillingController {
 
     private final JdbcTemplate jdbcTemplate;
+    private final BillingBreakupService billingBreakupService;
 
-    public BillingController(JdbcTemplate jdbcTemplate) {
+    public BillingController(JdbcTemplate jdbcTemplate, BillingBreakupService billingBreakupService) {
         this.jdbcTemplate = jdbcTemplate;
+        this.billingBreakupService = billingBreakupService;
     }
 
     public record PaymentRequest(
@@ -207,6 +214,103 @@ public class BillingController {
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to apply discount: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * Submit billing breakup details for a patient visit.
+     * This endpoint replicates the functionality of USP_Insert_Billing_BreakupData stored procedure.
+     * 
+     * Request body should contain:
+     * - userId: User ID for audit fields
+     * - doctorId: Doctor ID
+     * - shiftId: Shift ID
+     * - patientId: Patient ID
+     * - clinicId: Clinic ID
+     * - visitDate: Visit date (ISO format: yyyy-MM-ddTHH:mm:ss)
+     * - patientVisitNo: Patient visit number
+     * - billingData: List of billing items, each containing:
+     *   - billingGroupName: Billing group name
+     *   - billingSubgroupName: Billing subgroup name
+     *   - billingDetails: Billing details
+     *   - defaultFees: Default fees amount
+     *   - collectedFees: Collected fees amount
+     * - useOverwrite: (optional) If true, also saves to overwrite table
+     */
+    @PostMapping("/breakup/submit")
+    public ResponseEntity<?> submitBillingBreakup(@RequestBody Map<String, Object> request) {
+        try {
+            // Extract required fields
+            String userId = (String) request.get("userId");
+            String doctorId = (String) request.get("doctorId");
+            Object shiftIdObj = request.get("shiftId");
+            Short shiftId = shiftIdObj instanceof Number ? ((Number) shiftIdObj).shortValue() : Short.parseShort(shiftIdObj.toString());
+            String patientId = (String) request.get("patientId");
+            String clinicId = (String) request.get("clinicId");
+            String visitDateStr = (String) request.get("visitDate");
+            Object patientVisitNoObj = request.get("patientVisitNo");
+            Integer patientVisitNo = patientVisitNoObj instanceof Number ? ((Number) patientVisitNoObj).intValue() : Integer.parseInt(patientVisitNoObj.toString());
+            Boolean useOverwrite = (Boolean) request.getOrDefault("useOverwrite", false);
+            
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> billingData = (List<Map<String, Object>>) request.get("billingData");
+            
+            if (userId == null || doctorId == null || patientId == null || clinicId == null || 
+                visitDateStr == null || patientVisitNo == null || billingData == null) {
+                Map<String, Object> error = new HashMap<>();
+                error.put("error", "Missing required fields: userId, doctorId, patientId, clinicId, visitDate, patientVisitNo, billingData");
+                return ResponseEntity.badRequest().body(error);
+            }
+            
+            // Parse visit date - handle both date-only and date-time formats
+            LocalDateTime visitDate;
+            try {
+                // Try ISO date-time format first (yyyy-MM-ddTHH:mm:ss)
+                visitDate = LocalDateTime.parse(visitDateStr, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+            } catch (Exception e1) {
+                try {
+                    // Try date-only format (yyyy-MM-dd) - set to start of day
+                    LocalDate dateOnly = LocalDate.parse(visitDateStr);
+                    visitDate = dateOnly.atStartOfDay();
+                } catch (Exception e2) {
+                    try {
+                        // Try alternative date-time format without 'T' separator
+                        visitDate = LocalDateTime.parse(visitDateStr, DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+                    } catch (Exception e3) {
+                        Map<String, Object> error = new HashMap<>();
+                        error.put("error", "Invalid visitDate format. Expected formats: 'yyyy-MM-ddTHH:mm:ss', 'yyyy-MM-dd', or 'yyyy-MM-dd HH:mm:ss'. Received: " + visitDateStr);
+                        error.put("success", false);
+                        return ResponseEntity.badRequest().body(error);
+                    }
+                }
+            }
+            
+            // Save to base table
+            Map<String, Object> result = billingBreakupService.saveBillingBreakupData(
+                billingData, userId, doctorId, shiftId, patientId, clinicId, visitDate, patientVisitNo
+            );
+            
+            // If useOverwrite is true, also save to overwrite table
+            if (Boolean.TRUE.equals(useOverwrite)) {
+                Map<String, Object> overwriteResult = billingBreakupService.saveBillingBreakupDataOverwrite(
+                    billingData, userId, doctorId, shiftId, patientId, clinicId, visitDate, patientVisitNo
+                );
+                
+                // Merge results
+                result.put("overwrite", overwriteResult);
+            }
+            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to submit billing breakup: " + e.getMessage());
+            error.put("success", false);
             return ResponseEntity.badRequest().body(error);
         }
     }
