@@ -87,8 +87,8 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
     List<Object[]> findFolderAndName(@Param("patientId") String patientId);
 
     /**
-     * Returns consolidated fees aggregated by financial year
-     * Equivalent to USP_Get_ConsolidatedFamilyFees (without folder number filter)
+     * Returns consolidated fees aggregated by financial year for a specific patient
+     * Equivalent to USP_Get_ConsolidatedFamilyFees
      * 
      * Columns returned (in order):
      *  financial_year, billed, discount, dues, collected, balance
@@ -103,14 +103,15 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
             SUM(balance) AS balance
         FROM (
             SELECT 
-                COALESCE(pv.financial_year, EXTRACT(YEAR FROM pv.visit_date)::INTEGER) AS financial_year,
+                COALESCE(pv.financial_year, CAST(EXTRACT(YEAR FROM pv.visit_date) AS INTEGER)) AS financial_year,
                 COALESCE(pv.fees_to_collect, 0) AS billed,
                 COALESCE(pv.discount, 0) AS discount,
                 COALESCE(pv.fees_to_collect - pv.discount, 0) AS dues,
                 COALESCE(pv.fees_collected, 0) AS collected,
                 COALESCE((pv.fees_to_collect - pv.discount) - pv.fees_collected, 0) AS balance
             FROM patient_visits pv
-            WHERE (:doctorId IS NULL OR pv.doctor_id = :doctorId)
+            WHERE pv.patient_id = :patientId
+              AND (:doctorId IS NULL OR pv.doctor_id = :doctorId)
               AND pv.clinic_id = :clinicId
               AND pv.delete_flag = false
               AND pv.fees_to_collect IS NOT NULL
@@ -118,14 +119,15 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
               AND pv.status_id = 5
             UNION ALL
             SELECT 
-                COALESCE(pvs.financial_year, EXTRACT(YEAR FROM pvs.visit_date)::INTEGER) AS financial_year,
+                COALESCE(pvs.financial_year, CAST(EXTRACT(YEAR FROM pvs.visit_date) AS INTEGER)) AS financial_year,
                 COALESCE(pvs.fees_to_collect, 0) AS billed,
                 COALESCE(pvs.discount, 0) AS discount,
                 COALESCE(pvs.fees_to_collect - pvs.discount, 0) AS dues,
                 COALESCE(pvs.fees_collected, 0) AS collected,
                 COALESCE((pvs.fees_to_collect - pvs.discount) - pvs.fees_collected, 0) AS balance
             FROM patient_visits_services pvs
-            WHERE (:doctorId IS NULL OR pvs.doctor_id = :doctorId)
+            WHERE pvs.patient_id = :patientId
+              AND (:doctorId IS NULL OR pvs.doctor_id = :doctorId)
               AND pvs.clinic_id = :clinicId
               AND pvs.delete_flag = false
               AND pvs.fees_to_collect IS NOT NULL
@@ -135,7 +137,7 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
         GROUP BY financial_year
         ORDER BY financial_year DESC
         """, nativeQuery = true)
-    List<Object[]> findConsolidatedFamilyFees(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
+    List<Object[]> findConsolidatedFamilyFees(@Param("patientId") String patientId, @Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
 }
 
 

@@ -93,16 +93,17 @@ public class FeesDetailsService {
 
     /**
      * JPA/JDBC equivalent for USP_Get_ConsolidatedFamilyFees
-     * Returns consolidated fees aggregated by financial year
+     * Returns consolidated fees aggregated by financial year for a specific patient
      * 
+     * @param patientId Patient ID (required)
      * @param doctorId Doctor ID (optional, filters by doctor if provided)
      * @param clinicId Clinic ID (required, filters by clinic)
-     * @return Map with success, doctorId, clinicId, and rows (list of financial year summaries)
+     * @return Map with success, patientId, doctorId, clinicId, and rows (list of financial year summaries)
      */
-    public Map<String, Object> getConsolidatedFamilyFees(String doctorId, String clinicId) {
+    public Map<String, Object> getConsolidatedFamilyFees(String patientId, String doctorId, String clinicId) {
         Map<String, Object> response = new LinkedHashMap<>();
         try {
-            List<Object[]> rows = feeDetailsRepository.findConsolidatedFamilyFees(doctorId, clinicId);
+            List<Object[]> rows = feeDetailsRepository.findConsolidatedFamilyFees(patientId, doctorId, clinicId);
             List<Map<String, Object>> data = new ArrayList<>();
 
             for (Object[] r : rows) {
@@ -132,6 +133,7 @@ public class FeesDetailsService {
             }
 
             response.put("success", true);
+            response.put("patientId", patientId);
             response.put("doctorId", doctorId);
             response.put("clinicId", clinicId);
             response.put("rows", data);

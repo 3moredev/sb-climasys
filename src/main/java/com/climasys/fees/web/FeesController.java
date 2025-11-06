@@ -39,17 +39,19 @@ public class FeesController {
 
     /**
      * JPA endpoint equivalent to USP_Get_ConsolidatedFamilyFees
-     * Returns consolidated fees aggregated by financial year
+     * Returns consolidated fees aggregated by financial year for a specific patient
      * 
+     * @param patientId Patient ID (required)
      * @param doctorId Doctor ID (optional, filters by doctor if provided)
      * @param clinicId Clinic ID (required, filters by clinic)
-     * @return Response with success, doctorId, clinicId, and rows (list of financial year summaries)
+     * @return Response with success, patientId, doctorId, clinicId, and rows (list of financial year summaries)
      */
     @GetMapping("/consolidated-family-fees")
     public ResponseEntity<Map<String, Object>> getConsolidatedFamilyFees(
+            @RequestParam String patientId,
             @RequestParam(required = false) String doctorId,
             @RequestParam String clinicId) {
-        Map<String, Object> result = feesDetailsService.getConsolidatedFamilyFees(doctorId, clinicId);
+        Map<String, Object> result = feesDetailsService.getConsolidatedFamilyFees(patientId, doctorId, clinicId);
         return ResponseEntity.ok(result);
     }
 
