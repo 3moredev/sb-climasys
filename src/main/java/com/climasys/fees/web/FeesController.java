@@ -21,13 +21,35 @@ public class FeesController {
 
     /**
      * JPA endpoint equivalent to USP_Get_Patient_FeesDetails
-     * Params match the original signature where applicable; doctorId is accepted for parity but not used.
+     * Returns patient fees details for individual visits
+     * 
+     * @param patientId Patient ID (required)
+     * @param doctorId Doctor ID (optional, filters by doctor if provided)
+     * @param clinicId Clinic ID (required, filters by clinic)
+     * @return Response with success, patientId, doctorId, clinicId, header (folder_no, full_name), and rows (list of fee details)
      */
     @GetMapping("/details")
     public ResponseEntity<Map<String, Object>> getFeesDetails(
             @RequestParam String patientId,
-            @RequestParam(required = false) String doctorId) {
-        Map<String, Object> result = feesDetailsService.getPatientFeesDetails(patientId);
+            @RequestParam(required = false) String doctorId,
+            @RequestParam String clinicId) {
+        Map<String, Object> result = feesDetailsService.getPatientFeesDetails(patientId, doctorId, clinicId);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * JPA endpoint equivalent to USP_Get_ConsolidatedFamilyFees
+     * Returns consolidated fees aggregated by financial year
+     * 
+     * @param doctorId Doctor ID (optional, filters by doctor if provided)
+     * @param clinicId Clinic ID (required, filters by clinic)
+     * @return Response with success, doctorId, clinicId, and rows (list of financial year summaries)
+     */
+    @GetMapping("/consolidated-family-fees")
+    public ResponseEntity<Map<String, Object>> getConsolidatedFamilyFees(
+            @RequestParam(required = false) String doctorId,
+            @RequestParam String clinicId) {
+        Map<String, Object> result = feesDetailsService.getConsolidatedFamilyFees(doctorId, clinicId);
         return ResponseEntity.ok(result);
     }
 

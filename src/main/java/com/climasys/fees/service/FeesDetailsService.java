@@ -20,8 +20,17 @@ public class FeesDetailsService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public Map<String, Object> getPatientFeesDetails(String patientId) {
-        List<Object[]> rows = feeDetailsRepository.findFeesDetailsByPatientId(patientId);
+    /**
+     * JPA/JDBC equivalent for USP_Get_Patient_FeesDetails
+     * Returns patient fees details for individual visits
+     * 
+     * @param patientId Patient ID (required)
+     * @param doctorId Doctor ID (optional, filters by doctor if provided)
+     * @param clinicId Clinic ID (required, filters by clinic)
+     * @return Map with success, patientId, header (folder_no, full_name), and rows (list of fee details)
+     */
+    public Map<String, Object> getPatientFeesDetails(String patientId, String doctorId, String clinicId) {
+        List<Object[]> rows = feeDetailsRepository.findFeesDetailsByPatientId(patientId, doctorId, clinicId);
         List<Map<String, Object>> data = new ArrayList<>();
 
         DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
@@ -75,8 +84,61 @@ public class FeesDetailsService {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("success", true);
         response.put("patientId", patientId);
+        response.put("doctorId", doctorId);
+        response.put("clinicId", clinicId);
         response.put("header", header);
         response.put("rows", data);
+        return response;
+    }
+
+    /**
+     * JPA/JDBC equivalent for USP_Get_ConsolidatedFamilyFees
+     * Returns consolidated fees aggregated by financial year
+     * 
+     * @param doctorId Doctor ID (optional, filters by doctor if provided)
+     * @param clinicId Clinic ID (required, filters by clinic)
+     * @return Map with success, doctorId, clinicId, and rows (list of financial year summaries)
+     */
+    public Map<String, Object> getConsolidatedFamilyFees(String doctorId, String clinicId) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        try {
+            List<Object[]> rows = feeDetailsRepository.findConsolidatedFamilyFees(doctorId, clinicId);
+            List<Map<String, Object>> data = new ArrayList<>();
+
+            for (Object[] r : rows) {
+                int i = 0;
+                Map<String, Object> m = new LinkedHashMap<>();
+                Object financialYearObj = r[i++];
+                Integer financialYear = financialYearObj != null ? 
+                    (financialYearObj instanceof Integer ? (Integer) financialYearObj : Integer.valueOf(financialYearObj.toString())) : null;
+                m.put("Financial_Year", financialYear);
+                
+                Object billedObj = r[i++];
+                m.put("Billed", billedObj != null ? ((Number) billedObj).doubleValue() : 0.0);
+                
+                Object discountObj = r[i++];
+                m.put("Discount", discountObj != null ? ((Number) discountObj).doubleValue() : 0.0);
+                
+                Object duesObj = r[i++];
+                m.put("Dues", duesObj != null ? ((Number) duesObj).doubleValue() : 0.0);
+                
+                Object collectedObj = r[i++];
+                m.put("Collected", collectedObj != null ? ((Number) collectedObj).doubleValue() : 0.0);
+                
+                Object balanceObj = r[i++];
+                m.put("Balance", balanceObj != null ? ((Number) balanceObj).doubleValue() : 0.0);
+                
+                data.add(m);
+            }
+
+            response.put("success", true);
+            response.put("doctorId", doctorId);
+            response.put("clinicId", clinicId);
+            response.put("rows", data);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("error", "Failed to get consolidated family fees: " + e.getMessage());
+        }
         return response;
     }
 
