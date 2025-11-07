@@ -161,8 +161,14 @@ public class ServiceVisitService {
 
         Map<String, Object> response = new HashMap<>();
         try {
-            logger.info("Building master-lists for services visit: patient={}, visitNo={}, date={}", patientId, patientVisitNo, visitDate);
+            logger.info("Building master-lists for services visit: patient={}, visitNo={}, date={}, doctorId={}", 
+                patientId, patientVisitNo, visitDate, doctorId != null ? doctorId : "ALL");
 
+            // Helper: Build doctor_id condition for SQL queries
+            String doctorIdCondition = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND pv.doctor_id = ?" 
+                : "";
+            
             // 1) Vitals from patient_visits_services (PRIMARY TABLE FOR SERVICES)
             // Includes billing/payment fields and joins with receipt table for receipt details
             String vitalsSql = """
@@ -191,14 +197,21 @@ public class ServiceVisitService {
                     AND prs.clinic_id = pv.clinic_id
                     AND prs.doctor_id = pv.doctor_id
                 WHERE pv.patient_id = ? AND pv.shift_id = ? AND pv.clinic_id = ?
-                  AND pv.doctor_id = ? AND DATE(pv.visit_date) = ? AND pv.patient_visit_no = ?
+                  """ + doctorIdCondition + """
+                  AND DATE(pv.visit_date) = ? AND pv.patient_visit_no = ?
                   AND COALESCE(pv.delete_flag,false) = false
             """;
             logger.info("Executing vitals query with params: patientId={}, shiftId={}, clinicId={}, doctorId={}, visitDate={}, patientVisitNo={}", 
-                patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                patientId, shiftId, clinicId, doctorId != null ? doctorId : "ALL", visitDate, patientVisitNo);
             
-            List<Map<String, Object>> vitals = jdbcTemplate.queryForList(
-                vitalsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            List<Map<String, Object>> vitals;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                vitals = jdbcTemplate.queryForList(
+                    vitalsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            } else {
+                vitals = jdbcTemplate.queryForList(
+                    vitalsSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+            }
             
             logger.info("Query executed for vitals. Found {} records for patient={}, visitNo={}, date={}", 
                 vitals.size(), patientId, patientVisitNo, visitDate);
@@ -235,54 +248,89 @@ public class ServiceVisitService {
             }
 
             // 2) Complaints
+            String doctorIdConditionForVisit = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND vc.doctor_id = ?" 
+                : "";
             String complaintsSql = """
                 SELECT short_description || '*' || complaint_description AS id,
                        short_description || ' : ' || complaint_description AS symptoms_description,
                        complaint_description, COALESCE(complaint_comment,'') AS complaint_comment
                 FROM visit_complaints vc
-                WHERE vc.patient_id = ? AND vc.shift_id = ? AND vc.clinic_id = ? AND vc.doctor_id = ?
+                WHERE vc.patient_id = ? AND vc.shift_id = ? AND vc.clinic_id = ? """ + doctorIdConditionForVisit + """
                   AND DATE(vc.visit_date) = ? AND vc.patient_visit_no = ? AND COALESCE(vc.delete_flag,false) = false
             """;
-            List<Map<String, Object>> complaints = jdbcTemplate.queryForList(
-                complaintsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            List<Map<String, Object>> complaints;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                complaints = jdbcTemplate.queryForList(
+                    complaintsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            } else {
+                complaints = jdbcTemplate.queryForList(
+                    complaintsSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+            }
 
             // 3) Diagnosis
+            String doctorIdConditionForDiagnosis = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND vd.doctor_id = ?" 
+                : "";
             String diagnosisSql = """
                 SELECT short_description || '*' || desease_description AS id,
                        short_description || ' : ' || desease_description AS diagnosis_description,
                        desease_description
                 FROM visit_diagnosis vd
-                WHERE vd.patient_id = ? AND vd.shift_id = ? AND vd.clinic_id = ? AND vd.doctor_id = ?
+                WHERE vd.patient_id = ? AND vd.shift_id = ? AND vd.clinic_id = ? """ + doctorIdConditionForDiagnosis + """
                   AND DATE(vd.visit_date) = ? AND vd.patient_visit_no = ? AND COALESCE(vd.delete_flag,false) = false
             """;
-            List<Map<String, Object>> diagnosis = jdbcTemplate.queryForList(
-                diagnosisSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            List<Map<String, Object>> diagnosis;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                diagnosis = jdbcTemplate.queryForList(
+                    diagnosisSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            } else {
+                diagnosis = jdbcTemplate.queryForList(
+                    diagnosisSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+            }
 
             // 4) Dressing
+            String doctorIdConditionForDressing = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND dd.doctor_id = ?" 
+                : "";
             String dressingSql = """
                 SELECT dressing_description AS dressing_description,
                        dressing_description AS short_description,
                        dressing_description AS longdressing_description
                 FROM visit_dressing dd
-                WHERE dd.patient_id = ? AND dd.shift_id = ? AND dd.clinic_id = ? AND dd.doctor_id = ?
+                WHERE dd.patient_id = ? AND dd.shift_id = ? AND dd.clinic_id = ? """ + doctorIdConditionForDressing + """
                   AND DATE(dd.visit_date) = ? AND dd.patient_visit_no = ? AND COALESCE(dd.delete_flag,false) = false
             """;
-            List<Map<String, Object>> dressing = jdbcTemplate.queryForList(
-                dressingSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            List<Map<String, Object>> dressing;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                dressing = jdbcTemplate.queryForList(
+                    dressingSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            } else {
+                dressing = jdbcTemplate.queryForList(
+                    dressingSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+            }
 
             // 5) Medicines - prefer overwrite (check if exists with status_id = 5 from patient_visits_services)
+            String doctorIdConditionForMedicine = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND vm.doctor_id = ?" 
+                : "";
             String medicineOverwriteCheckSql = """
                 SELECT COUNT(*) FROM visit_medicine_overwrite vm
                 INNER JOIN patient_visits_services pv ON vm.patient_id = pv.patient_id
-                WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? AND vm.doctor_id = ?
+                WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? """ + doctorIdConditionForMedicine + """
                   AND DATE(vm.visit_date) = ? AND vm.patient_visit_no = ?
                   AND pv.status_id = 5
                   AND COALESCE(vm.delete_indicator,false) = false AND COALESCE(vm.delete_flag,false) = false
             """;
             Integer medicineOverwriteCount = 0;
             try {
-                medicineOverwriteCount = jdbcTemplate.queryForObject(
-                    medicineOverwriteCheckSql, Integer.class, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                if (doctorId != null && !doctorId.trim().isEmpty()) {
+                    medicineOverwriteCount = jdbcTemplate.queryForObject(
+                        medicineOverwriteCheckSql, Integer.class, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                } else {
+                    medicineOverwriteCount = jdbcTemplate.queryForObject(
+                        medicineOverwriteCheckSql, Integer.class, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+                }
             } catch (Exception e) {
                 logger.debug("No medicine overwrite records found or error checking: {}", e.getMessage());
                 medicineOverwriteCount = 0;
@@ -298,12 +346,17 @@ public class ServiceVisitService {
                            vm.short_description AS short_description,
                            REPLACE(vm.short_description, '''', '') AS med_replace
                     FROM visit_medicine_overwrite vm
-                    WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? AND vm.doctor_id = ?
+                    WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? """ + doctorIdConditionForMedicine + """
                       AND DATE(vm.visit_date) = ? AND vm.patient_visit_no = ?
                       AND COALESCE(vm.delete_indicator,false) = false AND COALESCE(vm.delete_flag,false) = false
                 """;
-                medicines = jdbcTemplate.queryForList(
-                    medicineOverwriteSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                if (doctorId != null && !doctorId.trim().isEmpty()) {
+                    medicines = jdbcTemplate.queryForList(
+                        medicineOverwriteSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                } else {
+                    medicines = jdbcTemplate.queryForList(
+                        medicineOverwriteSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+                }
             } else {
                 // Use regular table
                 String medicineSql = """
@@ -313,27 +366,40 @@ public class ServiceVisitService {
                            vm.short_description AS short_description,
                            REPLACE(vm.short_description, '''', '') AS med_replace
                     FROM visit_medicine vm
-                    WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? AND vm.doctor_id = ?
+                    WHERE vm.patient_id = ? AND vm.shift_id = ? AND vm.clinic_id = ? """ + doctorIdConditionForMedicine + """
                       AND DATE(vm.visit_date) = ? AND vm.patient_visit_no = ?
                       AND COALESCE(vm.delete_flag,false) = false
                 """;
-                medicines = jdbcTemplate.queryForList(
-                    medicineSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                if (doctorId != null && !doctorId.trim().isEmpty()) {
+                    medicines = jdbcTemplate.queryForList(
+                        medicineSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                } else {
+                    medicines = jdbcTemplate.queryForList(
+                        medicineSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+                }
             }
 
             // 6) Prescriptions - prefer overwrite (check if exists with status_id = 5 from patient_visits_services)
+            String doctorIdConditionForPrescription = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND vp.doctor_id = ?" 
+                : "";
             String prescriptionOverwriteCheckSql = """
                 SELECT COUNT(*) FROM visit_prescription_overwrite vp
                 INNER JOIN patient_visits_services pv ON vp.patient_id = pv.patient_id
-                WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? AND vp.doctor_id = ?
+                WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? """ + doctorIdConditionForPrescription + """
                   AND DATE(vp.visit_date) = ? AND vp.patient_visit_no = ?
                   AND pv.status_id = 5
                   AND COALESCE(vp.delete_indicator,false) = false AND COALESCE(vp.delete_flag,false) = false
             """;
             Integer prescriptionOverwriteCount = 0;
             try {
-                prescriptionOverwriteCount = jdbcTemplate.queryForObject(
-                    prescriptionOverwriteCheckSql, Integer.class, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                if (doctorId != null && !doctorId.trim().isEmpty()) {
+                    prescriptionOverwriteCount = jdbcTemplate.queryForObject(
+                        prescriptionOverwriteCheckSql, Integer.class, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                } else {
+                    prescriptionOverwriteCount = jdbcTemplate.queryForObject(
+                        prescriptionOverwriteCheckSql, Integer.class, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+                }
             } catch (Exception e) {
                 logger.debug("No prescription overwrite records found or error checking: {}", e.getMessage());
                 prescriptionOverwriteCount = 0;
@@ -351,13 +417,18 @@ public class ServiceVisitService {
                            vp.medicine_name,
                            vp.sequence_id
                     FROM visit_prescription_overwrite vp
-                    WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? AND vp.doctor_id = ?
+                    WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? """ + doctorIdConditionForPrescription + """
                       AND DATE(vp.visit_date) = ? AND vp.patient_visit_no = ?
                       AND COALESCE(vp.delete_indicator,false) = false AND COALESCE(vp.delete_flag,false) = false
                     ORDER BY vp.sequence_id
                 """;
-                prescriptions = jdbcTemplate.queryForList(
-                    prescriptionOverwriteSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                if (doctorId != null && !doctorId.trim().isEmpty()) {
+                    prescriptions = jdbcTemplate.queryForList(
+                        prescriptionOverwriteSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                } else {
+                    prescriptions = jdbcTemplate.queryForList(
+                        prescriptionOverwriteSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+                }
             } else {
                 // Use regular table
                 String prescriptionSql = """
@@ -369,33 +440,54 @@ public class ServiceVisitService {
                            vp.medicine_name,
                            vp.sequence_id
                     FROM visit_prescription vp
-                    WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? AND vp.doctor_id = ?
+                    WHERE vp.patient_id = ? AND vp.shift_id = ? AND vp.clinic_id = ? """ + doctorIdConditionForPrescription + """
                       AND DATE(vp.visit_date) = ? AND vp.patient_visit_no = ?
                       AND COALESCE(vp.delete_flag,false) = false
                     ORDER BY vp.sequence_id
                 """;
-                prescriptions = jdbcTemplate.queryForList(
-                    prescriptionSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                if (doctorId != null && !doctorId.trim().isEmpty()) {
+                    prescriptions = jdbcTemplate.queryForList(
+                        prescriptionSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+                } else {
+                    prescriptions = jdbcTemplate.queryForList(
+                        prescriptionSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+                }
             }
 
             // 7) Lab tests asked
+            String doctorIdConditionForLab = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND pvla.doctor_id = ?" 
+                : "";
             String labsSql = """
                 SELECT lab_test_description AS id
                 FROM patient_visit_labtestasked pvla
-                WHERE pvla.patient_id = ? AND pvla.shift_id = ? AND pvla.clinic_id = ? AND pvla.doctor_id = ?
+                WHERE pvla.patient_id = ? AND pvla.shift_id = ? AND pvla.clinic_id = ? """ + doctorIdConditionForLab + """
                   AND DATE(pvla.visit_date) = ? AND pvla.patient_visit_no = ? AND COALESCE(pvla.delete_flag,false) = false
             """;
-            List<Map<String, Object>> labTestsAsked = jdbcTemplate.queryForList(
-                labsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            List<Map<String, Object>> labTestsAsked;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                labTestsAsked = jdbcTemplate.queryForList(
+                    labsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            } else {
+                labTestsAsked = jdbcTemplate.queryForList(
+                    labsSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+            }
 
             // 8) Previous visit vitals from patient_visits (using CTE logic from stored procedure)
             // This finds the previous visit number and then gets vitals from patient_visits
+            String doctorIdConditionForPreviousVisit = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND doctor_id = ?" 
+                : "";
+            String doctorIdConditionForPreviousVisitFinal = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND pv.doctor_id = ?" 
+                : "";
             String previousVisitVitalsSql = """
                 WITH MaxDateTime AS (
                     SELECT ROW_NUMBER() OVER (PARTITION BY patient_id ORDER BY visit_date DESC, visit_time DESC) AS rownum,
                            patient_visit_no
                     FROM patient_visits_services
-                    WHERE patient_visit_no < ? AND patient_id = ? AND doctor_id = ? AND COALESCE(delete_flag,false) = false
+                    WHERE patient_visit_no < ? AND patient_id = ? """ + doctorIdConditionForPreviousVisit + """
+                     AND COALESCE(delete_flag,false) = false
                 ),
                 LastVisitNo AS (
                     SELECT rownum, patient_visit_no FROM MaxDateTime WHERE rownum = 1
@@ -416,35 +508,60 @@ public class ServiceVisitService {
                 FROM patient_visits pv
                 INNER JOIN patient_master pm ON pv.patient_id = pm.id
                 LEFT JOIN LastVisitNo lvn ON pv.patient_visit_no = lvn.patient_visit_no
-                WHERE pv.patient_id = ? AND pv.doctor_id = ? AND COALESCE(pv.delete_flag,false) = false
+                WHERE pv.patient_id = ? """ + doctorIdConditionForPreviousVisitFinal + """
+                 AND COALESCE(pv.delete_flag,false) = false
                 ORDER BY pv.patient_visit_no DESC
                 LIMIT 1
             """;
-            List<Map<String, Object>> previousVisitVitals = jdbcTemplate.queryForList(
-                previousVisitVitalsSql, patientVisitNo, patientId, doctorId, patientId, doctorId);
+            List<Map<String, Object>> previousVisitVitals;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                previousVisitVitals = jdbcTemplate.queryForList(
+                    previousVisitVitalsSql, patientVisitNo, patientId, doctorId, patientId, doctorId);
+            } else {
+                previousVisitVitals = jdbcTemplate.queryForList(
+                    previousVisitVitalsSql, patientVisitNo, patientId, patientId);
+            }
 
             // 9) Procedure findings
+            String doctorIdConditionForProcedure = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND vpf.doctor_id = ?" 
+                : "";
             String procedureFindingsSql = """
                 SELECT procedure_description, findings_description, findings_comment,
                        procedure_description AS pro_replace, findings_description AS find_replace
                 FROM visit_procedure_findings vpf
-                WHERE vpf.patient_id = ? AND vpf.shift_id = ? AND vpf.clinic_id = ? AND vpf.doctor_id = ?
+                WHERE vpf.patient_id = ? AND vpf.shift_id = ? AND vpf.clinic_id = ? """ + doctorIdConditionForProcedure + """
                   AND DATE(vpf.visit_date) = ? AND vpf.patient_visit_no = ?
                   AND COALESCE(vpf.delete_flag,false) = false
             """;
-            List<Map<String, Object>> procedureFindings = jdbcTemplate.queryForList(
-                procedureFindingsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            List<Map<String, Object>> procedureFindings;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                procedureFindings = jdbcTemplate.queryForList(
+                    procedureFindingsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            } else {
+                procedureFindings = jdbcTemplate.queryForList(
+                    procedureFindingsSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+            }
 
             // 10) Instruction groups
+            String doctorIdConditionForInstructions = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND vgi.doctor_id = ?" 
+                : "";
             String instructionGroupsSql = """
                 SELECT group_description, instructions_description, sequence_no
                 FROM visit_groups_instructions vgi
-                WHERE vgi.patient_id = ? AND vgi.shift_id = ? AND vgi.clinic_id = ? AND vgi.doctor_id = ?
+                WHERE vgi.patient_id = ? AND vgi.shift_id = ? AND vgi.clinic_id = ? """ + doctorIdConditionForInstructions + """
                   AND DATE(vgi.visit_date) = ? AND vgi.patient_visit_no = ?
                 ORDER BY vgi.group_description, vgi.sequence_no
             """;
-            List<Map<String, Object>> instructionGroupsRaw = jdbcTemplate.queryForList(
-                instructionGroupsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            List<Map<String, Object>> instructionGroupsRaw;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                instructionGroupsRaw = jdbcTemplate.queryForList(
+                    instructionGroupsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            } else {
+                instructionGroupsRaw = jdbcTemplate.queryForList(
+                    instructionGroupsSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+            }
             
             // Deduplicate instruction groups
             List<Map<String, Object>> instructionGroups = new ArrayList<>();
@@ -484,16 +601,25 @@ public class ServiceVisitService {
             }
 
             // 11) Receipts (all)
+            String doctorIdConditionForReceipts = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND pr.doctor_id = ?" 
+                : "";
             String receiptsSql = """
                 SELECT pr.receipt_number, pr.receipt_date, pr.receipt_type, pr.receipt_amount,
                        pr.treatment_details, pr.title, pt.title_description, pr.to_date, pr.from_date
                 FROM patient_receipts pr
                 INNER JOIN patient_title pt ON pr.title = pt.id
-                WHERE pr.patient_id = ? AND pr.clinic_id = ? AND pr.doctor_id = ?
+                WHERE pr.patient_id = ? AND pr.clinic_id = ? """ + doctorIdConditionForReceipts + """
                   AND DATE(pr.receipt_date) = ? AND pr.shift_id = ? AND pr.patient_visit_no = ?
             """;
-            List<Map<String, Object>> receipts = jdbcTemplate.queryForList(
-                receiptsSql, patientId, clinicId, doctorId, visitDate, shiftId, patientVisitNo);
+            List<Map<String, Object>> receipts;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                receipts = jdbcTemplate.queryForList(
+                    receiptsSql, patientId, clinicId, doctorId, visitDate, shiftId, patientVisitNo);
+            } else {
+                receipts = jdbcTemplate.queryForList(
+                    receiptsSql, patientId, clinicId, visitDate, shiftId, patientVisitNo);
+            }
 
             // 12) Receipts (excluding type 'L')
             String receiptsExcludingLSql = """
@@ -501,33 +627,57 @@ public class ServiceVisitService {
                        pr.treatment_details, pr.title, pt.title_description, pr.to_date, pr.from_date
                 FROM patient_receipts pr
                 INNER JOIN patient_title pt ON pr.title = pt.id
-                WHERE pr.patient_id = ? AND pr.clinic_id = ? AND pr.doctor_id = ?
+                WHERE pr.patient_id = ? AND pr.clinic_id = ? """ + doctorIdConditionForReceipts + """
                   AND DATE(pr.receipt_date) = ? AND pr.shift_id = ? AND pr.patient_visit_no = ?
                   AND pr.receipt_type != 'L'
             """;
-            List<Map<String, Object>> receiptsExcludingL = jdbcTemplate.queryForList(
-                receiptsExcludingLSql, patientId, clinicId, doctorId, visitDate, shiftId, patientVisitNo);
+            List<Map<String, Object>> receiptsExcludingL;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                receiptsExcludingL = jdbcTemplate.queryForList(
+                    receiptsExcludingLSql, patientId, clinicId, doctorId, visitDate, shiftId, patientVisitNo);
+            } else {
+                receiptsExcludingL = jdbcTemplate.queryForList(
+                    receiptsExcludingLSql, patientId, clinicId, visitDate, shiftId, patientVisitNo);
+            }
 
             // 13) Payments (AdHoc)
+            String doctorIdConditionForPayments = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND ppa.doctor_id = ?" 
+                : "";
             String paymentsSql = """
                 SELECT fees_collected
                 FROM patient_payments_adhoc ppa
-                WHERE ppa.patient_id = ? AND ppa.clinic_id = ? AND ppa.doctor_id = ?
+                WHERE ppa.patient_id = ? AND ppa.clinic_id = ? """ + doctorIdConditionForPayments + """
                   AND DATE(ppa.payment_date) = ? AND ppa.shift_id = ?
             """;
-            List<Map<String, Object>> payments = jdbcTemplate.queryForList(
-                paymentsSql, patientId, clinicId, doctorId, visitDate, shiftId);
+            List<Map<String, Object>> payments;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                payments = jdbcTemplate.queryForList(
+                    paymentsSql, patientId, clinicId, doctorId, visitDate, shiftId);
+            } else {
+                payments = jdbcTemplate.queryForList(
+                    paymentsSql, patientId, clinicId, visitDate, shiftId);
+            }
 
             // 14) Lab test results
+            String doctorIdConditionForLabResults = (doctorId != null && !doctorId.trim().isEmpty()) 
+                ? "AND pvlr.doctor_id = ?" 
+                : "";
             String labTestResultsSql = """
                 SELECT lab_test_description AS id
                 FROM patient_visit_labtestresults pvlr
-                WHERE pvlr.patient_id = ? AND pvlr.shift_id = ? AND pvlr.clinic_id = ? AND pvlr.doctor_id = ?
+                WHERE pvlr.patient_id = ? AND pvlr.shift_id = ? AND pvlr.clinic_id = ? """ + doctorIdConditionForLabResults + """
                   AND DATE(pvlr.visit_date) = ? AND pvlr.patient_visit_no = ?
                   AND COALESCE(pvlr.delete_flag,false) = false
             """;
-            List<Map<String, Object>> labTestResults = jdbcTemplate.queryForList(
-                labTestResultsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            List<Map<String, Object>> labTestResults;
+            if (doctorId != null && !doctorId.trim().isEmpty()) {
+                labTestResults = jdbcTemplate.queryForList(
+                    labTestResultsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            } else {
+                labTestResults = jdbcTemplate.queryForList(
+                    labTestResultsSql, patientId, shiftId, clinicId, visitDate, patientVisitNo);
+            }
 
             // 15) Billing - prefer overwrite (check if exists)
             String billingOverwriteCheckSql = """

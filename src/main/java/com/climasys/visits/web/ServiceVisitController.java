@@ -93,13 +93,14 @@ public class ServiceVisitController {
     /**
      * JPA replacement for USP_Get_MasterLists_Services.
      * Returns master lists for services visits (uses patient_visits_services table).
+     * doctorId is optional - if not provided, returns data for all doctors for the patient/clinic/visit.
      */
     @GetMapping("/master-lists")
     public ResponseEntity<?> getMasterListsForServices(
             @RequestParam String patientId,
             @RequestParam Short shiftId,
             @RequestParam String clinicId,
-            @RequestParam String doctorId,
+            @RequestParam(required = false) String doctorId,
             @RequestParam String visitDate, // YYYY-MM-DD
             @RequestParam Integer patientVisitNo) {
         try {
