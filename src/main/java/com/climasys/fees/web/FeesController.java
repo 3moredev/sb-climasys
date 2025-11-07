@@ -56,16 +56,22 @@ public class FeesController {
     }
 
     /**
-     * JPA/JDBC equivalent for USP_Get_PatientFolderAmountForBilling
+     * JPA/JDBC equivalent for USP_Get_PatientFolderAmountForBilling.
+     * Returns ALL visits for a patient from patient_visits_services table.
+     * This is used to calculate the total A/C balance by summing all visit balances.
+     * 
+     * @param clinicId Clinic ID (required)
+     * @param doctorId Doctor ID (required, though not used in WHERE clause currently)
+     * @param patientId Patient ID (required)
+     * @return Response with success, clinicId, doctorId, patientId, rows (list of all visits with billing details), and totalAcBalance (sum of all balances)
      */
     @GetMapping("/folder-amount")
     public ResponseEntity<Map<String, Object>> getPatientFolderAmountForBilling(
             @RequestParam String clinicId,
             @RequestParam String doctorId,
-            @RequestParam String folderNo,
-            @RequestParam Integer patientVisitNo) {
+            @RequestParam String patientId) {
         Map<String, Object> result = feesDetailsService.getPatientFolderAmountForBilling(
-                clinicId, doctorId, folderNo, patientVisitNo);
+                clinicId, doctorId, patientId);
         return ResponseEntity.ok(result);
     }
 }

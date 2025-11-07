@@ -146,61 +146,111 @@ public class FeesDetailsService {
 
     /**
      * JPA/JDBC equivalent for USP_Get_PatientFolderAmountForBilling.
-     * Computes folder-level billed, collected, discount and dues for a specific visit.
-     * Returns: { success, clinicId, doctorId, folderNo, patientVisitNo, billed, collected, discount, dues, patientId }
+     * Returns ALL visits for a patient from patient_visits_services table.
+     * This matches the stored procedure behavior which returns all visits to calculate total A/C balance.
+     * 
+     * Returns: { success, clinicId, doctorId, patientId, rows: [ { Patient_ID, Full_Name, Patient_Visit_No, 
+     *          Visit_Date, Financial_Year, Bill, Collected, Balance, Discount, Dues }, ... ] }
      */
-    public Map<String, Object> getPatientFolderAmountForBilling(String clinicId, String doctorId, String folderNo, Integer patientVisitNo) {
+    public Map<String, Object> getPatientFolderAmountForBilling(String clinicId, String doctorId, String patientId) {
         Map<String, Object> res = new LinkedHashMap<>();
         try {
-            // Resolve patient_id from folder number
-            String patientIdSql = "SELECT id FROM patient_master WHERE folder_no = ? LIMIT 1";
-            List<Map<String, Object>> pid = jdbcTemplate.queryForList(patientIdSql, folderNo);
-            if (pid.isEmpty()) {
-                res.put("success", false);
-                res.put("error", "Folder not found");
-                return res;
-            }
-            String patientId = Objects.toString(pid.get(0).get("id"), null);
-
-            // Fetch the visit row matching patient + clinic + doctor + visitNo (latest date for that visitNo)
+            // Query matching the stored procedure USP_Get_PatientFolderAmountForBilling
+            // Returns all visits from patient_visits_services with status_id=8
+            // Using UNION ALL to also include patient_visits (status_id=5) for comprehensive billing data
             String visitSql = """
-                SELECT fees_to_collect AS billed,
-                       COALESCE(fees_collected, 0) AS collected,
-                       COALESCE(discount, 0) AS discount
-                  FROM patient_visits
-                 WHERE patient_id = ? AND clinic_id = ? AND doctor_id = ?
-                   AND patient_visit_no = ? AND COALESCE(delete_flag,false) = false
-                 ORDER BY visit_date DESC
-                 LIMIT 1
+                SELECT pv.patient_id AS Patient_ID,
+                       (pm.first_name || ' ' || pm.last_name) AS Full_Name,
+                       pv.patient_visit_no AS Patient_Visit_No,
+                       pv.visit_date AS Visit_Date,
+                       pv.financial_year AS Financial_Year,
+                       pv.fees_to_collect AS Bill,
+                       COALESCE(pv.fees_collected, 0) AS Collected,
+                       ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
+                       COALESCE(pv.discount, 0) AS Discount,
+                       (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
+                  FROM patient_master pm
+                  INNER JOIN patient_visits_services pv
+                    ON pm.id = pv.patient_id
+                   AND pm.clinic_id = pv.clinic_id
+                 WHERE pv.patient_id = ?
+                   AND pv.clinic_id = ?
+                   AND COALESCE(pv.delete_flag, false) = false
+                   AND pv.fees_to_collect IS NOT NULL
+                   AND pv.status_id = 8
+                UNION ALL
+                SELECT pv.patient_id AS Patient_ID,
+                       (pm.first_name || ' ' || pm.last_name) AS Full_Name,
+                       pv.patient_visit_no AS Patient_Visit_No,
+                       pv.visit_date AS Visit_Date,
+                       pv.financial_year AS Financial_Year,
+                       pv.fees_to_collect AS Bill,
+                       COALESCE(pv.fees_collected, 0) AS Collected,
+                       ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
+                       COALESCE(pv.discount, 0) AS Discount,
+                       (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
+                  FROM patient_master pm
+                  INNER JOIN patient_visits pv
+                    ON pm.id = pv.patient_id
+                   AND pm.clinic_id = pv.clinic_id
+                 WHERE pv.patient_id = ?
+                   AND pv.clinic_id = ?
+                   AND COALESCE(pv.delete_flag, false) = false
+                   AND pv.fees_to_collect IS NOT NULL
+                   AND pv.status_id = 5
+                 ORDER BY Visit_Date ASC
             """;
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(visitSql, patientId, clinicId, doctorId, patientVisitNo);
-
-            double billed = 0.0;
-            double collected = 0.0;
-            double discount = 0.0;
-            if (!rows.isEmpty()) {
-                Map<String, Object> r = rows.get(0);
-                billed = r.get("billed") == null ? 0.0 : ((Number) r.get("billed")).doubleValue();
-                collected = r.get("collected") == null ? 0.0 : ((Number) r.get("collected")).doubleValue();
-                discount = r.get("discount") == null ? 0.0 : ((Number) r.get("discount")).doubleValue();
+            
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(visitSql, patientId, clinicId, patientId, clinicId);
+            
+            List<Map<String, Object>> data = new ArrayList<>();
+            
+            for (Map<String, Object> row : rows) {
+                Map<String, Object> visit = new LinkedHashMap<>();
+                visit.put("Patient_ID", row.get("Patient_ID"));
+                visit.put("Full_Name", row.get("Full_Name"));
+                visit.put("Patient_Visit_No", row.get("Patient_Visit_No"));
+                visit.put("Visit_Date", row.get("Visit_Date"));
+                visit.put("Financial_Year", row.get("Financial_Year"));
+                
+                // Convert numeric values to double for consistency
+                Object billObj = row.get("Bill");
+                visit.put("Bill", billObj != null ? ((Number) billObj).doubleValue() : 0.0);
+                
+                Object collectedObj = row.get("Collected");
+                visit.put("Collected", collectedObj != null ? ((Number) collectedObj).doubleValue() : 0.0);
+                
+                Object balanceObj = row.get("Balance");
+                visit.put("Balance", balanceObj != null ? ((Number) balanceObj).doubleValue() : 0.0);
+                
+                Object discountObj = row.get("Discount");
+                visit.put("Discount", discountObj != null ? ((Number) discountObj).doubleValue() : 0.0);
+                
+                Object duesObj = row.get("Dues");
+                visit.put("Dues", duesObj != null ? ((Number) duesObj).doubleValue() : 0.0);
+                
+                data.add(visit);
             }
-
-            double dues = (billed - discount) - collected;
 
             res.put("success", true);
             res.put("clinicId", clinicId);
             res.put("doctorId", doctorId);
-            res.put("folderNo", folderNo);
-            res.put("patientVisitNo", patientVisitNo);
             res.put("patientId", patientId);
-            res.put("billed", billed);
-            res.put("collected", collected);
-            res.put("discount", discount);
-            res.put("dues", dues);
+            res.put("rows", data);
+            
+            // Calculate total A/C balance (sum of all balances)
+            double totalAcBalance = data.stream()
+                .mapToDouble(v -> {
+                    Object balance = v.get("Balance");
+                    return balance != null ? ((Number) balance).doubleValue() : 0.0;
+                })
+                .sum();
+            res.put("totalAcBalance", totalAcBalance);
+            
             return res;
         } catch (Exception e) {
             res.put("success", false);
-            res.put("error", e.getMessage());
+            res.put("error", "Failed to get patient folder amount for billing: " + e.getMessage());
             return res;
         }
     }
