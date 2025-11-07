@@ -44,7 +44,7 @@ public class ServiceVisitController {
     @GetMapping("/previous-visit-items")
     public ResponseEntity<?> getPreviousServiceVisitItems(
             @RequestParam String patientId,
-            @RequestParam String doctorId,
+            @RequestParam(required = false) String doctorId,
             @RequestParam String clinicId,
             @RequestParam Short shiftId,
             @RequestParam Integer visitNo,

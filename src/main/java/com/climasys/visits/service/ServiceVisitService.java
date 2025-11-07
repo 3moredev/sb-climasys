@@ -76,7 +76,7 @@ public class ServiceVisitService {
 
     public Map<String, Object> getPreviousServiceVisitLineItems(
             String patientId,
-            String doctorId,
+            String doctorId, // Optional - not used in queries but kept for logging/consistency
             String clinicId,
             Short shiftId,
             Integer visitNo,
@@ -86,7 +86,7 @@ public class ServiceVisitService {
         List<Map<String, Object>> items = new ArrayList<>(); // Always initialize
         try {
             logger.info("Fetching previous service visit line-items for patient: {}, doctor: {}, clinic: {}, shiftId: {}, visitNo: {}, visitDate: {}", 
-                patientId, doctorId, clinicId, shiftId, visitNo, visitDate);
+                patientId, doctorId != null ? doctorId : "ALL", clinicId, shiftId, visitNo, visitDate);
             
             // Match stored procedure logic: check overwrite table first, then fallback to base table
             // Stored procedure uses: Patient_ID, Clinic_ID, Patient_Visit_No only (Shift_ID, Doctor_ID, Visit_Date are not filtered)
@@ -137,7 +137,7 @@ public class ServiceVisitService {
             logger.info("Returning {} service visit line-items (from {})", items.size(), existsInOverwrite ? "overwrite table" : "base table");
         } catch (Exception e) {
             logger.error("Failed to fetch previous service line-items for patient: {}, doctor: {}, clinic: {}, shiftId: {}, visitNo: {}, visitDate: {}: {}", 
-                patientId, doctorId, clinicId, shiftId, visitNo, visitDate, e.getMessage(), e);
+                patientId, doctorId != null ? doctorId : "ALL", clinicId, shiftId, visitNo, visitDate, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to fetch previous service line-items: " + e.getMessage());
             response.put("items", items); // Always include items, even on error
