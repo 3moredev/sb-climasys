@@ -1688,7 +1688,8 @@ public class VisitJpaService {
         visitMap.put("weightInKgs", visit.getWeightInKgs());
         visitMap.put("bloodPressure", visit.getBloodPressure());
         visitMap.put("sugar", visit.getSugar());
-        // TFT field not available in entity
+        visitMap.put("tft", visit.getThtext());
+        visitMap.put("thtext", visit.getThtext()); // Also include as thtext for compatibility
         
         // Medical Conditions
         visitMap.put("hypertension", visit.getHypertension());
