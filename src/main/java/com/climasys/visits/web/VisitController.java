@@ -635,6 +635,15 @@ public class VisitController {
             logger.info("Received comprehensive-save-jpa request - PatientId: {}, DoctorId: {}, ClinicId: {}, ShiftId: {}, VisitNo: {}, StatusId: {}", 
                 req.patientId(), req.doctorId(), req.clinicId(), req.shiftId(), req.patientVisitNo(), req.statusId());
             
+            // Log instruction groups immediately when request arrives
+            logger.info("🔍 INSTRUCTION GROUPS IN REQUEST - isNull: {}, isEmpty: {}, size: {}", 
+                req.instructionGroups() == null, 
+                req.instructionGroups() == null ? "N/A" : req.instructionGroups().isEmpty(),
+                req.instructionGroups() == null ? "N/A" : req.instructionGroups().size());
+            if (req.instructionGroups() != null && !req.instructionGroups().isEmpty()) {
+                logger.info("📋 INSTRUCTION GROUPS DATA RECEIVED: {}", req.instructionGroups());
+            }
+            
             // Validate and parse required fields
             if (req.shiftId() == null || req.shiftId().trim().isEmpty()) {
                 logger.warn("Shift ID validation failed - received: {}", req.shiftId());
@@ -1361,8 +1370,24 @@ public class VisitController {
                     }
                     
                     // Instruction Groups - Save using JPA (matching stored procedure logic)
+                    // Log instruction groups status BEFORE checking
+                    logger.info("🔍 Checking instruction groups - isNull: {}, isEmpty: {}, size: {}", 
+                        req.instructionGroups() == null, 
+                        req.instructionGroups() == null ? "N/A" : req.instructionGroups().isEmpty(),
+                        req.instructionGroups() == null ? "N/A" : req.instructionGroups().size());
+                    
+                    if (req.instructionGroups() == null) {
+                        logger.warn("⚠️ instructionGroups is NULL in request");
+                    } else if (req.instructionGroups().isEmpty()) {
+                        logger.warn("⚠️ instructionGroups is EMPTY in request (size: 0)");
+                    }
+                    
                     if (req.instructionGroups() != null && !req.instructionGroups().isEmpty()) {
-                        logger.info("Processing {} instruction group items for patient: {}, visit: {}", req.instructionGroups().size(), patientId, patientVisitNoVal);
+                        logger.info("📋 Processing {} instruction group items for patient: {}, visit: {}", 
+                            req.instructionGroups().size(), patientId, patientVisitNoVal);
+                        
+                        // Log raw data received for debugging (INFO level so it shows in logs)
+                        logger.info("Raw instructionGroups data: {}", req.instructionGroups());
                         
                         try {
                             // CRITICAL: Use the EXACT visit_date from the saved visit entity (from result map)
@@ -1406,21 +1431,11 @@ public class VisitController {
                             
                             logger.info("Final visit_date to use for instruction groups: {}", exactVisitDateForInstructions);
                             
-                            // CRITICAL: Verify the visit exists in patient_visits table with exact composite key before proceeding
-                            String verifyVisitSql = "SELECT COUNT(*) FROM patient_visits WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND visit_date = ? AND delete_flag = false";
-                            java.sql.Timestamp verifyVisitDateTs = java.sql.Timestamp.valueOf(exactVisitDateForInstructions);
-                            Integer visitCount = jdbcTemplate.queryForObject(verifyVisitSql, Integer.class, 
-                                patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, verifyVisitDateTs);
-                            
-                            if (visitCount == null || visitCount == 0) {
-                                logger.error("CRITICAL: Visit does not exist in patient_visits table with exact composite key!");
-                                logger.error("  PatientId: {}, DoctorId: {}, ClinicId: {}, ShiftId: {}, PatientVisitNo: {}, VisitDate: {}", 
-                                    patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateForInstructions);
-                                result.put("instructionGroupsInsertError", "Parent visit not found in patient_visits table with exact composite key");
-                                throw new IllegalStateException("Parent visit not found: Cannot insert instruction groups without matching patient_visits record");
-                            }
-                            
-                            logger.info("✓ Verified visit exists in patient_visits table (count: {})", visitCount);
+                            // NOTE: We don't need to verify the visit exists because we just saved it in the same transaction
+                            // The visit is guaranteed to exist since saveComprehensiveVisit succeeded
+                            // Verification was causing issues because JPA entities might not be visible to JDBC queries
+                            // until flush, but we can trust the visitDate from the saved entity
+                            logger.info("✓ Using visit_date from saved visit entity (no verification needed - visit was just saved)");
                             
                             // Delete existing instruction groups for this visit (matching stored procedure logic)
                             visitGroupsInstructionsRepository.deleteByVisit(
@@ -1436,8 +1451,25 @@ public class VisitController {
                                 String instructionsDescription = getStringValue(instructionItem, "instructionsDescription", "instructions_description");
                                 Integer sequenceNo = getIntegerValue(instructionItem, "sequenceNo", "sequence_no");
                                 
-                                if (groupDescription != null && !groupDescription.trim().isEmpty() &&
-                                    instructionsDescription != null && !instructionsDescription.trim().isEmpty()) {
+                                logger.info("Processing instruction item {} - groupDescription: '{}', instructionsDescription: '{}', sequenceNo: {}, fullItem: {}", 
+                                    visitInstructions.size() + 1, groupDescription, instructionsDescription, sequenceNo, instructionItem);
+                                
+                                // Allow saving if at least groupDescription OR instructionsDescription is present
+                                // Both fields are required in the table, but we'll use empty string if one is missing
+                                boolean hasGroupDesc = groupDescription != null && !groupDescription.trim().isEmpty();
+                                boolean hasInstrDesc = instructionsDescription != null && !instructionsDescription.trim().isEmpty();
+                                
+                                if (hasGroupDesc || hasInstrDesc) {
+                                    // Use empty string if a field is missing (table allows it)
+                                    String finalGroupDesc = hasGroupDesc ? groupDescription.trim() : "";
+                                    String finalInstrDesc = hasInstrDesc ? instructionsDescription.trim() : "";
+                                    
+                                    if (!hasGroupDesc) {
+                                        logger.warn("⚠️ Instruction item missing groupDescription, using empty string. Item: {}", instructionItem);
+                                    }
+                                    if (!hasInstrDesc) {
+                                        logger.warn("⚠️ Instruction item missing instructionsDescription, using empty string. Item: {}", instructionItem);
+                                    }
                                     
                                     VisitGroupsInstructions visitInstruction = new VisitGroupsInstructions();
                                     visitInstruction.setDoctorId(doctorId);
@@ -1446,31 +1478,64 @@ public class VisitController {
                                     visitInstruction.setPatientId(patientId);
                                     visitInstruction.setPatientVisitNo(patientVisitNoVal);
                                     visitInstruction.setVisitDate(exactVisitDateForInstructions);
-                                    visitInstruction.setGroupDescription(groupDescription.trim());
-                                    visitInstruction.setInstructionsDescription(instructionsDescription.trim());
+                                    visitInstruction.setGroupDescription(finalGroupDesc);
+                                    visitInstruction.setInstructionsDescription(finalInstrDesc);
                                     visitInstruction.setSequenceNo(sequenceNo != null ? sequenceNo : 0);
                                     visitInstruction.setCreatedByName(userIdVal);
                                     visitInstruction.setCreatedOn(now);
                                     
                                     visitInstructions.add(visitInstruction);
+                                    logger.info("✓ Added instruction item to save list: group='{}', instruction='{}'", finalGroupDesc, finalInstrDesc);
                                 } else {
-                                    logger.warn("Skipping instruction group item with missing required fields: {}", instructionItem);
+                                    logger.warn("⚠️ Skipping instruction group item - both groupDescription and instructionsDescription are missing/empty. Full item: {}", 
+                                        instructionItem);
                                 }
                             }
                             
                             if (!visitInstructions.isEmpty()) {
-                                visitGroupsInstructionsRepository.saveAll(visitInstructions);
-                                logger.info("Successfully saved {} instruction group items for patient: {}, visit: {}", 
+                                logger.info("Attempting to save {} instruction group items for patient: {}, visit: {}", 
                                     visitInstructions.size(), patientId, patientVisitNoVal);
+                                
+                                // Log each instruction being saved for debugging (INFO level)
+                                for (int i = 0; i < visitInstructions.size(); i++) {
+                                    VisitGroupsInstructions vi = visitInstructions.get(i);
+                                    logger.info("Instruction {}: doctorId={}, clinicId={}, shiftId={}, patientId={}, visitNo={}, visitDate={}, group={}, instruction={}", 
+                                        i + 1, vi.getDoctorId(), vi.getClinicId(), vi.getShiftId(), vi.getPatientId(), 
+                                        vi.getPatientVisitNo(), vi.getVisitDate(), vi.getGroupDescription(), vi.getInstructionsDescription());
+                                }
+                                
+                                // Save all instruction groups
+                                List<VisitGroupsInstructions> savedInstructions = visitGroupsInstructionsRepository.saveAll(visitInstructions);
+                                
+                                logger.info("✓ saveAll() returned {} instruction group items (expected {})", 
+                                    savedInstructions.size(), visitInstructions.size());
+                                
+                                // Verify the save by counting records
+                                long countAfterSave = visitGroupsInstructionsRepository.countByDoctorIdAndClinicIdAndShiftIdAndPatientIdAndPatientVisitNoAndVisitDate(
+                                    doctorId, clinicId, shiftIdVal, patientId, patientVisitNoVal, exactVisitDateForInstructions);
+                                logger.info("✓ Verified: {} instruction group records now exist in database for this visit", countAfterSave);
+                                
                                 result.put("instructionGroupsInsertedCount", visitInstructions.size());
+                                result.put("instructionGroupsVerifiedCount", countAfterSave);
                             } else {
-                                logger.warn("No valid instruction group items to save after filtering");
+                                logger.warn("No valid instruction group items to save after filtering. Total items received: {}", 
+                                    req.instructionGroups() != null ? req.instructionGroups().size() : 0);
+                                result.put("instructionGroupsInsertedCount", 0);
+                                result.put("instructionGroupsFilteredOut", true);
                             }
                         } catch (Exception instructionEx) {
-                            logger.error("Failed to save instruction groups for patient: {}, visit: {}, error: {}", 
+                            logger.error("❌ Failed to save instruction groups for patient: {}, visit: {}, error: {}", 
                                 patientId, patientVisitNoVal, instructionEx.getMessage(), instructionEx);
+                            logger.error("Exception stack trace:", instructionEx);
                             result.put("instructionGroupsSaveError", true);
                             result.put("instructionGroupsErrorMessage", instructionEx.getMessage());
+                            
+                            // Re-throw if it's a critical error (like foreign key violation)
+                            if (instructionEx instanceof IllegalStateException || 
+                                (instructionEx.getCause() != null && instructionEx.getCause().getMessage() != null && 
+                                 instructionEx.getCause().getMessage().contains("foreign key"))) {
+                                throw instructionEx;
+                            }
                         }
                     }
                 } catch (Exception persistEx) {
