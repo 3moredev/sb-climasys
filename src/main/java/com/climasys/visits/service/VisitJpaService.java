@@ -976,7 +976,8 @@ public class VisitJpaService {
                        pv.sugar, pv.tpr, pv.odeama, pv.pallor,
                        COALESCE(pv.in_person,false) AS in_person,
                        pv.payment_by_id, pv.payment_remark, pv.fees_collected, pv.receipt_number,
-                       pv.follow_up, pv.follow_up_type, pv.follow_up_date
+                       pv.follow_up, pv.follow_up_type, pv.follow_up_date,
+                       pv.thtext
                 FROM patient_visits pv
                 WHERE pv.patient_id = ? AND pv.shift_id = ? AND pv.clinic_id = ?
                   AND pv.doctor_id = ? AND DATE(pv.visit_date) = ? AND pv.patient_visit_no = ?
@@ -1182,6 +1183,7 @@ public class VisitJpaService {
                 uiFields.put("tpr", v.get("tpr"));
                 uiFields.put("oedema", v.get("odeama"));
                 uiFields.put("pallor", v.get("pallor"));
+                uiFields.put("tft", v.get("thtext"));
                 // Conditions
                 uiFields.put("hypertension", v.get("hypertension"));
                 uiFields.put("diabetes", v.get("diabetes"));
