@@ -56,14 +56,19 @@ public class FeesController {
     }
 
     /**
-     * JPA/JDBC equivalent for USP_Get_PatientFolderAmountForBilling.
-     * Returns ALL visits for a patient from patient_visits_services table.
-     * This is used to calculate the total A/C balance by summing all visit balances.
+     * JPA/JDBC equivalent for USP_Get_PatientFolderAmount.
+     * Returns ALL visits and adhoc payments for a patient to calculate total A/C balance.
+     * This matches the exact stored procedure logic including:
+     * - Patient_Visits (status_id=5)
+     * - Patient_Visits_Services (status_id=8)
+     * - Patient_Payments_AdHoc (advance payments)
+     * 
+     * The method derives folderNo from patientId internally to match the stored procedure's folderNo parameter.
      * 
      * @param clinicId Clinic ID (required)
      * @param doctorId Doctor ID (required, though not used in WHERE clause currently)
-     * @param patientId Patient ID (required)
-     * @return Response with success, clinicId, doctorId, patientId, rows (list of all visits with billing details), and totalAcBalance (sum of all balances)
+     * @param patientId Patient ID (required) - used to derive folderNo
+     * @return Response with success, clinicId, doctorId, patientId, folderNo, rows (list of all visits/payments with billing details), and totalAcBalance (sum of all balances)
      */
     @GetMapping("/folder-amount")
     public ResponseEntity<Map<String, Object>> getPatientFolderAmountForBilling(

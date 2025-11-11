@@ -145,63 +145,124 @@ public class FeesDetailsService {
     }
 
     /**
-     * JPA/JDBC equivalent for USP_Get_PatientFolderAmountForBilling.
-     * Returns ALL visits for a patient from patient_visits_services table.
-     * This matches the stored procedure behavior which returns all visits to calculate total A/C balance.
+     * JPA/JDBC equivalent for USP_Get_PatientFolderAmount.
+     * Returns ALL visits and adhoc payments for a patient to calculate total A/C balance.
+     * This matches the exact stored procedure logic including:
+     * - Patient_Visits (status_id=5)
+     * - Patient_Visits_Services (status_id=8)
+     * - Patient_Payments_AdHoc (advance payments)
      * 
-     * Returns: { success, clinicId, doctorId, patientId, rows: [ { Patient_ID, Full_Name, Patient_Visit_No, 
-     *          Visit_Date, Financial_Year, Bill, Collected, Balance, Discount, Dues }, ... ] }
+     * Note: The stored procedure uses Folder_No as parameter, but this method accepts patientId
+     * and derives folderNo from patient_master. Alternatively, you can pass folderNo directly.
+     * 
+     * Returns: { success, clinicId, doctorId, patientId, folderNo, rows: [ { Patient_ID, Full_Name, Patient_Visit_No, 
+     *          Visit_Date, Financial_Year, Bill, Collected, Balance, Discount, Dues, Folder_No }, ... ], totalAcBalance }
      */
     public Map<String, Object> getPatientFolderAmountForBilling(String clinicId, String doctorId, String patientId) {
         Map<String, Object> res = new LinkedHashMap<>();
         try {
-            // Query matching the stored procedure USP_Get_PatientFolderAmountForBilling
-            // Returns all visits from patient_visits_services with status_id=8
-            // Using UNION ALL to also include patient_visits (status_id=5) for comprehensive billing data
+            // First, get folder_no from patient_master if patientId is provided
+            String folderNo = null;
+            if (patientId != null && !patientId.trim().isEmpty()) {
+                String folderSql = "SELECT folder_no FROM patient_master WHERE id = ? AND clinic_id = ?";
+                List<Map<String, Object>> folderRows = jdbcTemplate.queryForList(folderSql, patientId, clinicId);
+                if (!folderRows.isEmpty()) {
+                    folderNo = (String) folderRows.get(0).get("folder_no");
+                }
+            }
+            
+            if (folderNo == null || folderNo.trim().isEmpty()) {
+                res.put("success", false);
+                res.put("error", "Folder number not found for patient: " + patientId);
+                return res;
+            }
+            
+            // Query matching the exact stored procedure USP_Get_PatientFolderAmount
+            // Part 1: Patient_Visits (status_id=5)
+            // Part 2: Patient_Visits_Services (status_id=8)
+            // Part 3: Patient_Payments_AdHoc (advance payments)
             String visitSql = """
-                SELECT pv.patient_id AS Patient_ID,
-                       (pm.first_name || ' ' || pm.last_name) AS Full_Name,
-                       pv.patient_visit_no AS Patient_Visit_No,
-                       pv.visit_date AS Visit_Date,
-                       pv.financial_year AS Financial_Year,
-                       pv.fees_to_collect AS Bill,
-                       COALESCE(pv.fees_collected, 0) AS Collected,
-                       ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
-                       COALESCE(pv.discount, 0) AS Discount,
-                       (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
-                  FROM patient_master pm
-                  INNER JOIN patient_visits_services pv
-                    ON pm.id = pv.patient_id
-                   AND pm.clinic_id = pv.clinic_id
-                 WHERE pv.patient_id = ?
-                   AND pv.clinic_id = ?
-                   AND COALESCE(pv.delete_flag, false) = false
-                   AND pv.fees_to_collect IS NOT NULL
-                   AND pv.status_id = 8
-                UNION ALL
-                SELECT pv.patient_id AS Patient_ID,
-                       (pm.first_name || ' ' || pm.last_name) AS Full_Name,
-                       pv.patient_visit_no AS Patient_Visit_No,
-                       pv.visit_date AS Visit_Date,
-                       pv.financial_year AS Financial_Year,
-                       pv.fees_to_collect AS Bill,
-                       COALESCE(pv.fees_collected, 0) AS Collected,
-                       ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
-                       COALESCE(pv.discount, 0) AS Discount,
-                       (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
-                  FROM patient_master pm
-                  INNER JOIN patient_visits pv
-                    ON pm.id = pv.patient_id
-                   AND pm.clinic_id = pv.clinic_id
-                 WHERE pv.patient_id = ?
-                   AND pv.clinic_id = ?
-                   AND COALESCE(pv.delete_flag, false) = false
-                   AND pv.fees_to_collect IS NOT NULL
-                   AND pv.status_id = 5
+                WITH FeesCollectionData AS (
+                    -- Part 1: Patient_Visits (status_id=5)
+                    SELECT pv.patient_id AS Patient_ID,
+                           (pm.first_name || ' ' || pm.last_name) AS Full_Name,
+                           pv.patient_visit_no AS Patient_Visit_No,
+                           pv.visit_date AS Visit_Date,
+                           pm.folder_no AS Folder_No,
+                           pv.doctor_id AS Doctor_ID,
+                           pv.financial_year AS Financial_Year,
+                           pv.fees_to_collect AS Bill,
+                           COALESCE(pv.fees_collected, 0) AS Collected,
+                           ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
+                           COALESCE(pv.discount, 0) AS Discount,
+                           (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
+                      FROM patient_master pm
+                      INNER JOIN patient_visits pv
+                        ON pm.id = pv.patient_id
+                       AND pm.clinic_id = pv.clinic_id
+                     WHERE pm.clinic_id = ?
+                       AND pm.folder_no = ?
+                       AND COALESCE(pv.delete_flag, false) = false
+                       AND pv.fees_to_collect IS NOT NULL
+                       AND pv.status_id = 5
+                    
+                    UNION ALL
+                    
+                    -- Part 2: Patient_Visits_Services (status_id=8)
+                    SELECT pv.patient_id AS Patient_ID,
+                           (pm.first_name || ' ' || pm.last_name) AS Full_Name,
+                           pv.patient_visit_no AS Patient_Visit_No,
+                           pv.visit_date AS Visit_Date,
+                           pm.folder_no AS Folder_No,
+                           pv.doctor_id AS Doctor_ID,
+                           pv.financial_year AS Financial_Year,
+                           pv.fees_to_collect AS Bill,
+                           COALESCE(pv.fees_collected, 0) AS Collected,
+                           ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
+                           COALESCE(pv.discount, 0) AS Discount,
+                           (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
+                      FROM patient_master pm
+                      INNER JOIN patient_visits_services pv
+                        ON pm.id = pv.patient_id
+                       AND pm.clinic_id = pv.clinic_id
+                     WHERE pm.clinic_id = ?
+                       AND pm.folder_no = ?
+                       AND COALESCE(pv.delete_flag, false) = false
+                       AND pv.fees_to_collect IS NOT NULL
+                       AND pv.status_id = 8
+                    
+                    UNION ALL
+                    
+                    -- Part 3: Patient_Payments_AdHoc (advance payments)
+                    SELECT pv.patient_id AS Patient_ID,
+                           (pm.first_name || ' ' || pm.last_name) AS Full_Name,
+                           0 AS Patient_Visit_No,
+                           pv.payment_date AS Visit_Date,
+                           pm.folder_no AS Folder_No,
+                           pv.doctor_id AS Doctor_ID,
+                           pv.financial_year AS Financial_Year,
+                           0 AS Bill,
+                           COALESCE(pv.fees_collected, 0) AS Collected,
+                           (0 - COALESCE(pv.fees_collected, 0)) AS Balance,
+                           0 AS Discount,
+                           0 AS Dues
+                      FROM patient_payments_adhoc pv
+                      INNER JOIN patient_master pm
+                        ON pm.id = pv.patient_id
+                       AND pm.clinic_id = pv.clinic_id
+                     WHERE pm.clinic_id = ?
+                       AND pm.folder_no = ?
+                       AND COALESCE(pv.delete_flag, false) = false
+                       AND pv.fees_collected IS NOT NULL
+                )
+                SELECT Patient_ID, Full_Name, Patient_Visit_No, Visit_Date, Financial_Year,
+                       Bill, Collected, Folder_No, Balance, Discount, Dues
+                  FROM FeesCollectionData
                  ORDER BY Visit_Date ASC
             """;
             
-            List<Map<String, Object>> rows = jdbcTemplate.queryForList(visitSql, patientId, clinicId, patientId, clinicId);
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                visitSql, clinicId, folderNo, clinicId, folderNo, clinicId, folderNo);
             
             List<Map<String, Object>> data = new ArrayList<>();
             
@@ -212,6 +273,7 @@ public class FeesDetailsService {
                 visit.put("Patient_Visit_No", row.get("Patient_Visit_No"));
                 visit.put("Visit_Date", row.get("Visit_Date"));
                 visit.put("Financial_Year", row.get("Financial_Year"));
+                visit.put("Folder_No", row.get("Folder_No"));
                 
                 // Convert numeric values to double for consistency
                 Object billObj = row.get("Bill");
@@ -236,9 +298,11 @@ public class FeesDetailsService {
             res.put("clinicId", clinicId);
             res.put("doctorId", doctorId);
             res.put("patientId", patientId);
+            res.put("folderNo", folderNo);
             res.put("rows", data);
             
             // Calculate total A/C balance (sum of all balances)
+            // This matches the stored procedure logic where A/C balance is the sum of all Balance values
             double totalAcBalance = data.stream()
                 .mapToDouble(v -> {
                     Object balance = v.get("Balance");
@@ -250,7 +314,7 @@ public class FeesDetailsService {
             return res;
         } catch (Exception e) {
             res.put("success", false);
-            res.put("error", "Failed to get patient folder amount for billing: " + e.getMessage());
+            res.put("error", "Failed to get patient folder amount: " + e.getMessage());
             return res;
         }
     }
