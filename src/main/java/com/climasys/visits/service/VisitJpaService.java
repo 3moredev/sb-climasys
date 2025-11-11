@@ -497,6 +497,24 @@ public class VisitJpaService {
                 dressingSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
             associatedData.put("dressing", dressing);
             
+            // Also return dressingBodyParts as a single string (concatenated from all dressing records)
+            // This matches the textbox field format used in the frontend
+            if (dressing != null && !dressing.isEmpty()) {
+                StringBuilder dressingBodyParts = new StringBuilder();
+                for (Map<String, Object> dressingRow : dressing) {
+                    Object dressingDesc = dressingRow.get("dressing_description");
+                    if (dressingDesc != null && !dressingDesc.toString().trim().isEmpty()) {
+                        if (dressingBodyParts.length() > 0) {
+                            dressingBodyParts.append("\n"); // Separate multiple dressings with newline
+                        }
+                        dressingBodyParts.append(dressingDesc.toString().trim());
+                    }
+                }
+                associatedData.put("dressingBodyParts", dressingBodyParts.toString());
+            } else {
+                associatedData.put("dressingBodyParts", "");
+            }
+            
             // 4) Medicines - prefer overwrite
             String medicineOverwriteSql = """
                 SELECT vm.short_description || '*' || vm.medicine_description AS id,
