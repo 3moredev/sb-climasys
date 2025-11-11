@@ -20,9 +20,37 @@ import java.util.List;
 public interface LabTrendsRepository extends JpaRepository<PatientVisitLabTestResult, PatientVisitLabTestResultId> {
     
     /**
-     * Get previous lab test results for a patient
+     * Get all previous lab test results for a patient (all dates)
+     * Replicates USP_Get_LabTestDetails12 stored procedure
+     * Returns all lab test results for the patient across all visit dates
+     * Matches the Lab Trend popup behavior
+     */
+    @Query(value = """
+        SELECT 
+            CAST(pvl.visit_date AS date) AS visitDate,
+            pvl.patient_visit_no AS patientVisitNo,
+            pvl.lab_test_description AS labTestDescription,
+            pvl.parameter_name AS parameterName,
+            pvl.test_parameter_value AS parameterValue,
+            pvl.doctor_name AS doctorName,
+            pvl.lab_name AS labName,
+            pvl.report_date AS reportDate,
+            (pm.first_name || ' ' || COALESCE(pm.middle_name, '') || ' ' || COALESCE(pm.last_name, '')) AS patientFullName,
+            pvl.comment AS comment,
+            NULL AS patientLastVisitNo
+        FROM patient_visit_labtestresults pvl
+        INNER JOIN patient_master pm 
+            ON pvl.patient_id = pm.id
+        WHERE pvl.patient_id = :patientId
+          AND pvl.delete_flag = false
+        ORDER BY pvl.visit_date DESC, pvl.patient_visit_no DESC
+        """, nativeQuery = true)
+    List<LabTrend> findAllLabTrendsForPatient(@Param("patientId") String patientId);
+    
+    /**
+     * Get previous lab test results for a specific patient visit (date-specific)
      * Replicates USP_Get_PreviousLabReports stored procedure
-     * Returns lab test results directly mapped to LabTrendDTO
+     * Returns lab test results for a specific visit date
      */
     @Query(value = """
         SELECT 

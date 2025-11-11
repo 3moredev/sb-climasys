@@ -32,40 +32,28 @@ public class LabTrendsController {
     private LabTrendsService labTrendsService;
     
     /**
-     * Get lab test results for a patient visit
+     * Get all lab test results for a patient (all previous visits)
      * GET /api/trends/lab/patients/{patientId}/results
      * 
-     * This endpoint replicates the stored procedure USP_Get_PreviousLabReports
+     * This endpoint replicates the stored procedure USP_Get_LabTestDetails12
+     * Returns all previous lab test results for the patient across all visit dates
+     * Matches the Lab Trend popup behavior shown in the UI
      */
     @GetMapping("/patients/{patientId}/results")
     @Operation(
-        summary = "Get patient's lab test results",
-        description = "Retrieves lab test results for a specific visit including test descriptions, parameters, and values. Based on USP_Get_PreviousLabReports stored procedure."
+        summary = "Get all patient's lab test results",
+        description = "Retrieves all previous lab test results for a patient across all visit dates. " +
+                     "Based on USP_Get_LabTestDetails12 stored procedure. " +
+                     "Returns results ordered by visit date descending (most recent first)."
     )
     public ResponseEntity<?> getLabTrends(
             @Parameter(description = "Patient ID", example = "01-10-2021-051429", required = true)
-            @PathVariable String patientId,
-            
-            @Parameter(description = "Doctor ID", example = "DR-00010", required = true)
-            @RequestParam String doctorId,
-            
-            @Parameter(description = "Clinic ID", example = "CL-00001", required = true)
-            @RequestParam String clinicId,
-            
-            @Parameter(description = "Visit date (YYYY-MM-DD)", example = "2025-10-29", required = true)
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate visitDate,
-            
-            @Parameter(description = "Shift ID", example = "1", required = true)
-            @RequestParam Short shiftId,
-            
-            @Parameter(description = "Patient visit number", example = "7", required = true)
-            @RequestParam Integer patientVisitNo) {
+            @PathVariable String patientId) {
         
         try {
-            logger.info("Getting lab trends for patient: {}, visit: {} on {}", patientId, patientVisitNo, visitDate);
+            logger.info("Getting all lab trends for patient: {}", patientId);
             
-            List<LabTrendDTO> labTrends = labTrendsService.getLabTrends(
-                    patientId, doctorId, clinicId, visitDate, shiftId, patientVisitNo);
+            List<LabTrendDTO> labTrends = labTrendsService.getAllLabTrendsForPatient(patientId);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -77,6 +65,61 @@ public class LabTrendsController {
             
         } catch (Exception e) {
             logger.error("Error getting lab trends for patient {}: {}", patientId, e.getMessage(), e);
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to get lab test results: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+    
+    /**
+     * Get lab test results for a specific patient visit (date-specific)
+     * GET /api/trends/lab/patients/{patientId}/visits/{visitNo}/results
+     * 
+     * This endpoint replicates the stored procedure USP_Get_PreviousLabReports
+     * Returns lab test results for a specific visit date only
+     */
+    @GetMapping("/patients/{patientId}/visits/{visitNo}/results")
+    @Operation(
+        summary = "Get patient's lab test results for a specific visit",
+        description = "Retrieves lab test results for a specific visit date including test descriptions, parameters, and values. " +
+                     "Based on USP_Get_PreviousLabReports stored procedure."
+    )
+    public ResponseEntity<?> getLabTrendsForVisit(
+            @Parameter(description = "Patient ID", example = "01-10-2021-051429", required = true)
+            @PathVariable String patientId,
+            
+            @Parameter(description = "Patient visit number", example = "7", required = true)
+            @PathVariable Integer visitNo,
+            
+            @Parameter(description = "Doctor ID", example = "DR-00010", required = true)
+            @RequestParam String doctorId,
+            
+            @Parameter(description = "Clinic ID", example = "CL-00001", required = true)
+            @RequestParam String clinicId,
+            
+            @Parameter(description = "Visit date (YYYY-MM-DD)", example = "2025-10-29", required = true)
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate visitDate,
+            
+            @Parameter(description = "Shift ID", example = "1", required = true)
+            @RequestParam Short shiftId) {
+        
+        try {
+            logger.info("Getting lab trends for patient: {}, visit: {} on {}", patientId, visitNo, visitDate);
+            
+            List<LabTrendDTO> labTrends = labTrendsService.getLabTrendsForVisit(
+                    patientId, doctorId, clinicId, visitDate, shiftId, visitNo);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Lab test results retrieved successfully");
+            response.put("data", labTrends);
+            response.put("count", labTrends.size());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            logger.error("Error getting lab trends for patient {} visit {}: {}", patientId, visitNo, e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", "Failed to get lab test results: " + e.getMessage());
