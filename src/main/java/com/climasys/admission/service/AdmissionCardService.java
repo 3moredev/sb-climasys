@@ -30,14 +30,14 @@ public class AdmissionCardService {
      * Get all admission cards (list of admitted patients)
      * 
      * @param patientId Patient ID (optional, can be null)
-     * @param doctorId Doctor ID
+     * @param doctorId Doctor ID (optional, can be null - if null, returns all doctors for the clinic)
      * @param clinicId Clinic ID
      * @return List of admission cards
      */
     @Transactional(readOnly = true)
     public List<AdmissionCardDTO> getAllAdmissionCards(String patientId, String doctorId, String clinicId) {
         logger.info("Getting admission cards for doctor: {}, clinic: {}, patient: {}", 
-                    doctorId, clinicId, patientId != null ? patientId : "ALL");
+                    doctorId != null ? doctorId : "ALL", clinicId, patientId != null ? patientId : "ALL");
         
         List<Map<String, Object>> results = admissionCardRepository
                 .findAllAdmissionCards(patientId, doctorId, clinicId);
@@ -54,14 +54,14 @@ public class AdmissionCardService {
      * Search admission cards by patient ID, name, or contact
      * 
      * @param searchStr Search string
-     * @param doctorId Doctor ID
+     * @param doctorId Doctor ID (optional, can be null - if null, searches all doctors for the clinic)
      * @param clinicId Clinic ID
      * @return List of matching admission cards
      */
     @Transactional(readOnly = true)
     public List<AdmissionCardDTO> searchAdmissionCards(String searchStr, String doctorId, String clinicId) {
         logger.info("Searching admission cards for: '{}', doctor: {}, clinic: {}", 
-                    searchStr, doctorId, clinicId);
+                    searchStr, doctorId != null ? doctorId : "ALL", clinicId);
         
         List<Map<String, Object>> results = admissionCardRepository
                 .searchAdmissionCards(searchStr, doctorId, clinicId);

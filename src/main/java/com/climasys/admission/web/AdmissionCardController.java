@@ -34,7 +34,7 @@ public class AdmissionCardController {
      * Get all admission cards (list of admitted patients)
      * 
      * @param patientId Patient ID (optional)
-     * @param doctorId Doctor ID (required)
+     * @param doctorId Doctor ID (optional - if not provided, returns all doctors for the clinic)
      * @param clinicId Clinic ID (required)
      * @return List of admission cards with metadata
      */
@@ -43,7 +43,8 @@ public class AdmissionCardController {
         summary = "Get list of admitted patients",
         description = "Retrieves all admission cards matching the Manage Admission Card page format. " +
                      "Returns fields: Patient Name, Admission/IPD No, IPD File No, Admission Date, " +
-                     "Reason of Admission, Discharge Date, Insurance, Company, Advance (Rs)",
+                     "Reason of Admission, Discharge Date, Insurance, Company, Advance (Rs). " +
+                     "If doctorId is not provided, returns admission cards for all doctors in the clinic.",
         responses = {
             @ApiResponse(
                 responseCode = "200",
@@ -61,11 +62,11 @@ public class AdmissionCardController {
         }
     )
     public ResponseEntity<Map<String, Object>> getAdmissionCards(
-            @Parameter(description = "Patient ID (optional - if not provided, returns all patients for the doctor)")
+            @Parameter(description = "Patient ID (optional - if not provided, returns all patients)")
             @RequestParam(required = false) String patientId,
             
-            @Parameter(description = "Doctor ID", required = true)
-            @RequestParam String doctorId,
+            @Parameter(description = "Doctor ID (optional - if not provided, returns all doctors for the clinic)")
+            @RequestParam(required = false) String doctorId,
             
             @Parameter(description = "Clinic ID", required = true)
             @RequestParam String clinicId
@@ -78,7 +79,9 @@ public class AdmissionCardController {
             response.put("success", true);
             response.put("count", admissionCards.size());
             response.put("data", admissionCards);
-            response.put("doctorId", doctorId);
+            if (doctorId != null) {
+                response.put("doctorId", doctorId);
+            }
             response.put("clinicId", clinicId);
             
             return ResponseEntity.ok(response);
@@ -95,14 +98,15 @@ public class AdmissionCardController {
      * Search admission cards by patient ID, name, or contact number
      * 
      * @param searchStr Search string
-     * @param doctorId Doctor ID (required)
+     * @param doctorId Doctor ID (optional - if not provided, searches all doctors for the clinic)
      * @param clinicId Clinic ID (required)
      * @return List of matching admission cards
      */
     @GetMapping("/cards/search")
     @Operation(
         summary = "Search admitted patients",
-        description = "Search admission cards by patient ID, patient name, contact number, or IPD number",
+        description = "Search admission cards by patient ID, patient name, contact number, or IPD number. " +
+                     "If doctorId is not provided, searches across all doctors in the clinic.",
         responses = {
             @ApiResponse(
                 responseCode = "200",
@@ -122,8 +126,8 @@ public class AdmissionCardController {
             @Parameter(description = "Search string (patient ID, name, contact, or IPD number)", required = true)
             @RequestParam String searchStr,
             
-            @Parameter(description = "Doctor ID", required = true)
-            @RequestParam String doctorId,
+            @Parameter(description = "Doctor ID (optional - if not provided, searches all doctors for the clinic)")
+            @RequestParam(required = false) String doctorId,
             
             @Parameter(description = "Clinic ID", required = true)
             @RequestParam String clinicId
@@ -137,7 +141,9 @@ public class AdmissionCardController {
             response.put("count", admissionCards.size());
             response.put("data", admissionCards);
             response.put("searchStr", searchStr);
-            response.put("doctorId", doctorId);
+            if (doctorId != null) {
+                response.put("doctorId", doctorId);
+            }
             response.put("clinicId", clinicId);
             
             return ResponseEntity.ok(response);

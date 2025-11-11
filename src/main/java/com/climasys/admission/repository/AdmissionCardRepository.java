@@ -22,7 +22,7 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
      * Based on the Manage Admission Card page fields
      * 
      * @param patientId Patient ID (optional)
-     * @param doctorId Doctor ID
+     * @param doctorId Doctor ID (optional - if null, returns all doctors for the clinic)
      * @param clinicId Clinic ID
      * @return List of admission cards
      */
@@ -67,7 +67,7 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
             AND ad.clinic_id = dd.clinic_id
         LEFT JOIN insurance_company_master icm ON ad.insurance_company_id = icm.company_id
         WHERE (:patientId IS NULL OR ad.patient_id = :patientId)
-          AND ad.doctor_id = :doctorId
+          AND (:doctorId IS NULL OR ad.doctor_id = :doctorId)
           AND ad.clinic_id = :clinicId
         ORDER BY ad.admission_date DESC, ad.admission_time DESC
         """, nativeQuery = true)
@@ -81,7 +81,7 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
      * Search admission cards by patient ID, name, or contact
      * 
      * @param searchStr Search string
-     * @param doctorId Doctor ID
+     * @param doctorId Doctor ID (optional - if null, searches all doctors for the clinic)
      * @param clinicId Clinic ID
      * @return List of matching admission cards
      */
@@ -125,7 +125,7 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
             AND ad.doctor_id = dd.doctor_id
             AND ad.clinic_id = dd.clinic_id
         LEFT JOIN insurance_company_master icm ON ad.insurance_company_id = icm.company_id
-        WHERE ad.doctor_id = :doctorId
+        WHERE (:doctorId IS NULL OR ad.doctor_id = :doctorId)
           AND ad.clinic_id = :clinicId
           AND (
               ad.patient_id ILIKE '%' || :searchStr || '%'
