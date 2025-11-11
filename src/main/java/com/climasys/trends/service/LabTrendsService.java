@@ -30,23 +30,25 @@ public class LabTrendsService {
      * Get all previous lab test results for a patient (all dates)
      * Replicates stored procedure: USP_Get_LabTestDetails12
      * Matches the Lab Trend popup behavior - returns all previous lab results across all visit dates
+     * Filtered by clinic_id for multi-clinic isolation
      * 
      * @param patientId Patient ID
+     * @param clinicId Clinic ID
      * @return List of lab test results for all previous visits
      */
     @Transactional(readOnly = true)
-    public List<LabTrendDTO> getAllLabTrendsForPatient(String patientId) {
+    public List<LabTrendDTO> getAllLabTrendsForPatient(String patientId, String clinicId) {
         
-        logger.info("Getting all lab trends for patient: {}", patientId);
+        logger.info("Getting all lab trends for patient: {}, clinic: {}", patientId, clinicId);
         
-        List<LabTrend> labTrends = labTrendsRepository.findAllLabTrendsForPatient(patientId);
+        List<LabTrend> labTrends = labTrendsRepository.findAllLabTrendsForPatient(patientId, clinicId);
         
         // Convert to DTOs
         List<LabTrendDTO> dtos = labTrends.stream()
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
         
-        logger.info("Retrieved {} lab test records for patient {}", dtos.size(), patientId);
+        logger.info("Retrieved {} lab test records for patient {} in clinic {}", dtos.size(), patientId, clinicId);
         return dtos;
     }
     

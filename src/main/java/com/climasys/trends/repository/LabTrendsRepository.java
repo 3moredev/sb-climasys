@@ -24,6 +24,7 @@ public interface LabTrendsRepository extends JpaRepository<PatientVisitLabTestRe
      * Replicates USP_Get_LabTestDetails12 stored procedure
      * Returns all lab test results for the patient across all visit dates
      * Matches the Lab Trend popup behavior
+     * Filtered by clinic_id for multi-clinic isolation
      */
     @Query(value = """
         SELECT 
@@ -42,10 +43,14 @@ public interface LabTrendsRepository extends JpaRepository<PatientVisitLabTestRe
         INNER JOIN patient_master pm 
             ON pvl.patient_id = pm.id
         WHERE pvl.patient_id = :patientId
+          AND pvl.clinic_id = :clinicId
           AND pvl.delete_flag = false
         ORDER BY pvl.visit_date DESC, pvl.patient_visit_no DESC
         """, nativeQuery = true)
-    List<LabTrend> findAllLabTrendsForPatient(@Param("patientId") String patientId);
+    List<LabTrend> findAllLabTrendsForPatient(
+        @Param("patientId") String patientId,
+        @Param("clinicId") String clinicId
+    );
     
     /**
      * Get previous lab test results for a specific patient visit (date-specific)

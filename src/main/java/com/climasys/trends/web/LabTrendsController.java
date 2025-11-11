@@ -38,33 +38,39 @@ public class LabTrendsController {
      * This endpoint replicates the stored procedure USP_Get_LabTestDetails12
      * Returns all previous lab test results for the patient across all visit dates
      * Matches the Lab Trend popup behavior shown in the UI
+     * Filtered by clinic_id for multi-clinic isolation
      */
     @GetMapping("/patients/{patientId}/results")
     @Operation(
         summary = "Get all patient's lab test results",
         description = "Retrieves all previous lab test results for a patient across all visit dates. " +
                      "Based on USP_Get_LabTestDetails12 stored procedure. " +
-                     "Returns results ordered by visit date descending (most recent first)."
+                     "Returns results ordered by visit date descending (most recent first). " +
+                     "Filtered by clinic_id for multi-clinic isolation."
     )
     public ResponseEntity<?> getLabTrends(
             @Parameter(description = "Patient ID", example = "01-10-2021-051429", required = true)
-            @PathVariable String patientId) {
+            @PathVariable String patientId,
+            
+            @Parameter(description = "Clinic ID", example = "CL-00001", required = true)
+            @RequestParam String clinicId) {
         
         try {
-            logger.info("Getting all lab trends for patient: {}", patientId);
+            logger.info("Getting all lab trends for patient: {}, clinic: {}", patientId, clinicId);
             
-            List<LabTrendDTO> labTrends = labTrendsService.getAllLabTrendsForPatient(patientId);
+            List<LabTrendDTO> labTrends = labTrendsService.getAllLabTrendsForPatient(patientId, clinicId);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Lab test results retrieved successfully");
             response.put("data", labTrends);
             response.put("count", labTrends.size());
+            response.put("clinicId", clinicId);
             
             return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Error getting lab trends for patient {}: {}", patientId, e.getMessage(), e);
+            logger.error("Error getting lab trends for patient {} in clinic {}: {}", patientId, clinicId, e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", "Failed to get lab test results: " + e.getMessage());
