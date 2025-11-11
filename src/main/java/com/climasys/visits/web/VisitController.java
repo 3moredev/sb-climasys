@@ -333,7 +333,7 @@ public class VisitController {
             // Each item should have: groupDescription, instructionsDescription, sequenceNo
             java.util.List<Map<String, Object>> instructionGroups,
             
-            // Treatment arrays (diagnosis, medicines, prescriptions, investigations, complaints, dressings)
+            // Treatment arrays (diagnosis, medicines, prescriptions, investigations, complaints)
             java.util.List<Map<String, Object>> complaintsRows,
             
             // Optional treatment arrays
@@ -341,7 +341,9 @@ public class VisitController {
             java.util.List<Map<String, Object>> medicineRows,
             java.util.List<Map<String, Object>> prescriptionRows,
             java.util.List<Map<String, Object>> investigationRows,
-            java.util.List<Map<String, Object>> dressingRows
+            
+            // Dressing (body parts) - textbox field
+            String dressingBodyParts
     ) {}
 
     @PostMapping
@@ -847,13 +849,13 @@ public class VisitController {
             logger.info("Composite key values - patientId: {}, doctorId: {}, clinicId: {}, shiftId: {}, patientVisitNo: {}", 
                 patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal);
             
-            logger.info("Preparing to persist treatment arrays - complaintsRows: {}, diagnosisRows: {}, medicineRows: {}, prescriptionRows: {}, investigationRows: {}, dressingRows: {}", 
+            logger.info("Preparing to persist treatment arrays - complaintsRows: {}, diagnosisRows: {}, medicineRows: {}, prescriptionRows: {}, investigationRows: {}, dressingBodyParts: {}", 
                 req.complaintsRows() != null ? req.complaintsRows().size() : 0,
                 req.diagnosisRows() != null ? req.diagnosisRows().size() : 0,
                 req.medicineRows() != null ? req.medicineRows().size() : 0,
                 req.prescriptionRows() != null ? req.prescriptionRows().size() : 0,
                 req.investigationRows() != null ? req.investigationRows().size() : 0,
-                req.dressingRows() != null ? req.dressingRows().size() : 0);
+                req.dressingBodyParts() != null && !req.dressingBodyParts().trim().isEmpty() ? "present" : "empty");
             
             if (result.get("success") != null && (Boolean) result.get("success")) {
                 logger.info("Visit saved successfully, proceeding with treatment arrays persistence");
@@ -1257,9 +1259,11 @@ public class VisitController {
                         logger.debug("No investigation rows to process (null or empty)");
                     }
 
-                    // Dressings
-                    if (req.dressingRows() != null && !req.dressingRows().isEmpty()) {
-                        logger.info("Processing {} dressing rows for patient: {}, visit: {}", req.dressingRows().size(), patientId, patientVisitNoVal);
+                    // Dressing (body parts) - textbox field
+                    if (req.dressingBodyParts() != null && !req.dressingBodyParts().trim().isEmpty()) {
+                        String dressingBodyParts = req.dressingBodyParts().trim();
+                        logger.info("Processing dressing (body parts) textbox data for patient: {}, visit: {}, content length: {}", 
+                            patientId, patientVisitNoVal, dressingBodyParts.length());
                         
                         // CRITICAL: Query the EXACT visit_date from patient_visits to ensure foreign key matches
                         String getExactVisitDateSql = "SELECT visit_date FROM patient_visits WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND delete_flag = false ORDER BY visit_date DESC LIMIT 1";
@@ -1284,89 +1288,55 @@ public class VisitController {
 
                         LocalDateTime now = timezoneUtils.convertTargetTimezoneToUtc(LocalDateTime.now());
                         String insDressing = "INSERT INTO visit_dressing (patient_id, visit_date, patient_visit_no, shift_id, clinic_id, doctor_id, dressing_description, delete_flag, created_on, createdby_name, modified_on, modifiedby_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                        int insertedCount = 0;
-                        Set<String> processedDressings = new HashSet<>(); // Track duplicates within the same request
                         
-                        for (Map<String, Object> row : req.dressingRows()) {
-                            // Support multiple field name formats for dressing_description
-                            Object dressingDescObj = row.get("dressing_description");
-                            if (dressingDescObj == null) {
-                                dressingDescObj = row.get("dressingDescription");
-                            }
-                            if (dressingDescObj == null) {
-                                dressingDescObj = row.get("dressing");
-                            }
-                            
-                            String dressingDescription = (dressingDescObj != null) ? dressingDescObj.toString().trim() : "";
-                            
-                            logger.debug("Processing dressing row - dressing_description: '{}'", dressingDescription);
-                            
-                            // Insert if dressing_description has content (required field)
-                            if (!dressingDescription.isEmpty()) {
-                                // Check for duplicate dressings in the same request to avoid primary key violations
-                                if (processedDressings.contains(dressingDescription)) {
-                                    logger.warn("Skipping duplicate dressing in request: '{}'", dressingDescription);
-                                    continue;
-                                }
-                                processedDressings.add(dressingDescription);
+                        try {
+                            logger.info("Attempting INSERT with exact visit_date: {} for dressing (body parts): {}", exactVisitDateTs, dressingBodyParts);
+                            int rowsAffected = jdbcTemplate.update(insDressing, patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId, 
+                                    dressingBodyParts, false, now, userIdVal, now, userIdVal);
+                            if (rowsAffected > 0) {
+                                logger.info("✓ Successfully inserted dressing (body parts): dressing_description='{}', visitDate={}", 
+                                    dressingBodyParts, exactVisitDateTs);
                                 
-                                try {
-                                    logger.info("Attempting INSERT with exact visit_date: {} for dressing: {}", exactVisitDateTs, dressingDescription);
-                                    int rowsAffected = jdbcTemplate.update(insDressing, patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId, 
-                                            dressingDescription, false, now, userIdVal, now, userIdVal);
-                                    if (rowsAffected > 0) {
-                                        insertedCount++;
-                                        logger.info("✓ Successfully inserted dressing row {}: dressing_description='{}', visitDate={}", 
-                                            insertedCount, dressingDescription, exactVisitDateTs);
-                                    } else {
-                                        logger.error("✗ INSERT statement returned 0 rows affected for dressing: dressing_description='{}'", dressingDescription);
-                                        result.put("dressingInsertWarning", "Some dressing rows may not have been inserted");
-                                    }
-                                } catch (Exception insertEx) {
-                                    String errorMsg = insertEx.getMessage();
-                                    // Check for specific error types
-                                    if (errorMsg != null && errorMsg.contains("duplicate key")) {
-                                        logger.warn("Duplicate key violation for dressing '{}' - may already exist in database, skipping", dressingDescription);
-                                        // Don't fail the entire request, just log and continue
-                                    } else if (errorMsg != null && errorMsg.contains("foreign key constraint")) {
-                                        logger.error("✗ Foreign key constraint violation for dressing: '{}' - visit may not exist with exact visit_date: {}", 
-                                            dressingDescription, exactVisitDateTs);
-                                        logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
-                                            patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
-                                        result.put("dressingInsertError", "Foreign key constraint violation - visit may not exist");
-                                        throw insertEx; // Re-throw foreign key errors as they indicate a serious issue
-                                    } else {
-                                        logger.error("✗ Error inserting dressing row: dressing_description='{}', error: {}", 
-                                            dressingDescription, insertEx.getMessage(), insertEx);
-                                        logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
-                                            patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
-                                        throw insertEx; // Re-throw to be caught by outer catch
-                                    }
+                                // Verify the insert worked by querying back using the exact visit_date
+                                String verifySql = "SELECT COUNT(*) FROM visit_dressing WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND visit_date = ? AND delete_flag = false";
+                                Integer actualCount = jdbcTemplate.queryForObject(verifySql, Integer.class, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
+                                logger.info("✓ Verification: Found {} dressing record(s) in database after insert (visitDate: {})", actualCount, exactVisitDateTs);
+                                if (actualCount == null || actualCount == 0) {
+                                    logger.error("✗ CRITICAL: No dressing record found in database after insert attempt! visitDate used: {}", exactVisitDateTs);
+                                    result.put("dressingInsertWarning", "Dressing (body parts) was not saved. Check logs for details.");
+                                    result.put("dressingInsertedCount", 0);
+                                } else {
+                                    result.put("dressingInsertedCount", actualCount);
+                                    logger.info("✓ Confirmed: Dressing (body parts) is now in visit_dressing table");
                                 }
                             } else {
-                                logger.warn("Skipping dressing row with empty dressing_description: {}", row);
-                            }
-                        }
-                        logger.info("Successfully inserted {} dressing records for patient: {}, visit: {}", insertedCount, patientId, patientVisitNoVal);
-                        
-                        // Verify the insert worked by querying back using the exact visit_date
-                        if (insertedCount > 0) {
-                            String verifySql = "SELECT COUNT(*) FROM visit_dressing WHERE patient_id = ? AND doctor_id = ? AND clinic_id = ? AND shift_id = ? AND patient_visit_no = ? AND visit_date = ? AND delete_flag = false";
-                            Integer actualCount = jdbcTemplate.queryForObject(verifySql, Integer.class, patientId, doctorId, clinicId, shiftIdVal, patientVisitNoVal, exactVisitDateTs);
-                            logger.info("✓ Verification: Found {} dressing records in database after insert (expected: {}, visitDate: {})", actualCount, insertedCount, exactVisitDateTs);
-                            if (actualCount == null || actualCount == 0) {
-                                logger.error("✗ CRITICAL: No dressing records found in database after insert attempt! visitDate used: {}", exactVisitDateTs);
-                                result.put("dressingInsertWarning", "Dressing rows were not saved. Check logs for details.");
+                                logger.error("✗ INSERT statement returned 0 rows affected for dressing (body parts): '{}'", dressingBodyParts);
+                                result.put("dressingInsertWarning", "Dressing (body parts) may not have been inserted");
                                 result.put("dressingInsertedCount", 0);
-                            } else {
-                                result.put("dressingInsertedCount", actualCount);
-                                logger.info("✓ Confirmed: {} dressing records are now in visit_dressing table", actualCount);
                             }
-                        } else {
-                            result.put("dressingInsertedCount", 0);
+                        } catch (Exception insertEx) {
+                            String errorMsg = insertEx.getMessage();
+                            // Check for specific error types
+                            if (errorMsg != null && errorMsg.contains("duplicate key")) {
+                                logger.warn("Duplicate key violation for dressing (body parts) '{}' - may already exist in database", dressingBodyParts);
+                                result.put("dressingInsertWarning", "Dressing may already exist");
+                            } else if (errorMsg != null && errorMsg.contains("foreign key constraint")) {
+                                logger.error("✗ Foreign key constraint violation for dressing (body parts): '{}' - visit may not exist with exact visit_date: {}", 
+                                    dressingBodyParts, exactVisitDateTs);
+                                logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
+                                    patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
+                                result.put("dressingInsertError", "Foreign key constraint violation - visit may not exist");
+                                throw insertEx; // Re-throw foreign key errors as they indicate a serious issue
+                            } else {
+                                logger.error("✗ Error inserting dressing (body parts): '{}', error: {}", 
+                                    dressingBodyParts, insertEx.getMessage(), insertEx);
+                                logger.error("✗ Failed INSERT parameters - patientId: {}, visitDate: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}", 
+                                    patientId, exactVisitDateTs, patientVisitNoVal, shiftIdVal, clinicId, doctorId);
+                                throw insertEx; // Re-throw to be caught by outer catch
+                            }
                         }
                     } else {
-                        logger.debug("No dressing rows to process (null or empty)");
+                        logger.debug("No dressing (body parts) data to process (null or empty)");
                     }
                     
                     // Instruction Groups - Save using JPA (matching stored procedure logic)
@@ -1578,9 +1548,9 @@ public class VisitController {
                     result.put("investigationRows", req.investigationRows());
                     result.put("investigationRowsCount", req.investigationRows().size());
                 }
-                if (req.dressingRows() != null) {
-                    result.put("dressingRows", req.dressingRows());
-                    result.put("dressingRowsCount", req.dressingRows().size());
+                if (req.dressingBodyParts() != null && !req.dressingBodyParts().trim().isEmpty()) {
+                    result.put("dressingBodyParts", req.dressingBodyParts());
+                    result.put("dressingBodyPartsSaved", true);
                 }
                 if (req.instructionGroups() != null) {
                     result.put("instructionGroups", req.instructionGroups());
