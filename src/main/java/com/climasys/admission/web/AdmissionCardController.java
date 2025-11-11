@@ -1,0 +1,174 @@
+package com.climasys.admission.web;
+
+import com.climasys.admission.dto.AdmissionCardDTO;
+import com.climasys.admission.service.AdmissionCardService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * REST Controller for admission card operations
+ * Provides endpoints for retrieving patient admission information
+ * Matches the fields shown in Manage Admission Card page
+ */
+@RestController
+@RequestMapping("/api/admission")
+@Tag(name = "Admission Cards", description = "APIs for managing patient admission cards")
+public class AdmissionCardController {
+    
+    @Autowired
+    private AdmissionCardService admissionCardService;
+    
+    /**
+     * Get all admission cards (list of admitted patients)
+     * 
+     * @param patientId Patient ID (optional)
+     * @param doctorId Doctor ID (required)
+     * @param clinicId Clinic ID (required)
+     * @return List of admission cards with metadata
+     */
+    @GetMapping("/cards")
+    @Operation(
+        summary = "Get list of admitted patients",
+        description = "Retrieves all admission cards matching the Manage Admission Card page format. " +
+                     "Returns fields: Patient Name, Admission/IPD No, IPD File No, Admission Date, " +
+                     "Reason of Admission, Discharge Date, Insurance, Company, Advance (Rs)",
+        responses = {
+            @ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved admission cards",
+                content = @Content(schema = @Schema(implementation = AdmissionCardResponse.class))
+            ),
+            @ApiResponse(
+                responseCode = "400",
+                description = "Invalid request parameters"
+            ),
+            @ApiResponse(
+                responseCode = "500",
+                description = "Internal server error"
+            )
+        }
+    )
+    public ResponseEntity<Map<String, Object>> getAdmissionCards(
+            @Parameter(description = "Patient ID (optional - if not provided, returns all patients for the doctor)")
+            @RequestParam(required = false) String patientId,
+            
+            @Parameter(description = "Doctor ID", required = true)
+            @RequestParam String doctorId,
+            
+            @Parameter(description = "Clinic ID", required = true)
+            @RequestParam String clinicId
+    ) {
+        try {
+            List<AdmissionCardDTO> admissionCards = admissionCardService
+                    .getAllAdmissionCards(patientId, doctorId, clinicId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("count", admissionCards.size());
+            response.put("data", admissionCards);
+            response.put("doctorId", doctorId);
+            response.put("clinicId", clinicId);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    /**
+     * Search admission cards by patient ID, name, or contact number
+     * 
+     * @param searchStr Search string
+     * @param doctorId Doctor ID (required)
+     * @param clinicId Clinic ID (required)
+     * @return List of matching admission cards
+     */
+    @GetMapping("/cards/search")
+    @Operation(
+        summary = "Search admitted patients",
+        description = "Search admission cards by patient ID, patient name, contact number, or IPD number",
+        responses = {
+            @ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved matching admission cards"
+            ),
+            @ApiResponse(
+                responseCode = "400",
+                description = "Invalid request parameters"
+            ),
+            @ApiResponse(
+                responseCode = "500",
+                description = "Internal server error"
+            )
+        }
+    )
+    public ResponseEntity<Map<String, Object>> searchAdmissionCards(
+            @Parameter(description = "Search string (patient ID, name, contact, or IPD number)", required = true)
+            @RequestParam String searchStr,
+            
+            @Parameter(description = "Doctor ID", required = true)
+            @RequestParam String doctorId,
+            
+            @Parameter(description = "Clinic ID", required = true)
+            @RequestParam String clinicId
+    ) {
+        try {
+            List<AdmissionCardDTO> admissionCards = admissionCardService
+                    .searchAdmissionCards(searchStr, doctorId, clinicId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("count", admissionCards.size());
+            response.put("data", admissionCards);
+            response.put("searchStr", searchStr);
+            response.put("doctorId", doctorId);
+            response.put("clinicId", clinicId);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    /**
+     * Response schema for Swagger documentation
+     */
+    @Schema(description = "Admission card response")
+    private static class AdmissionCardResponse {
+        @Schema(description = "Success status")
+        public boolean success;
+        
+        @Schema(description = "Number of admission cards")
+        public int count;
+        
+        @Schema(description = "List of admission cards")
+        public List<AdmissionCardDTO> data;
+        
+        @Schema(description = "Doctor ID")
+        public String doctorId;
+        
+        @Schema(description = "Clinic ID")
+        public String clinicId;
+    }
+}
+
