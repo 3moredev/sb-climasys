@@ -143,5 +143,22 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
         @Param("doctorId") String doctorId,
         @Param("clinicId") String clinicId
     );
+    
+    /**
+     * Check if admission card already exists
+     * Matches USP_Insert_AdmissionCard logic: Patient_ID + Clinic_ID + IPD_RefNo
+     */
+    @Query(value = """
+        SELECT COUNT(*) > 0
+        FROM admission_data
+        WHERE patient_id = :patientId
+          AND clinic_id = :clinicId
+          AND ipd_refno = :ipdRefNo
+        """, nativeQuery = true)
+    boolean existsByCompositeKey(
+        @Param("patientId") String patientId,
+        @Param("clinicId") String clinicId,
+        @Param("ipdRefNo") String ipdRefNo
+    );
 }
 

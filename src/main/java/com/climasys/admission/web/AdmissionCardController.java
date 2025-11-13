@@ -1,6 +1,7 @@
 package com.climasys.admission.web;
 
 import com.climasys.admission.dto.AdmissionCardDTO;
+import com.climasys.admission.dto.AdmissionCardRequest;
 import com.climasys.admission.service.AdmissionCardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -147,6 +148,50 @@ public class AdmissionCardController {
             response.put("clinicId", clinicId);
             
             return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    /**
+     * Insert or update admission card
+     * Replicates USP_Insert_AdmissionCard
+     */
+    @PostMapping
+    @Operation(
+        summary = "Save admission card",
+        description = "Insert new or update existing admission card. IPD Reference Number is auto-generated if not provided.",
+        responses = {
+            @ApiResponse(
+                responseCode = "200",
+                description = "Successfully saved admission card"
+            ),
+            @ApiResponse(
+                responseCode = "400",
+                description = "Invalid request parameters"
+            ),
+            @ApiResponse(
+                responseCode = "500",
+                description = "Internal server error"
+            )
+        }
+    )
+    public ResponseEntity<Map<String, Object>> saveAdmissionCard(
+            @Parameter(description = "Admission card request data", required = true)
+            @RequestBody AdmissionCardRequest request
+    ) {
+        try {
+            Map<String, Object> result = admissionCardService.saveAdmissionCard(request);
+            
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(result);
+            }
             
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
