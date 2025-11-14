@@ -84,6 +84,24 @@ public class AdmissionCardService {
     }
     
     /**
+     * Get admission data by patient ID
+     * Returns all admission records for a specific patient from admission_data table
+     * 
+     * @param patientId Patient ID
+     * @return List of admission data records
+     */
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getAdmissionDataByPatientId(String patientId) {
+        logger.info("Getting admission data for patient: {}", patientId);
+        
+        List<Map<String, Object>> results = admissionCardRepository
+                .findByPatientId(patientId);
+        
+        logger.info("Retrieved {} admission record(s) for patient: {}", results.size(), patientId);
+        return results;
+    }
+    
+    /**
      * Insert or update admission card
      * Replicates USP_Insert_AdmissionCard
      */

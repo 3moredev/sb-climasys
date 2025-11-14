@@ -76,14 +76,15 @@ public class AdvanceCollectionController {
     @GetMapping("/search")
     @Operation(
         summary = "Search patients with advance cards",
-        description = "Autocomplete search for patients with advance cards by patient ID, name, or IPD number"
+        description = "Autocomplete search for patients with advance cards by patient ID, name, or IPD number. " +
+                     "Doctor ID is optional - if not provided, searches across all doctors."
     )
     public ResponseEntity<Map<String, Object>> searchPatientsWithAdvanceCard(
             @Parameter(description = "Search string (patient ID, name, or IPD number)", required = true, example = "JYOTI")
             @RequestParam String searchStr,
             
-            @Parameter(description = "Doctor ID", required = true, example = "DR-00010")
-            @RequestParam String doctorId
+            @Parameter(description = "Doctor ID (optional - if not provided, searches across all doctors)", required = false, example = "DR-00010")
+            @RequestParam(required = false) String doctorId
     ) {
         try {
             List<AdvanceCollectionSearchResultDTO> searchResults = advanceCollectionService
@@ -94,7 +95,9 @@ public class AdvanceCollectionController {
             response.put("count", searchResults.size());
             response.put("data", searchResults);
             response.put("searchStr", searchStr);
-            response.put("doctorId", doctorId);
+            if (doctorId != null) {
+                response.put("doctorId", doctorId);
+            }
             
             return ResponseEntity.ok(response);
             

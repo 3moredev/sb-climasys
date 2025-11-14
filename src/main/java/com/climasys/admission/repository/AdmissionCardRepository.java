@@ -160,5 +160,49 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
         @Param("clinicId") String clinicId,
         @Param("ipdRefNo") String ipdRefNo
     );
+    
+    /**
+     * Get admission data by patient ID
+     * Returns all admission records for a specific patient
+     * 
+     * @param patientId Patient ID
+     * @return List of admission data records
+     */
+    @Query(value = """
+        SELECT 
+            ad.patient_id,
+            ad.doctor_id,
+            ad.clinic_id,
+            ad.ipd_refno,
+            ad.relativename,
+            ad.relation,
+            ad.contactno,
+            ad.admission_date,
+            ad.admission_time,
+            ad.reasonofadmission,
+            ad.shift_id,
+            ad.department,
+            ad.isinsurance,
+            ad.insurancedetails,
+            ad.treatingdoctor,
+            ad.consultantdoctor,
+            ad.ipdfileno,
+            ad.roomno,
+            ad.packageremarks,
+            ad.bedno,
+            ad.referred_doctor,
+            ad.comments_note,
+            ad.insurance_company_id,
+            ad.createdby_name,
+            ad.created_on,
+            ad.modifiedby_name,
+            ad.modified_on
+        FROM admission_data ad
+        WHERE ad.patient_id = :patientId
+        ORDER BY ad.admission_date DESC, ad.admission_time DESC
+        """, nativeQuery = true)
+    List<Map<String, Object>> findByPatientId(
+        @Param("patientId") String patientId
+    );
 }
 

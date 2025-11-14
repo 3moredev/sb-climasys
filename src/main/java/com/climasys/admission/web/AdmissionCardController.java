@@ -158,6 +158,62 @@ public class AdmissionCardController {
     }
     
     /**
+     * Get admission data by patient ID
+     * Retrieves all admission records from admission_data table for a specific patient
+     * 
+     * @param patientId Patient ID
+     * @return List of admission data records
+     */
+    @GetMapping("/patient/{patientId}")
+    @Operation(
+        summary = "Get admission data by patient ID",
+        description = "Retrieves all admission records from admission_data table for a specific patient. " +
+                     "Returns all fields from the admission_data table including IPD reference number, " +
+                     "admission date/time, reason, department, insurance details, etc.",
+        responses = {
+            @ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved admission data"
+            ),
+            @ApiResponse(
+                responseCode = "404",
+                description = "No admission records found for the patient"
+            ),
+            @ApiResponse(
+                responseCode = "500",
+                description = "Internal server error"
+            )
+        }
+    )
+    public ResponseEntity<Map<String, Object>> getAdmissionDataByPatientId(
+            @Parameter(description = "Patient ID", required = true, example = "01-10-2021-051429")
+            @PathVariable String patientId
+    ) {
+        try {
+            List<Map<String, Object>> admissionData = admissionCardService
+                    .getAdmissionDataByPatientId(patientId);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("count", admissionData.size());
+            response.put("data", admissionData);
+            response.put("patientId", patientId);
+            
+            if (admissionData.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+            }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    /**
      * Insert or update admission card
      * Replicates USP_Insert_AdmissionCard
      */
