@@ -201,5 +201,97 @@ public interface DischargeCardRepository extends JpaRepository<AdmissionData, Ad
         @Param("doctorId") String doctorId,
         @Param("clinicId") String clinicId
     );
+    
+    /**
+     * Get discharge card details for a specific patient and IPD
+     * Matches USP_Get_Patient_DischargeCard_Data stored procedure
+     * Returns multiple result sets (main data, investigations, invoices, bills, labour card, advance)
+     * 
+     * Note: shiftId, clinicId, and invoiceNo are not used in the WHERE clause (matching stored procedure behavior)
+     * 
+     * @param patientId Patient ID
+     * @param doctorId Doctor ID
+     * @param ipdNo IPD Number
+     * @return Main discharge card data (Table[0])
+     */
+    @Query(value = """
+        SELECT 
+            dd.ipd_refno AS ipdRefNo,
+            dd.admission_date AS admissionDate,
+            dd.admission_time AS admissionTime,
+            dd.treating_doctor AS treatingDoctor,
+            dd.consulting_doctor AS consultingDoctor,
+            dd.discharge_date AS dischargeDate,
+            dd.discharge_time AS dischargeTime,
+            dd.weight,
+            dd.ipd_no AS ipdNo,
+            dd.diagnosis,
+            dd.complaints,
+            dd.history,
+            dd.investigations,
+            dd.oe,
+            dd.se,
+            dd.procedure,
+            dd.treatment,
+            dd.discharge,
+            dd.instructions,
+            COALESCE(dd.keyword, '') AS keyword,
+            dd.operation_start_date AS operationStartDate,
+            dd.operation_end_date AS operationEndDate,
+            dd.operation_start_time AS operationStartTime,
+            dd.operation_end_time AS operationEndTime,
+            COALESCE(dd.operative_notes, '') AS operativeNotes,
+            COALESCE(dd.remark, '') AS remark,
+            COALESCE(dd.follow_up_comments, '') AS followUpComments,
+            dd.anesthesia,
+            dd.doctor_id AS doctorId,
+            dd.reasonfordischarge AS reasonForDischarge,
+            COALESCE(dm.emergency_number, '') AS emergencyNumber,
+            COALESCE(ad.insurancedetails, '') AS company,
+            COALESCE(dd.referred_doctor, '') AS referredDoctor,
+            COALESCE(dd.condition_discharge, '') AS conditionDischarge,
+            COALESCE(dd.footer, '') AS footer,
+            COALESCE(dd.printed_on_date, '') AS printedOnDate,
+            COALESCE(dd.printed_on_date_op, '') AS printedOnDateOp,
+            COALESCE(dd.room, '') AS room,
+            COALESCE(dd.bedno, '') AS bedNo,
+            COALESCE(dd.admitted_days, '') AS admittedDays,
+            COALESCE(dd.ot_hours, '') AS otHours,
+            COALESCE(ad.department, '') AS department,
+            dd.followup_date AS followUpDate,
+            -- Patient information
+            COALESCE(pm.first_name || ' ' || COALESCE(pm.middle_name || ' ', '') || COALESCE(pm.last_name, ''), '') AS patientName,
+            pm.id AS patientId,
+            COALESCE(gt.gender_description, '') AS gender,
+            CASE 
+                WHEN pm.date_of_birth IS NOT NULL THEN 
+                    CAST(EXTRACT(YEAR FROM AGE(pm.date_of_birth)) AS INTEGER)
+                WHEN pm.age_given IS NOT NULL THEN CAST(pm.age_given AS INTEGER)
+                ELSE NULL
+            END AS age,
+            COALESCE(
+                CASE 
+                    WHEN pm.address_1 IS NOT NULL AND pm.city_id IS NOT NULL THEN 
+                        pm.address_1 || ', ' || COALESCE((SELECT ct.city_name FROM city_translations ct WHERE ct.city_id = pm.city_id AND (ct.language_id = 1 OR ct.language_id IS NULL) LIMIT 1), '')
+                    WHEN pm.address_1 IS NOT NULL THEN pm.address_1
+                    WHEN pm.city_id IS NOT NULL THEN COALESCE((SELECT ct.city_name FROM city_translations ct WHERE ct.city_id = pm.city_id AND (ct.language_id = 1 OR ct.language_id IS NULL) LIMIT 1), '')
+                    ELSE ''
+                END, ''
+            ) AS address,
+            COALESCE(pm.mobile_1, '') AS contactNo
+        FROM discharge_data dd
+        INNER JOIN doctor_master dm ON dm.doctor_id = :doctorId
+        LEFT JOIN admission_data ad ON ad.ipd_refno = :ipdNo
+        LEFT JOIN patient_master pm ON pm.id = dd.patient_id
+        LEFT JOIN gender_translations gt ON gt.gender_id = pm.gender_id AND (gt.language_id = 1 OR gt.language_id IS NULL)
+        WHERE dd.patient_id = :patientId
+          AND dd.ipd_refno = :ipdNo
+        LIMIT 1
+        """, nativeQuery = true)
+    Map<String, Object> getDischargeCardMainData(
+        @Param("patientId") String patientId,
+        @Param("doctorId") String doctorId,
+        @Param("ipdNo") String ipdNo
+    );
 }
 
