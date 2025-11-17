@@ -12,7 +12,8 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
     "com.climasys.trends.repository", 
     "com.climasys.admission.repository",
     "com.climasys.advance.repository",
-    "com.climasys.billing.repository"
+    "com.climasys.billing.repository",
+    "com.climasys.discharge.repository"
 })
 @EntityScan(basePackages = {"com.climasys.entity", "com.climasys.auth.entity"})
 @EnableTransactionManagement
