@@ -43,6 +43,7 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
     /**
      * Search patients with advance cards (autocomplete)
      * Replicates USP_Search_Patient_With_AdvanceCard
+     * Note: doctorId is optional - if null, searches across all doctors
      */
     @Query(value = """
         SELECT 
@@ -52,7 +53,7 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
             COALESCE(pm.middle_name, '') || ' ' || 
             COALESCE(pm.last_name, '') || '   :  ' || 
             COALESCE(pm.mobile_1, '') || '   :  ' || 
-            COALESCE(TO_CHAR(dd.discharge_date, 'DD Mon YYYY'), '') as searchValue
+            COALESCE(TO_CHAR(dd.visit_date, 'DD Mon YYYY'), '') as searchValue
         FROM patient_master pm
         INNER JOIN admission_data ad ON ad.patient_id = pm.id
         INNER JOIN discharge_data dd ON dd.ipd_refno = ad.ipd_refno
@@ -64,7 +65,7 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
             OR (pm.first_name || ' ' || pm.last_name) ILIKE '%' || :searchStr || '%'
             OR ad.ipd_refno ILIKE '%' || :searchStr || '%'
         )
-        AND ad.doctor_id = :doctorId
+        AND (:doctorId IS NULL OR ad.doctor_id = :doctorId)
         ORDER BY ad.ipd_refno DESC
         LIMIT 20
         """, nativeQuery = true)
