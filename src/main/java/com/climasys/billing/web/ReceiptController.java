@@ -1,7 +1,6 @@
 package com.climasys.billing.web;
 
-import com.climasys.billing.dto.ReceiptDetailsRequest;
-import com.climasys.billing.dto.ReceiptDetailsResponse;
+import com.climasys.billing.dto.*;
 import com.climasys.billing.service.ReceiptService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -118,6 +117,35 @@ public class ReceiptController {
             return ResponseEntity.ok(response);
         } else {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+    
+    /**
+     * Save patient receipt details
+     * Equivalent to USP_Insert_ReceiptDetails_Receipt stored procedure
+     * Used on Collection screen when submitting payment
+     * 
+     * @param request Save receipt request with all payment and receipt details
+     * @return SaveReceiptResponse with success status and receipt number
+     */
+    @PostMapping("/save")
+    @Operation(
+        summary = "Save patient receipt",
+        description = "Saves receipt details when payment is submitted on Collection screen. " +
+                     "Equivalent to USP_Insert_ReceiptDetails_Receipt stored procedure."
+    )
+    public ResponseEntity<SaveReceiptResponse> saveReceipt(
+            @Valid @RequestBody SaveReceiptRequest request
+    ) {
+        logger.info("Save receipt request - Patient: {}, Amount: {}", 
+                   request.getPatientId(), request.getReceiptAmount());
+        
+        SaveReceiptResponse response = receiptService.saveReceipt(request);
+        
+        if (response.isSuccess()) {
+            return ResponseEntity.ok(response);
+        } else {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 }
