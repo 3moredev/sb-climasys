@@ -63,6 +63,8 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
             OR pm.middle_name ILIKE '%' || :searchStr || '%'
             OR pm.last_name ILIKE '%' || :searchStr || '%'
             OR (pm.first_name || ' ' || pm.last_name) ILIKE '%' || :searchStr || '%'
+            OR TRIM(pm.first_name || ' ' || COALESCE(pm.middle_name, '') || ' ' || COALESCE(pm.last_name, '')) ILIKE '%' || :searchStr || '%'
+            OR pm.mobile_1 ILIKE '%' || :searchStr || '%'
             OR ad.ipd_refno ILIKE '%' || :searchStr || '%'
         )
         AND (:doctorId IS NULL OR ad.doctor_id = :doctorId)
