@@ -190,5 +190,147 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
         @Param("loginId") String loginId,
         @Param("advanceDate") LocalDateTime advanceDate
     );
+    
+    /**
+     * Get previous advance collection records (Table[0] from USP_Get_Patient_AdmissionCard_data)
+     */
+    @Query(value = """
+        SELECT 
+            ADV.ipd_refno AS ipdRefNo,
+            CASE 
+                WHEN AD.admission_date IS NOT NULL THEN 
+                    TO_CHAR(AD.admission_date, 'DD Mon YYYY') || '-' || TO_CHAR(AD.admission_time, 'HH24:MI:SS')
+                ELSE ''
+            END AS admissionDate,
+            COALESCE(AD.reasonofadmission, '') AS reasonOfAdmission,
+            ADV.receipt_number AS receiptNumber,
+            ADV.date AS date,
+            CASE WHEN AD.isinsurance = true THEN 'Yes' ELSE 'No' END AS isInsurance,
+            CASE 
+                WHEN ADV.advance_date IS NOT NULL THEN TO_CHAR(ADV.advance_date, 'DD Mon YYYY')
+                ELSE ''
+            END AS dateOfAdvance,
+            ADV.doctor_id AS doctorId,
+            ADV.amount_received AS amountReceived,
+            CASE 
+                WHEN DD.discharge_date IS NOT NULL THEN 
+                    TO_CHAR(DD.discharge_date, 'DD Mon YYYY') || '-' || TO_CHAR(DD.discharge_time, 'HH24:MI:SS')
+                ELSE ''
+            END AS dischargeDate,
+            SUM(ADV.amount_received) OVER () AS sumTotal,
+            CASE 
+                WHEN DD.discharge_date IS NOT NULL THEN TO_CHAR(DD.discharge_date, 'DD Mon YYYY')
+                ELSE ''
+            END AS validDischargeDate
+        FROM advance_collection_details ADV
+        INNER JOIN admission_data AD ON ADV.ipd_refno = AD.ipd_refno
+        LEFT JOIN discharge_data DD ON DD.ipd_refno = AD.ipd_refno
+        WHERE ADV.patient_id = :patientId
+          AND ADV.clinic_id = :clinicId
+          AND ADV.ipd_refno = :ipdRefNo
+        ORDER BY ADV.ipd_refno DESC
+        """, nativeQuery = true)
+    List<java.util.Map<String, Object>> getPreviousAdvanceRecords(
+        @Param("patientId") String patientId,
+        @Param("clinicId") String clinicId,
+        @Param("ipdRefNo") String ipdRefNo
+    );
+    
+    /**
+     * Get current advance collection details (Table[1] from USP_Get_Patient_AdmissionCard_data)
+     */
+    @Query(value = """
+        SELECT 
+            ADV.amount_received AS amountReceived,
+            ADV.advance_date AS advanceDate,
+            ADV.payment_by_id AS paymentById,
+            COALESCE(ADV.payment_remark, '') AS paymentRemark,
+            COALESCE(ADV.receipt_number, '') AS receiptNumber,
+            ADV.receipt_date AS receiptDate
+        FROM advance_collection_details ADV
+        INNER JOIN admission_data AD ON ADV.ipd_refno = AD.ipd_refno
+        WHERE ADV.patient_id = :patientId
+          AND ADV.clinic_id = :clinicId
+          AND ADV.ipd_refno = :ipdRefNo
+          AND CAST(ADV.date AS DATE) = CAST(:date AS DATE)
+        LIMIT 1
+        """, nativeQuery = true)
+    java.util.Map<String, Object> getCurrentAdvanceDetails(
+        @Param("patientId") String patientId,
+        @Param("clinicId") String clinicId,
+        @Param("ipdRefNo") String ipdRefNo,
+        @Param("date") LocalDateTime date
+    );
+    
+    /**
+     * Get admission data (Table[2] from USP_Get_Patient_AdmissionCard_data)
+     */
+    @Query(value = """
+        SELECT 
+            AD.admission_date AS admissionDate,
+            COALESCE(AD.ipdfileno, '') AS ipdFileNo,
+            COALESCE(AD.department, '') AS department,
+            COALESCE(AD.reasonofadmission, '') AS reasonOfAdmission,
+            COALESCE(AD.insurancedetails, '') AS insuranceDetails,
+            CASE WHEN AD.isinsurance = true THEN 'Yes' ELSE 'No' END AS isInsurance,
+            COALESCE(AD.packageremarks, '') AS packageRemarks,
+            COALESCE(DBH.bill_no, '') AS billNo,
+            DBH.bill_date AS billDate,
+            COALESCE(DIH.invoice_no, '') AS invoiceNo,
+            AD.admission_time AS admissionTime,
+            DD.discharge_date AS dischargeDate,
+            DD.discharge_time AS dischargeTime,
+            COALESCE(AD.roomno, '') AS roomNo,
+            COALESCE(AD.bedno, '') AS bedNo
+        FROM admission_data AD
+        LEFT JOIN discharge_bill_hdr DBH ON DBH.ipd_refno = AD.ipd_refno
+        LEFT JOIN discharge_invoice_hdr DIH ON DIH.ipd_refno = AD.ipd_refno
+        LEFT JOIN discharge_data DD ON DD.ipd_refno = AD.ipd_refno
+        WHERE AD.ipd_refno = :ipdRefNo
+          AND AD.patient_id = :patientId
+        LIMIT 1
+        """, nativeQuery = true)
+    java.util.Map<String, Object> getAdmissionData(
+        @Param("patientId") String patientId,
+        @Param("ipdRefNo") String ipdRefNo
+    );
+    
+    /**
+     * Get total advance amount (Table[3] from USP_Get_Patient_AdmissionCard_data)
+     */
+    @Query(value = """
+        SELECT COALESCE(SUM(amount_received), 0) AS totalAmount
+        FROM advance_collection_details
+        WHERE ipd_refno = :ipdRefNo
+          AND patient_id = :patientId
+        """, nativeQuery = true)
+    BigDecimal getTotalAdvanceAmount(
+        @Param("patientId") String patientId,
+        @Param("ipdRefNo") String ipdRefNo
+    );
+    
+    /**
+     * Update receipt number in advance collection details
+     */
+    @Modifying
+    @Query(value = """
+        UPDATE advance_collection_details
+        SET receipt_number = :receiptNo,
+            receipt_date = :receiptDate,
+            charges_details = :treatmentDetails
+        WHERE date = :date
+          AND doctor_id = :doctorId
+          AND clinic_id = :clinicId
+          AND patient_id = :patientId
+        """, nativeQuery = true)
+    void updateReceiptNumber(
+        @Param("receiptNo") String receiptNo,
+        @Param("receiptDate") LocalDateTime receiptDate,
+        @Param("treatmentDetails") String treatmentDetails,
+        @Param("date") LocalDateTime date,
+        @Param("doctorId") String doctorId,
+        @Param("clinicId") String clinicId,
+        @Param("patientId") String patientId
+    );
 }
 
