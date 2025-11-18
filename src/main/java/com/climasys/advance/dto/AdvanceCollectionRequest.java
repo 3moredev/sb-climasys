@@ -6,8 +6,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 /**
  * Request DTO for inserting/updating advance collection
@@ -34,8 +35,9 @@ public class AdvanceCollectionRequest {
     private String ipdRefNo;
     
     @JsonProperty("date")
-    @Schema(description = "Transaction date and time", example = "2022-08-20T14:45:00", required = true)
-    private LocalDateTime date;
+    @Schema(description = "Transaction date", example = "2022-08-20", required = true)
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    private LocalDate date;
     
     @JsonProperty("amountReceived")
     @Schema(description = "Amount received", example = "5000.00", required = true)
@@ -58,7 +60,8 @@ public class AdvanceCollectionRequest {
     private String loginId;
     
     @JsonProperty("advanceDate")
-    @Schema(description = "Advance payment date and time", example = "2022-08-20T14:45:00", required = true)
-    private LocalDateTime advanceDate;
+    @Schema(description = "Advance payment date", example = "2022-08-20", required = true)
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    private LocalDate advanceDate;
 }
 

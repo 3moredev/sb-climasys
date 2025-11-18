@@ -84,8 +84,12 @@ public class ReceiptDetailsRequest {
     private String billNo;
     
     @JsonProperty("date")
-    @Schema(description = "Date", example = "2022-08-20T14:45:00", required = true)
+    @Schema(description = "Date of advance collection record to update", example = "2022-08-20T14:45:00", required = true)
     private LocalDateTime date;
+    
+    @JsonProperty("ipdRefNo")
+    @Schema(description = "IPD Reference Number (optional, for better matching)")
+    private String ipdRefNo;
     
     /**
      * Receipt data item for the receipt data list

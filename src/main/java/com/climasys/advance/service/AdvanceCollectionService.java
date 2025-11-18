@@ -86,12 +86,16 @@ public class AdvanceCollectionService {
         Map<String, Object> response = new HashMap<>();
         
         try {
+            // Convert LocalDate to LocalDateTime at start of day for database operations
+            LocalDateTime dateTime = request.getDate() != null ? request.getDate().atStartOfDay() : null;
+            LocalDateTime advanceDateTime = request.getAdvanceDate() != null ? request.getAdvanceDate().atStartOfDay() : null;
+            
             // Check if record exists
             boolean exists = advanceCollectionRepository.existsByCompositeKey(
                 request.getPatientId(),
                 request.getClinicId(),
                 request.getIpdRefNo(),
-                request.getDate()
+                dateTime
             );
             
             if (!exists) {
@@ -101,14 +105,14 @@ public class AdvanceCollectionService {
                 detail.setDoctorId(request.getDoctorId());
                 detail.setClinicId(request.getClinicId());
                 detail.setIpdRefno(request.getIpdRefNo());
-                detail.setDate(request.getDate());
+                detail.setDate(dateTime);
                 detail.setAmountReceived(request.getAmountReceived());
                 detail.setPaymentById(request.getPaymentById());
                 detail.setPaymentRemark(request.getPaymentRemark());
                 detail.setShiftId(request.getShiftId());
                 detail.setCreatedbyName(request.getLoginId());
                 detail.setCreatedOn(java.time.LocalDateTime.now());
-                detail.setAdvanceDate(request.getAdvanceDate());
+                detail.setAdvanceDate(advanceDateTime);
                 
                 advanceCollectionRepository.save(detail);
                 
@@ -123,12 +127,12 @@ public class AdvanceCollectionService {
                     request.getPatientId(),
                     request.getClinicId(),
                     request.getIpdRefNo(),
-                    request.getDate(),
+                    dateTime,
                     request.getAmountReceived(),
                     request.getPaymentById(),
                     request.getPaymentRemark(),
                     request.getLoginId(),
-                    request.getAdvanceDate()
+                    advanceDateTime
                 );
                 
                 response.put("saveStatus", 2);
@@ -301,15 +305,34 @@ public class AdvanceCollectionService {
             
             // Update advance_collection_details with receipt number if visit type is 'A'
             if ("A".equals(request.getVisitType())) {
-                advanceCollectionRepository.updateReceiptNumber(
+                logger.info("Updating advance_collection_details with receipt number: {} for patient: {}, date: {}, paymentDate: {}, IPD: {}", 
+                           receiptNo, request.getPatientId(), request.getDate(), request.getPaymentDate(), request.getIpdRefNo());
+                
+                // Ensure paymentDate is not null - use current date if null
+                LocalDateTime receiptDate = request.getPaymentDate();
+                if (receiptDate == null) {
+                    receiptDate = LocalDateTime.now();
+                    logger.warn("PaymentDate was null, using current date: {}", receiptDate);
+                }
+                
+                int updatedRows = advanceCollectionRepository.updateReceiptNumber(
                     receiptNo,
-                    request.getPaymentDate(),
+                    receiptDate,
                     request.getTreatmentDetails(),
                     request.getDate(),
                     request.getDoctorId(),
                     request.getClinicId(),
-                    request.getPatientId()
+                    request.getPatientId(),
+                    request.getIpdRefNo()
                 );
+                
+                if (updatedRows == 0) {
+                    logger.warn("No advance_collection_details records were updated. Patient: {}, Date: {}, IPD: {}", 
+                               request.getPatientId(), request.getDate(), request.getIpdRefNo());
+                } else {
+                    logger.info("Updated {} advance_collection_details record(s) with receipt number: {}, receipt_date: {}", 
+                               updatedRows, receiptNo, receiptDate);
+                }
             }
             
             response.put("success", true);

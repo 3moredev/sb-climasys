@@ -311,26 +311,36 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
     
     /**
      * Update receipt number in advance collection details
+     * Replicates the UPDATE logic from USP_Insert_AdvanceReceiptDetails when Visit_Type='A'
+     * Matches by IPD refno (primary) or by date if IPD refno not provided
      */
     @Modifying
     @Query(value = """
         UPDATE advance_collection_details
         SET receipt_number = :receiptNo,
-            receipt_date = :receiptDate,
+            receipt_date = CAST(:receiptDate AS TIMESTAMP),
             charges_details = :treatmentDetails
-        WHERE date = :date
+        WHERE patient_id = :patientId
           AND doctor_id = :doctorId
           AND clinic_id = :clinicId
-          AND patient_id = :patientId
+          AND (receipt_number IS NULL OR receipt_number = '')
+          AND (
+              -- Primary: Match by IPD refno if provided
+              (:ipdRefNo IS NOT NULL AND ipd_refno = :ipdRefNo)
+              OR
+              -- Fallback: Match by date if IPD refno not provided
+              (:ipdRefNo IS NULL AND CAST(date AS DATE) = CAST(:date AS DATE))
+          )
         """, nativeQuery = true)
-    void updateReceiptNumber(
+    int updateReceiptNumber(
         @Param("receiptNo") String receiptNo,
         @Param("receiptDate") LocalDateTime receiptDate,
         @Param("treatmentDetails") String treatmentDetails,
         @Param("date") LocalDateTime date,
         @Param("doctorId") String doctorId,
         @Param("clinicId") String clinicId,
-        @Param("patientId") String patientId
+        @Param("patientId") String patientId,
+        @Param("ipdRefNo") String ipdRefNo
     );
 }
 
