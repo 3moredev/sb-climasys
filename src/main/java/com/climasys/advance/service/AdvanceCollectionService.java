@@ -152,61 +152,30 @@ public class AdvanceCollectionService {
     
     /**
      * Convert AdvanceCollectionSearchResult projection to DTO
-     * Format: IPD_RefNo + '   :  ' + Patient_ID + '   :   ' + Name + '   :  ' + Mobile + '   :  ' + VisitDate
-     * Note: The separator between Patient_ID and Name has 3 spaces after colon, others have 2 spaces
+     * Maps all fields from the query result to the DTO
      */
     private AdvanceCollectionSearchResultDTO convertToSearchDTO(AdvanceCollectionSearchResult searchResult) {
-        String searchValue = searchResult.getSearchValue();
-        
         AdvanceCollectionSearchResultDTO dto = new AdvanceCollectionSearchResultDTO();
-        dto.setSearchValue(searchValue);
         
-        // Split by the pattern that appears between Patient_ID and Name: "   :   " (3 spaces after colon)
-        // First split by "   :   " to separate Patient_ID from Name
-        String[] mainParts = searchValue.split("   :   ", 2);
+        // Map all fields directly
+        dto.setSr(searchResult.getSerialNumber());
+        dto.setPatientName(searchResult.getPatientName());
+        dto.setAdmissionIpdNo(searchResult.getIpdRefNo());
+        dto.setAdmissionDate(searchResult.getAdmissionDate());
+        dto.setReasonOfAdmission(searchResult.getReasonOfAdmission());
+        dto.setInsurance(searchResult.getInsurance());
+        dto.setDateOfAdvance(searchResult.getDateOfAdvance());
+        dto.setReceiptNo(searchResult.getReceiptNo());
+        dto.setAdvance(searchResult.getAdvanceRs());
+        dto.setPatientId(searchResult.getPatientId());
+        dto.setClinicId(searchResult.getClinicId());
+        dto.setDoctorId(searchResult.getDoctorId());
         
-        if (mainParts.length == 2) {
-            // mainParts[0] = IPD_RefNo + '   :  ' + Patient_ID
-            // mainParts[1] = Name + '   :  ' + Mobile + '   :  ' + VisitDate
-            
-            // Split the first part to get IPD_RefNo and Patient_ID
-            String[] firstPart = mainParts[0].split("   :  ", 2);
-            if (firstPart.length == 2) {
-                dto.setIpdRefNo(firstPart[0].trim());
-                dto.setPatientId(firstPart[1].trim());
-            }
-            
-            // Split the second part to get Name, Mobile, and VisitDate
-            String[] secondPart = mainParts[1].split("   :  ");
-            if (secondPart.length >= 3) {
-                dto.setPatientName(secondPart[0].trim());
-                dto.setMobile(secondPart[1].trim());
-                dto.setVisitDate(secondPart[2].trim());
-            } else if (secondPart.length == 2) {
-                dto.setPatientName(secondPart[0].trim());
-                dto.setMobile(secondPart[1].trim());
-            } else if (secondPart.length == 1) {
-                dto.setPatientName(secondPart[0].trim());
-            }
-        } else {
-            // Fallback: try splitting by "   :  " if the format is different
-            String[] parts = searchValue.split("   :  ");
-            if (parts.length >= 5) {
-                dto.setIpdRefNo(parts[0].trim());
-                dto.setPatientId(parts[1].trim());
-                dto.setPatientName(parts[2].trim());
-                dto.setMobile(parts[3].trim());
-                dto.setVisitDate(parts[4].trim());
-            } else if (parts.length >= 4) {
-                dto.setIpdRefNo(parts[0].trim());
-                dto.setPatientId(parts[1].trim());
-                dto.setPatientName(parts[2].trim());
-                dto.setMobile(parts[3].trim());
-            }
-        }
+        // Legacy fields for backward compatibility
+        dto.setIpdRefNo(searchResult.getIpdRefNo());
         
-        logger.debug("Parsed search result - IPD: {}, Patient: {}, Name: {}", 
-                dto.getIpdRefNo(), dto.getPatientId(), dto.getPatientName());
+        logger.debug("Mapped search result - IPD: {}, Patient: {}, Name: {}, Advance: {}", 
+                dto.getAdmissionIpdNo(), dto.getPatientId(), dto.getPatientName(), dto.getAdvance());
         
         return dto;
     }

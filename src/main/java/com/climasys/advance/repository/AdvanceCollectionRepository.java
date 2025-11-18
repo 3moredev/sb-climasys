@@ -41,22 +41,61 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
     );
     
     /**
-     * Search patients with advance cards (autocomplete)
+     * Search patients with advance cards
      * Replicates USP_Search_Patient_With_AdvanceCard
+     * Returns all fields needed for the "List of Admitted Patient/s" table
      * Note: doctorId is optional - if null, searches across all doctors
      */
     @Query(value = """
         SELECT 
-            COALESCE(ad.ipd_refno, '') || '   :  ' || 
-            COALESCE(pm.id, '') || '   :   ' || 
-            COALESCE(pm.first_name, '') || ' ' || 
-            COALESCE(pm.middle_name, '') || ' ' || 
-            COALESCE(pm.last_name, '') || '   :  ' || 
-            COALESCE(pm.mobile_1, '') || '   :  ' || 
-            COALESCE(TO_CHAR(dd.visit_date, 'DD Mon YYYY'), '') as searchValue
-        FROM patient_master pm
-        INNER JOIN admission_data ad ON ad.patient_id = pm.id
-        INNER JOIN discharge_data dd ON dd.ipd_refno = ad.ipd_refno
+            ROW_NUMBER() OVER (ORDER BY ad.admission_date DESC, ad.admission_time DESC) AS serialNumber,
+            TRIM(pm.first_name || ' ' || COALESCE(pm.middle_name, '') || ' ' || COALESCE(pm.last_name, '')) AS patientName,
+            ad.ipd_refno AS ipdRefNo,
+            CASE 
+                WHEN ad.admission_date IS NOT NULL THEN 
+                    TO_CHAR(ad.admission_date, 'DD Mon YYYY') || 
+                    CASE WHEN ad.admission_time IS NOT NULL 
+                        THEN ' - ' || TO_CHAR(ad.admission_time, 'HH24:MI:SS')
+                        ELSE ''
+                    END
+                ELSE ''
+            END AS admissionDate,
+            COALESCE(ad.reasonofadmission, '') AS reasonOfAdmission,
+            CASE WHEN ad.isinsurance = true THEN 'Yes' ELSE 'No' END AS insurance,
+            COALESCE(TO_CHAR(acd_latest.advance_date, 'DD Mon YYYY'), '') AS dateOfAdvance,
+            COALESCE(acd_latest.receipt_number, '') AS receiptNo,
+            COALESCE(acd_total.total_advance, 0.00) AS advanceRs,
+            ad.patient_id AS patientId,
+            ad.clinic_id AS clinicId,
+            ad.doctor_id AS doctorId
+        FROM admission_data ad
+        INNER JOIN patient_master pm ON ad.patient_id = pm.id
+        LEFT JOIN LATERAL (
+            SELECT 
+                advance_date,
+                receipt_number
+            FROM advance_collection_details acd
+            WHERE acd.patient_id = ad.patient_id
+              AND acd.clinic_id = ad.clinic_id
+              AND acd.ipd_refno = ad.ipd_refno
+            ORDER BY 
+                CASE WHEN acd.advance_date IS NOT NULL THEN 0 ELSE 1 END,
+                COALESCE(acd.advance_date, acd.date) DESC NULLS LAST
+            LIMIT 1
+        ) acd_latest ON true
+        LEFT JOIN (
+            SELECT 
+                patient_id,
+                clinic_id,
+                doctor_id,
+                ipd_refno,
+                SUM(amount_received) AS total_advance
+            FROM advance_collection_details
+            GROUP BY patient_id, clinic_id, doctor_id, ipd_refno
+        ) acd_total ON acd_total.patient_id = ad.patient_id 
+            AND acd_total.clinic_id = ad.clinic_id 
+            AND acd_total.doctor_id = ad.doctor_id 
+            AND acd_total.ipd_refno = ad.ipd_refno
         WHERE (
             ad.patient_id ILIKE '%' || :searchStr || '%'
             OR pm.first_name ILIKE '%' || :searchStr || '%'
@@ -68,7 +107,7 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
             OR ad.ipd_refno ILIKE '%' || :searchStr || '%'
         )
         AND (:doctorId IS NULL OR ad.doctor_id = :doctorId)
-        ORDER BY ad.ipd_refno DESC
+        ORDER BY ad.admission_date DESC, ad.admission_time DESC
         LIMIT 20
         """, nativeQuery = true)
     List<AdvanceCollectionSearchResult> searchPatientsWithAdvanceCard(
