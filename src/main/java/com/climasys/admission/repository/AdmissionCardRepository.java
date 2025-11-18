@@ -19,11 +19,19 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
     
     /**
      * Get all admission cards (list of admitted patients)
-     * Based on the Manage Admission Card page fields
+     * Used for "List of Admitted Patient/s" table on Manage Advance Collection screen
+     * 
+     * Business Logic:
+     * - Starts from Admission_Data to show ALL admitted patients (not just those with discharge_data)
+     * - LEFT JOIN Discharge_Data to check if patient is discharged
+     * - LEFT JOIN Advance_Collection_details to get advance date and receipt number
+     * - Filters for non-discharged patients (Discharge_Date IS NULL or no discharge_data record)
+     * - Orders by Admission_Date DESC (newest first, matching original behavior)
+     * - Includes duplicate removal by IPD_RefNo in service layer
      * 
      * @param patientId Patient ID (optional)
      * @param doctorId Doctor ID (optional - if null, returns all doctors for the clinic)
-     * @param clinicId Clinic ID
+     * @param clinicId Clinic ID (required)
      * @return List of admission cards
      */
     @Query(value = """
@@ -52,11 +60,13 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
                 ELSE ''
             END AS dischargeDate,
             CASE WHEN ad.isinsurance = true THEN 'Yes' ELSE 'No' END AS insurance,
-            COALESCE(icm.company_name, '') AS company,
+            COALESCE(ad.insurancedetails, '') AS company,
+            COALESCE(TO_CHAR(acd.advance_date, 'DD Mon YYYY'), '') AS dateOfAdvance,
+            COALESCE(acd.receipt_number, '') AS receiptNo,
             COALESCE((
-                SELECT SUM(acd.amount_received) 
-                FROM advance_collection_details acd 
-                WHERE acd.ipd_refno = ad.ipd_refno
+                SELECT SUM(acd_sum.amount_received) 
+                FROM advance_collection_details acd_sum 
+                WHERE acd_sum.ipd_refno = ad.ipd_refno
             ), 0.00) AS advanceRs,
             ad.patient_id AS patientId
         FROM admission_data ad
@@ -65,10 +75,23 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
             AND ad.patient_id = dd.patient_id
             AND ad.doctor_id = dd.doctor_id
             AND ad.clinic_id = dd.clinic_id
-        LEFT JOIN insurance_company_master icm ON ad.insurance_company_id = icm.company_id
+        LEFT JOIN LATERAL (
+            SELECT 
+                advance_date,
+                receipt_number
+            FROM advance_collection_details acd_inner
+            WHERE acd_inner.patient_id = ad.patient_id
+              AND acd_inner.clinic_id = ad.clinic_id
+              AND acd_inner.ipd_refno = ad.ipd_refno
+            ORDER BY 
+                CASE WHEN acd_inner.advance_date IS NOT NULL THEN 0 ELSE 1 END,
+                COALESCE(acd_inner.advance_date, acd_inner.date) DESC NULLS LAST
+            LIMIT 1
+        ) acd ON true
         WHERE (:patientId IS NULL OR ad.patient_id = :patientId)
           AND (:doctorId IS NULL OR ad.doctor_id = :doctorId)
           AND ad.clinic_id = :clinicId
+          AND (dd.discharge_date IS NULL OR dd.ipd_refno IS NULL)
         ORDER BY ad.admission_date DESC, ad.admission_time DESC
         """, nativeQuery = true)
     List<Map<String, Object>> findAllAdmissionCards(

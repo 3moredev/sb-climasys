@@ -14,9 +14,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -37,11 +40,13 @@ public class AdmissionCardService {
     
     /**
      * Get all admission cards (list of admitted patients)
+     * Matches Table[5] from USP_Get_Patient_All_Discharge_Cards stored procedure
+     * Includes duplicate removal by IPD_RefNo (matching old codebase behavior)
      * 
-     * @param patientId Patient ID (optional, can be null)
-     * @param doctorId Doctor ID (optional, can be null - if null, returns all doctors for the clinic)
-     * @param clinicId Clinic ID
-     * @return List of admission cards
+     * @param patientId Patient ID (optional, can be null - not used in stored procedure for Table[5])
+     * @param doctorId Doctor ID (optional, can be null - not used in stored procedure WHERE clause for Table[5])
+     * @param clinicId Clinic ID (not used in stored procedure WHERE clause for Table[5])
+     * @return List of admission cards with duplicates removed by IPD_RefNo
      */
     @Transactional(readOnly = true)
     public List<AdmissionCardDTO> getAllAdmissionCards(String patientId, String doctorId, String clinicId) {
@@ -51,12 +56,42 @@ public class AdmissionCardService {
         List<Map<String, Object>> results = admissionCardRepository
                 .findAllAdmissionCards(patientId, doctorId, clinicId);
         
-        List<AdmissionCardDTO> admissionCards = results.stream()
-                .map(this::mapToDTO)
-                .collect(Collectors.toList());
+        // Apply duplicate removal logic by IPD_RefNo (matching Table[5] behavior from climasys2.0)
+        List<AdmissionCardDTO> admissionCards = removeDuplicatesByIpdRefNo(results);
         
-        logger.info("Retrieved {} admission card(s)", admissionCards.size());
+        logger.info("Retrieved {} admission card(s) after duplicate removal", admissionCards.size());
         return admissionCards;
+    }
+    
+    /**
+     * Remove duplicates by IPD_RefNo (matching old codebase logic for Table[5])
+     * The old codebase removes duplicate IPD_RefNo entries from Table[5]
+     * Matches the logic: if UniqueRecordsGroup.Contains(dRow["IPD_RefNo"]) then add to DuplicateRecordsGroup
+     */
+    private List<AdmissionCardDTO> removeDuplicatesByIpdRefNo(List<Map<String, Object>> results) {
+        Set<String> seenIpdRefNos = new LinkedHashSet<>();
+        List<AdmissionCardDTO> uniqueCards = new ArrayList<>();
+        
+        for (Map<String, Object> result : results) {
+            // Try both lowercase and camelCase keys (PostgreSQL typically returns lowercase)
+            String ipdRefNo = getStringValue(result, "admissionipdno");
+            if (ipdRefNo == null || ipdRefNo.isEmpty()) {
+                ipdRefNo = getStringValue(result, "admissionIpdNo");
+            }
+            
+            if (ipdRefNo != null && !ipdRefNo.isEmpty()) {
+                if (!seenIpdRefNos.contains(ipdRefNo)) {
+                    seenIpdRefNos.add(ipdRefNo);
+                    uniqueCards.add(mapToDTO(result));
+                }
+                // Skip duplicates (matching old codebase behavior)
+            } else {
+                // Include records without IPD_RefNo
+                uniqueCards.add(mapToDTO(result));
+            }
+        }
+        
+        return uniqueCards;
     }
     
     /**
@@ -383,19 +418,21 @@ public class AdmissionCardService {
      * Convert AdmissionCard projection to DTO
      */
     private AdmissionCardDTO convertToDTO(AdmissionCard admissionCard) {
-        return new AdmissionCardDTO(
-            admissionCard.getSerialNumber(),
-            admissionCard.getPatientName(),
-            admissionCard.getAdmissionIpdNo(),
-            admissionCard.getIpdFileNo(),
-            admissionCard.getAdmissionDate(),
-            admissionCard.getReasonOfAdmission(),
-            admissionCard.getDischargeDate(),
-            admissionCard.getInsurance(),
-            admissionCard.getCompany(),
-            admissionCard.getAdvanceRs(),
-            admissionCard.getPatientId()
-        );
+        AdmissionCardDTO dto = new AdmissionCardDTO();
+        dto.setSerialNumber(admissionCard.getSerialNumber());
+        dto.setPatientName(admissionCard.getPatientName());
+        dto.setAdmissionIpdNo(admissionCard.getAdmissionIpdNo());
+        dto.setIpdFileNo(admissionCard.getIpdFileNo());
+        dto.setAdmissionDate(admissionCard.getAdmissionDate());
+        dto.setReasonOfAdmission(admissionCard.getReasonOfAdmission());
+        dto.setDischargeDate(admissionCard.getDischargeDate());
+        dto.setInsurance(admissionCard.getInsurance());
+        dto.setCompany(admissionCard.getCompany());
+        dto.setAdvanceRs(admissionCard.getAdvanceRs());
+        dto.setDateOfAdvance(""); // Not available in AdmissionCard projection
+        dto.setReceiptNo(""); // Not available in AdmissionCard projection
+        dto.setPatientId(admissionCard.getPatientId());
+        return dto;
     }
     
     /**
@@ -414,6 +451,8 @@ public class AdmissionCardService {
         dto.setInsurance(getStringValue(result, "insurance"));
         dto.setCompany(getStringValue(result, "company"));
         dto.setAdvanceRs(getBigDecimalValue(result, "advancers"));
+        dto.setDateOfAdvance(getStringValue(result, "dateofadvance"));
+        dto.setReceiptNo(getStringValue(result, "receiptno"));
         dto.setPatientId(getStringValue(result, "patientid"));
         
         return dto;

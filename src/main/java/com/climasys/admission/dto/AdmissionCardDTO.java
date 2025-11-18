@@ -46,6 +46,12 @@ public class AdmissionCardDTO {
     @JsonProperty("advanceRs")
     private BigDecimal advanceRs;
     
+    @JsonProperty("dateOfAdvance")
+    private String dateOfAdvance;
+    
+    @JsonProperty("receiptNo")
+    private String receiptNo;
+    
     @JsonProperty("patientId")
     private String patientId;
 }
