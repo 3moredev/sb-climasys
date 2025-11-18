@@ -1788,6 +1788,8 @@ public class VisitJpaService {
         
         // Instructions
         visitMap.put("instructions", visit.getInstructions());
+        visitMap.put("instructionsText", visit.getInstructions());
+        visitMap.put("planAdvText", visit.getInstructions());
         visitMap.put("additionalInstructions", visit.getAdditionalInstructions());
         
         // Audit fields

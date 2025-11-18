@@ -328,6 +328,7 @@ public class VisitController {
             
             // Instructions
             String instructions,
+            String additionalInstructions,
             
             // Instruction Groups (structured instruction data)
             // Each item should have: groupDescription, instructionsDescription, sequenceNo
@@ -789,7 +790,7 @@ public class VisitController {
                     null, // plan
                     null, // notes
                     null, // impressionFinding
-                    null, // additionalInstructions
+                    req.additionalInstructions(),
                     
                     // Referral fields
                     req.referBy(), // referId
