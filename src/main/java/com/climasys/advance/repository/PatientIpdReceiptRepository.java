@@ -225,8 +225,39 @@ public class PatientIpdReceiptRepository {
     }
     
     /**
-     * Insert or update receipt using MERGE logic
-     * Note: PostgreSQL doesn't support MERGE, so we use INSERT ... ON CONFLICT
+     * Check if receipt record exists for update
+     */
+    public boolean receiptRecordExists(
+            String doctorId,
+            String clinicId,
+            String patientId,
+            String receiptNo,
+            Short shiftId
+    ) {
+        String sql = """
+            SELECT COUNT(*) > 0
+            FROM patient_ipd_receipts
+            WHERE doctor_id = :doctorId
+              AND clinic_id = :clinicId
+              AND patient_id = :patientId
+              AND receipt_number = :receiptNo
+              AND shift_id = :shiftId
+            """;
+        
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("doctorId", doctorId)
+                .addValue("clinicId", clinicId)
+                .addValue("patientId", patientId)
+                .addValue("receiptNo", receiptNo)
+                .addValue("shiftId", shiftId);
+        
+        Boolean result = namedParameterJdbcTemplate.queryForObject(sql, params, Boolean.class);
+        return result != null && result;
+    }
+    
+    /**
+     * Insert or update receipt using check-then-update-or-insert pattern
+     * Replicates the MERGE logic from USP_Insert_AdvanceReceiptDetails
      */
     public void upsertReceipt(
             String doctorId,
@@ -243,45 +274,80 @@ public class PatientIpdReceiptRepository {
             LocalDate fromDate,
             LocalDate toDate
     ) {
-        String sql = """
-            INSERT INTO patient_ipd_receipts (
-                doctor_id, clinic_id, patient_id, receipt_number, receipt_date,
-                receipt_type, receipt_amount, created_on, createdby_name,
-                modified_on, modifiedby_name, shift_id, treatment_details,
-                title, from_date, to_date, visit_type
-            ) VALUES (
-                :doctorId, :clinicId, :patientId, :receiptNo, CAST(:paymentDate AS DATE),
-                :receiptType, :receiptAmount, CURRENT_TIMESTAMP, :userId,
-                CURRENT_TIMESTAMP, :userId, :shiftId, :treatmentDetails,
-                :title, :fromDate, :toDate, 'A'
-            )
-            ON CONFLICT (doctor_id, clinic_id, patient_id, receipt_number, shift_id)
-            DO UPDATE SET
-                receipt_amount = EXCLUDED.receipt_amount,
-                modified_on = CURRENT_TIMESTAMP,
-                modifiedby_name = EXCLUDED.modifiedby_name,
-                treatment_details = EXCLUDED.treatment_details,
-                title = EXCLUDED.title,
-                from_date = EXCLUDED.from_date,
-                to_date = EXCLUDED.to_date
-            """;
+        // Convert LocalDate to LocalDateTime for database
+        // Use paymentDate as fallback if fromDate/toDate are null (columns are NOT NULL)
+        LocalDateTime paymentDateOnly = paymentDate != null ? paymentDate.toLocalDate().atStartOfDay() : LocalDateTime.now().toLocalDate().atStartOfDay();
+        LocalDateTime fromDateTime = fromDate != null ? fromDate.atStartOfDay() : paymentDateOnly;
+        LocalDateTime toDateTime = toDate != null ? toDate.atStartOfDay() : paymentDateOnly;
         
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("doctorId", doctorId)
-                .addValue("clinicId", clinicId)
-                .addValue("patientId", patientId)
-                .addValue("receiptNo", receiptNo)
-                .addValue("paymentDate", paymentDate)
-                .addValue("receiptType", receiptType)
-                .addValue("receiptAmount", receiptAmount)
-                .addValue("userId", userId)
-                .addValue("shiftId", shiftId)
-                .addValue("treatmentDetails", treatmentDetails)
-                .addValue("title", title)
-                .addValue("fromDate", fromDate)
-                .addValue("toDate", toDate);
+        // Check if record exists
+        boolean exists = receiptRecordExists(doctorId, clinicId, patientId, receiptNo, shiftId);
         
-        namedParameterJdbcTemplate.update(sql, params);
+        if (exists) {
+            // Update existing record
+            String updateSql = """
+                UPDATE patient_ipd_receipts
+                SET receipt_amount = :receiptAmount,
+                    modified_on = CURRENT_TIMESTAMP,
+                    modifiedby_name = :userId,
+                    treatment_details = :treatmentDetails,
+                    title = :title,
+                    from_date = :fromDate,
+                    to_date = :toDate
+                WHERE doctor_id = :doctorId
+                  AND clinic_id = :clinicId
+                  AND patient_id = :patientId
+                  AND receipt_number = :receiptNo
+                  AND shift_id = :shiftId
+                """;
+            
+            MapSqlParameterSource updateParams = new MapSqlParameterSource()
+                    .addValue("receiptAmount", receiptAmount)
+                    .addValue("userId", userId)
+                    .addValue("treatmentDetails", treatmentDetails)
+                    .addValue("title", title)
+                    .addValue("fromDate", fromDateTime)
+                    .addValue("toDate", toDateTime)
+                    .addValue("doctorId", doctorId)
+                    .addValue("clinicId", clinicId)
+                    .addValue("patientId", patientId)
+                    .addValue("receiptNo", receiptNo)
+                    .addValue("shiftId", shiftId);
+            
+            namedParameterJdbcTemplate.update(updateSql, updateParams);
+        } else {
+            // Insert new record
+            String insertSql = """
+                INSERT INTO patient_ipd_receipts (
+                    doctor_id, clinic_id, patient_id, receipt_number, receipt_date,
+                    receipt_type, receipt_amount, created_on, createdby_name,
+                    modified_on, modifiedby_name, shift_id, treatment_details,
+                    title, from_date, to_date, visit_type
+                ) VALUES (
+                    :doctorId, :clinicId, :patientId, :receiptNo, CAST(:paymentDate AS DATE),
+                    :receiptType, :receiptAmount, CURRENT_TIMESTAMP, :userId,
+                    CURRENT_TIMESTAMP, :userId, :shiftId, :treatmentDetails,
+                    :title, :fromDate, :toDate, 'A'
+                )
+                """;
+            
+            MapSqlParameterSource insertParams = new MapSqlParameterSource()
+                    .addValue("doctorId", doctorId)
+                    .addValue("clinicId", clinicId)
+                    .addValue("patientId", patientId)
+                    .addValue("receiptNo", receiptNo)
+                    .addValue("paymentDate", paymentDate)
+                    .addValue("receiptType", receiptType)
+                    .addValue("receiptAmount", receiptAmount)
+                    .addValue("userId", userId)
+                    .addValue("shiftId", shiftId)
+                    .addValue("treatmentDetails", treatmentDetails)
+                    .addValue("title", title)
+                    .addValue("fromDate", fromDateTime)
+                    .addValue("toDate", toDateTime);
+            
+            namedParameterJdbcTemplate.update(insertSql, insertParams);
+        }
     }
 }
 
