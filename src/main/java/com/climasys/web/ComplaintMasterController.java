@@ -145,17 +145,19 @@ public class ComplaintMasterController {
     }
 
     /**
-     * Get all complaint data for a doctor in formatted way (including non-operator visible)
-     * GET /api/complaint-master/doctor/{doctorId}/formatted
+     * Get all complaint data for a clinic in formatted way (including non-operator visible)
+     * GET /api/complaint-master/clinic/{clinicId}/formatted?doctorId={doctorId}
      */
-    @GetMapping("/doctor/{doctorId}/formatted")
-    public ResponseEntity<?> getAllComplaintsForDoctorFormatted(@PathVariable String doctorId) {
+    @GetMapping("/clinic/{clinicId}/formatted")
+    public ResponseEntity<?> getAllComplaintsForDoctorFormatted(
+            @PathVariable String clinicId,
+            @RequestParam(required = false) String doctorId) {
         try {
-            logger.info("Getting all formatted complaints for doctor: {}", doctorId);
-            List<Map<String, Object>> complaints = complaintMasterService.getAllComplaintsForDoctorFormatted(doctorId);
+            logger.info("Getting all formatted complaints for clinic: {} and doctor: {}", clinicId, doctorId);
+            List<Map<String, Object>> complaints = complaintMasterService.getAllComplaintsForDoctorFormatted(clinicId, doctorId);
             return ResponseEntity.ok(complaints);
         } catch (Exception e) {
-            logger.error("Error getting all formatted complaints for doctor {}: {}", doctorId, e.getMessage(), e);
+            logger.error("Error getting all formatted complaints for clinic {} and doctor {}: {}", clinicId, doctorId, e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get all formatted complaints: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
@@ -203,16 +205,17 @@ public class ComplaintMasterController {
     }
 
     /**
-     * Get a specific complaint by short description and doctor ID
-     * GET /api/complaint-master/doctor/{doctorId}/complaint/{shortDescription}
+     * Get a specific complaint by short description, doctor ID, and clinic ID
+     * GET /api/complaint-master/doctor/{doctorId}/clinic/{clinicId}/complaint/{shortDescription}
      */
-    @GetMapping("/doctor/{doctorId}/complaint/{shortDescription}")
+    @GetMapping("/doctor/{doctorId}/clinic/{clinicId}/complaint/{shortDescription}")
     public ResponseEntity<?> getComplaintByShortDescription(
             @PathVariable String doctorId,
+            @PathVariable String clinicId,
             @PathVariable String shortDescription) {
         try {
-            logger.info("Getting complaint: {} for doctor: {}", shortDescription, doctorId);
-            Optional<ComplaintMaster> complaint = complaintMasterService.getComplaintByShortDescription(shortDescription, doctorId);
+            logger.info("Getting complaint: {} for doctor: {} and clinic: {}", shortDescription, doctorId, clinicId);
+            Optional<ComplaintMaster> complaint = complaintMasterService.getComplaintByShortDescription(shortDescription, doctorId, clinicId);
             if (complaint.isPresent()) {
                 return ResponseEntity.ok(complaint.get());
             } else {
@@ -221,7 +224,7 @@ public class ComplaintMasterController {
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
-            logger.error("Error getting complaint {} for doctor {}: {}", shortDescription, doctorId, e.getMessage(), e);
+            logger.error("Error getting complaint {} for doctor {} and clinic {}: {}", shortDescription, doctorId, clinicId, e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get complaint: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
@@ -266,15 +269,16 @@ public class ComplaintMasterController {
 
     /**
      * Delete a complaint
-     * DELETE /api/complaint-master/doctor/{doctorId}/complaint/{shortDescription}
+     * DELETE /api/complaint-master/doctor/{doctorId}/clinic/{clinicId}/complaint/{shortDescription}
      */
-    @DeleteMapping("/doctor/{doctorId}/complaint/{shortDescription}")
+    @DeleteMapping("/doctor/{doctorId}/clinic/{clinicId}/complaint/{shortDescription}")
     public ResponseEntity<?> deleteComplaint(
             @PathVariable String doctorId,
+            @PathVariable String clinicId,
             @PathVariable String shortDescription) {
         try {
-            logger.info("Deleting complaint: {} for doctor: {}", shortDescription, doctorId);
-            boolean deleted = complaintMasterService.deleteComplaint(shortDescription, doctorId);
+            logger.info("Deleting complaint: {} for doctor: {} and clinic: {}", shortDescription, doctorId, clinicId);
+            boolean deleted = complaintMasterService.deleteComplaint(shortDescription, doctorId, clinicId);
             if (deleted) {
                 Map<String, Object> result = new HashMap<>();
                 result.put("message", "Complaint deleted successfully");
@@ -285,7 +289,7 @@ public class ComplaintMasterController {
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
-            logger.error("Error deleting complaint {} for doctor {}: {}", shortDescription, doctorId, e.getMessage(), e);
+            logger.error("Error deleting complaint {} for doctor {} and clinic {}: {}", shortDescription, doctorId, clinicId, e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to delete complaint: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
@@ -294,18 +298,19 @@ public class ComplaintMasterController {
 
     /**
      * Toggle display to operator flag for a complaint
-     * PATCH /api/complaint-master/doctor/{doctorId}/complaint/{shortDescription}/toggle-operator-display
+     * PATCH /api/complaint-master/doctor/{doctorId}/clinic/{clinicId}/complaint/{shortDescription}/toggle-operator-display
      */
-    @PatchMapping("/doctor/{doctorId}/complaint/{shortDescription}/toggle-operator-display")
+    @PatchMapping("/doctor/{doctorId}/clinic/{clinicId}/complaint/{shortDescription}/toggle-operator-display")
     public ResponseEntity<?> toggleDisplayToOperator(
             @PathVariable String doctorId,
+            @PathVariable String clinicId,
             @PathVariable String shortDescription,
             @RequestParam boolean displayToOperator) {
         try {
-            logger.info("Toggling display to operator for complaint: {} to {} for doctor: {}", 
-                       shortDescription, displayToOperator, doctorId);
+            logger.info("Toggling display to operator for complaint: {} to {} for doctor: {} and clinic: {}", 
+                       shortDescription, displayToOperator, doctorId, clinicId);
             Optional<ComplaintMaster> updatedComplaint = complaintMasterService.toggleDisplayToOperator(
-                    shortDescription, doctorId, displayToOperator);
+                    shortDescription, doctorId, clinicId, displayToOperator);
             if (updatedComplaint.isPresent()) {
                 return ResponseEntity.ok(updatedComplaint.get());
             } else {
@@ -314,8 +319,8 @@ public class ComplaintMasterController {
                 return ResponseEntity.notFound().build();
             }
         } catch (Exception e) {
-            logger.error("Error toggling display to operator for complaint {} for doctor {}: {}", 
-                        shortDescription, doctorId, e.getMessage(), e);
+            logger.error("Error toggling display to operator for complaint {} for doctor {} and clinic {}: {}", 
+                        shortDescription, doctorId, clinicId, e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to toggle display to operator: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);

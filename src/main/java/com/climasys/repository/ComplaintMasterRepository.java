@@ -1,6 +1,7 @@
 package com.climasys.repository;
 
 import com.climasys.entity.ComplaintMaster;
+import com.climasys.entity.ComplaintMasterId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +15,7 @@ import java.util.Map;
  * Provides data access methods for complaint master data
  */
 @Repository
-public interface ComplaintMasterRepository extends JpaRepository<ComplaintMaster, String> {
+public interface ComplaintMasterRepository extends JpaRepository<ComplaintMaster, ComplaintMasterId> {
 
     /**
      * Find all complaints for a specific doctor and clinic
@@ -98,9 +99,10 @@ public interface ComplaintMasterRepository extends JpaRepository<ComplaintMaster
     List<Map<String, Object>> findComplaintsForOperatorDisplayFormatted(@Param("doctorId") String doctorId);
 
     /**
-     * Get all complaint data for a doctor (including non-operator visible)
-     * @param doctorId Doctor ID
-     * @return List of all complaint data for the doctor
+     * Get all complaint data for a clinic (including non-operator visible)
+     * @param clinicId Clinic ID (mandatory)
+     * @param doctorId Doctor ID (optional)
+     * @return List of all complaint data for the clinic and optionally doctor
      */
     @Query(value = """
         SELECT 
@@ -110,10 +112,11 @@ public interface ComplaintMasterRepository extends JpaRepository<ComplaintMaster
             priority_value,
             COALESCE(display_to_operator, 0) AS display_to_operator
         FROM complaint_master 
-        WHERE doctor_id = :doctorId 
+        WHERE clinic_id = :clinicId 
+        AND (:doctorId IS NULL OR doctor_id = :doctorId)
         ORDER BY priority_value ASC, short_description ASC
         """, nativeQuery = true)
-    List<Map<String, Object>> findAllComplaintsForDoctorFormatted(@Param("doctorId") String doctorId);
+    List<Map<String, Object>> findAllComplaintsForDoctorFormatted(@Param("clinicId") String clinicId, @Param("doctorId") String doctorId);
 
     /**
      * Search complaints by description for a specific doctor

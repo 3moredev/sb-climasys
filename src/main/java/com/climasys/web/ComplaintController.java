@@ -43,17 +43,19 @@ public class ComplaintController {
     }
 
     /**
-     * Get all complaints for a doctor - shorter endpoint
-     * GET /api/complain/all/{doctorId}
+     * Get all complaints for a clinic - shorter endpoint
+     * GET /api/complain/all/{clinicId}?doctorId={doctorId}
      */
-    @GetMapping("/all/{doctorId}")
-    public ResponseEntity<?> getAllComplaintsForDoctor(@PathVariable String doctorId) {
+    @GetMapping("/all/{clinicId}")
+    public ResponseEntity<?> getAllComplaintsForDoctor(
+            @PathVariable String clinicId,
+            @RequestParam(required = false) String doctorId) {
         try {
-            logger.info("Getting all complaints for doctor: {}", doctorId);
-            List<Map<String, Object>> complaints = complaintMasterService.getAllComplaintsForDoctorFormatted(doctorId);
+            logger.info("Getting all complaints for clinic: {} and doctor: {}", clinicId, doctorId);
+            List<Map<String, Object>> complaints = complaintMasterService.getAllComplaintsForDoctorFormatted(clinicId, doctorId);
             return ResponseEntity.ok(complaints);
         } catch (Exception e) {
-            logger.error("Error getting all complaints for doctor {}: {}", doctorId, e.getMessage(), e);
+            logger.error("Error getting all complaints for clinic {} and doctor {}: {}", clinicId, doctorId, e.getMessage(), e);
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get complaints: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);

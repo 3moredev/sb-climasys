@@ -1,6 +1,7 @@
 package com.climasys.service;
 
 import com.climasys.entity.ComplaintMaster;
+import com.climasys.entity.ComplaintMasterId;
 import com.climasys.repository.ComplaintMasterRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,14 +101,15 @@ public class ComplaintMasterService {
     }
 
     /**
-     * Get all complaint data for a doctor in formatted way (including non-operator visible)
-     * @param doctorId Doctor ID
-     * @return List of all complaint data for the doctor
+     * Get all complaint data for a clinic in formatted way (including non-operator visible)
+     * @param clinicId Clinic ID (mandatory)
+     * @param doctorId Doctor ID (optional, can be null)
+     * @return List of all complaint data for the clinic and optionally doctor
      */
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> getAllComplaintsForDoctorFormatted(String doctorId) {
-        logger.info("Getting all formatted complaints for doctor: {}", doctorId);
-        return complaintMasterRepository.findAllComplaintsForDoctorFormatted(doctorId);
+    public List<Map<String, Object>> getAllComplaintsForDoctorFormatted(String clinicId, String doctorId) {
+        logger.info("Getting all formatted complaints for clinic: {} and doctor: {}", clinicId, doctorId);
+        return complaintMasterRepository.findAllComplaintsForDoctorFormatted(clinicId, doctorId);
     }
 
     /**
@@ -169,30 +171,33 @@ public class ComplaintMasterService {
     }
 
     /**
-     * Get a complaint by short description and doctor ID
+     * Get a complaint by short description, doctor ID, and clinic ID
      * @param shortDescription Short description
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @return Optional complaint
      */
     @Transactional(readOnly = true)
-    public Optional<ComplaintMaster> getComplaintByShortDescription(String shortDescription, String doctorId) {
-        logger.info("Getting complaint by short description: {} for doctor: {}", shortDescription, doctorId);
-        return complaintMasterRepository.findById(shortDescription)
-                .filter(complaint -> complaint.getDoctorId().equals(doctorId));
+    public Optional<ComplaintMaster> getComplaintByShortDescription(String shortDescription, String doctorId, String clinicId) {
+        logger.info("Getting complaint by short description: {} for doctor: {} and clinic: {}", shortDescription, doctorId, clinicId);
+        ComplaintMasterId id = new ComplaintMasterId(shortDescription, doctorId, clinicId);
+        return complaintMasterRepository.findById(id);
     }
 
     /**
      * Delete a complaint
      * @param shortDescription Short description of complaint to delete
-     * @param doctorId Doctor ID (for security check)
+     * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @return True if deleted successfully
      */
-    public boolean deleteComplaint(String shortDescription, String doctorId) {
-        logger.info("Deleting complaint: {} for doctor: {}", shortDescription, doctorId);
+    public boolean deleteComplaint(String shortDescription, String doctorId, String clinicId) {
+        logger.info("Deleting complaint: {} for doctor: {} and clinic: {}", shortDescription, doctorId, clinicId);
         
-        Optional<ComplaintMaster> complaintOpt = getComplaintByShortDescription(shortDescription, doctorId);
+        Optional<ComplaintMaster> complaintOpt = getComplaintByShortDescription(shortDescription, doctorId, clinicId);
         if (complaintOpt.isPresent()) {
-            complaintMasterRepository.deleteById(shortDescription);
+            ComplaintMasterId id = new ComplaintMasterId(shortDescription, doctorId, clinicId);
+            complaintMasterRepository.deleteById(id);
             return true;
         }
         return false;
@@ -202,14 +207,15 @@ public class ComplaintMasterService {
      * Toggle display to operator flag for a complaint
      * @param shortDescription Short description
      * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
      * @param displayToOperator New display to operator value
      * @return Updated complaint
      */
-    public Optional<ComplaintMaster> toggleDisplayToOperator(String shortDescription, String doctorId, boolean displayToOperator) {
-        logger.info("Toggling display to operator for complaint: {} to {} for doctor: {}", 
-                   shortDescription, displayToOperator, doctorId);
+    public Optional<ComplaintMaster> toggleDisplayToOperator(String shortDescription, String doctorId, String clinicId, boolean displayToOperator) {
+        logger.info("Toggling display to operator for complaint: {} to {} for doctor: {} and clinic: {}", 
+                   shortDescription, displayToOperator, doctorId, clinicId);
         
-        Optional<ComplaintMaster> complaintOpt = getComplaintByShortDescription(shortDescription, doctorId);
+        Optional<ComplaintMaster> complaintOpt = getComplaintByShortDescription(shortDescription, doctorId, clinicId);
         if (complaintOpt.isPresent()) {
             ComplaintMaster complaint = complaintOpt.get();
             complaint.setDisplayToOperator(displayToOperator);
