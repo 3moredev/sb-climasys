@@ -1,13 +1,13 @@
 package com.climasys.advance.service;
 
 import com.climasys.advance.dto.*;
+import com.climasys.advance.dto.PreviousAdvanceCollectionDTO;
 import com.climasys.advance.repository.AdvanceCollectionRepository;
 import com.climasys.advance.repository.PatientIpdReceiptRepository;
 import com.climasys.entity.AdvanceCollectionDetail;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,26 +34,40 @@ public class AdvanceCollectionService {
     @Autowired
     private PatientIpdReceiptRepository patientIpdReceiptRepository;
     
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-    
     /**
      * Get advance details for a patient's IPD
      * Replicates USP_GET_AdvanceDetails
+     * Returns comprehensive data for "Previous Advance Collection Records" table
      */
     @Transactional(readOnly = true)
-    public List<AdvanceCollectionDTO> getAdvanceDetails(String patientId, String clinicId, String ipdRefNo) {
+    public List<PreviousAdvanceCollectionDTO> getAdvanceDetails(String patientId, String clinicId, String ipdRefNo) {
         logger.info("Getting advance details for patient: {}, IPD: {}", patientId, ipdRefNo);
         
         List<AdvanceDetail> advanceDetails = advanceCollectionRepository
-                .findAdvanceDetails(patientId, clinicId, ipdRefNo);
+                .findComprehensiveAdvanceDetails(patientId, clinicId, ipdRefNo);
         
-        List<AdvanceCollectionDTO> advances = advanceDetails.stream()
-                .map(this::convertToDTO)
+        List<PreviousAdvanceCollectionDTO> advances = advanceDetails.stream()
+                .map(this::convertAdvanceDetailToDTO)
                 .collect(Collectors.toList());
         
         logger.info("Retrieved {} advance record(s)", advances.size());
         return advances;
+    }
+    
+    /**
+     * Convert AdvanceDetail interface projection to PreviousAdvanceCollectionDTO
+     */
+    private PreviousAdvanceCollectionDTO convertAdvanceDetailToDTO(AdvanceDetail advanceDetail) {
+        PreviousAdvanceCollectionDTO dto = new PreviousAdvanceCollectionDTO();
+        dto.setAdmissionIpdNo(advanceDetail.getAdmissionIpdNo());
+        dto.setAdmissionDate(advanceDetail.getAdmissionDate());
+        dto.setDischargeDate(advanceDetail.getDischargeDate());
+        dto.setReasonOfAdmission(advanceDetail.getReasonOfAdmission());
+        dto.setInsurance(advanceDetail.getInsurance());
+        dto.setAdvanceDate(advanceDetail.getAdvanceDate());
+        dto.setReceiptNo(advanceDetail.getReceiptNo());
+        dto.setAmount(advanceDetail.getAmount());
+        return dto;
     }
     
     /**
@@ -123,7 +137,7 @@ public class AdvanceCollectionService {
                 
             } else {
                 // Update using custom query
-                advanceCollectionRepository.updateAdvanceCollection(
+                int updatedRows = advanceCollectionRepository.updateAdvanceCollection(
                     request.getPatientId(),
                     request.getClinicId(),
                     request.getIpdRefNo(),
@@ -135,9 +149,18 @@ public class AdvanceCollectionService {
                     advanceDateTime
                 );
                 
+                if (updatedRows == 0) {
+                    logger.warn("No rows updated for advance collection. Patient: {}, IPD: {}, Date: {}", 
+                               request.getPatientId(), request.getIpdRefNo(), dateTime);
+                    response.put("saveStatus", 0);
+                    response.put("message", "No records found to update. The record may have been deleted or the date doesn't match.");
+                    response.put("success", false);
+                    return response;
+                }
+                
                 response.put("saveStatus", 2);
                 response.put("message", "Advance collection updated successfully");
-                logger.info("Updated existing advance collection");
+                logger.info("Updated {} existing advance collection record(s)", updatedRows);
             }
             
             response.put("success", true);
@@ -152,12 +175,13 @@ public class AdvanceCollectionService {
     }
     
     /**
-     * Convert AdvanceDetail projection to DTO
+     * Convert AdvanceDetail projection to DTO (basic version - for backward compatibility)
+     * Note: This is used by the basic findAdvanceDetails() method
      */
     private AdvanceCollectionDTO convertToDTO(AdvanceDetail advanceDetail) {
         return new AdvanceCollectionDTO(
             advanceDetail.getAdvanceDate(),
-            advanceDetail.getAdvance()
+            advanceDetail.getAmount()
         );
     }
     
@@ -259,7 +283,7 @@ public class AdvanceCollectionService {
             
             // Generate receipt number if not provided (sequence logic)
             if (receiptNo == null || receiptNo.trim().isEmpty()) {
-                receiptNo = generateReceiptNumber(request.getClinicId());
+                receiptNo = generateReceiptNumber(request.getDoctorId(), request.getClinicId());
                 response.put("getStatus", 1);
             } else {
                 response.put("getStatus", receiptExists ? 0 : 1);
@@ -281,7 +305,8 @@ public class AdvanceCollectionService {
                         request.getTreatmentDetails(),
                         request.getTitle() != null ? request.getTitle().shortValue() : null,
                         request.getFromDate(),
-                        request.getToDate()
+                        request.getToDate(),
+                        request.getVisitType()
                     );
                 }
             } else {
@@ -299,7 +324,8 @@ public class AdvanceCollectionService {
                     request.getTreatmentDetails(),
                     request.getTitle() != null ? request.getTitle().shortValue() : null,
                     request.getFromDate(),
-                    request.getToDate()
+                    request.getToDate(),
+                    request.getVisitType()
                 );
             }
             
@@ -569,21 +595,31 @@ public class AdvanceCollectionService {
     /**
      * Generate receipt number using sequence logic
      * Replicates the sequence generation logic from USP_Insert_AdvanceReceiptDetails
+     * 
+     * @param doctorId Doctor ID (required for sequence creation due to foreign key)
+     * @param clinicId Clinic ID
+     * @return Generated receipt number
      */
-    private String generateReceiptNumber(String clinicId) {
-        String sql = """
-            SELECT last_sequenceno, total_length
-            FROM sequence_nos_clinic
-            WHERE clinic_id = ? AND entity_type = 'IRC'
-            """;
+    private String generateReceiptNumber(String doctorId, String clinicId) {
+        Map<String, Object> seq = advanceCollectionRepository.getSequenceForIrc(clinicId);
         
-        List<Map<String, Object>> results = jdbcTemplate.queryForList(sql, clinicId);
-        
-        if (results.isEmpty()) {
-            throw new RuntimeException("Sequence configuration not found for clinic: " + clinicId);
+        if (seq == null || seq.isEmpty()) {
+            // Create default sequence entry if not exists
+            // Use try-catch to prevent transaction rollback if sequence already exists
+            try {
+                advanceCollectionRepository.createDefaultIrcSequence(doctorId, clinicId);
+            } catch (Exception e) {
+                // Sequence might already exist, try to get it again
+                logger.debug("Sequence creation may have failed (possibly already exists): {}", e.getMessage());
+            }
+            
+            // Retry getting sequence
+            seq = advanceCollectionRepository.getSequenceForIrc(clinicId);
+            if (seq == null || seq.isEmpty()) {
+                throw new RuntimeException("Failed to create or retrieve IRC sequence for clinic: " + clinicId);
+            }
         }
         
-        Map<String, Object> seq = results.get(0);
         Long lastSequenceNo = ((Number) seq.get("last_sequenceno")).longValue();
         Integer totalLength = ((Number) seq.get("total_length")).intValue();
         
@@ -602,12 +638,10 @@ public class AdvanceCollectionService {
         String receiptNo = "I-" + financialYear + "-" + paddedSequence;
         
         // Update sequence
-        String updateSql = """
-            UPDATE sequence_nos_clinic
-            SET last_sequenceno = ?
-            WHERE clinic_id = ? AND entity_type = 'IRC'
-            """;
-        jdbcTemplate.update(updateSql, lastSequenceNo, clinicId);
+        advanceCollectionRepository.updateIrcSequence(lastSequenceNo, clinicId);
+        
+        logger.info("Generated receipt number: {} (sequence: {}, financial year: {})", 
+                    receiptNo, lastSequenceNo, financialYear);
         
         return receiptNo;
     }

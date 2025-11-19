@@ -3,12 +3,12 @@ package com.climasys.admission.service;
 import com.climasys.admission.dto.AdmissionCard;
 import com.climasys.admission.dto.AdmissionCardDTO;
 import com.climasys.admission.dto.AdmissionCardRequest;
+import com.climasys.admission.dto.PatientAdmissionCardDataDTO;
 import com.climasys.admission.repository.AdmissionCardRepository;
 import com.climasys.entity.AdmissionData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,9 +34,6 @@ public class AdmissionCardService {
     
     @Autowired
     private AdmissionCardRepository admissionCardRepository;
-    
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
     
     /**
      * Get all admission cards (list of admitted patients)
@@ -162,7 +159,7 @@ public class AdmissionCardService {
             if (!exists) {
                 // Generate IPD Reference Number if not provided
                 if (ipdRefNo == null || ipdRefNo.trim().isEmpty()) {
-                    ipdRefNo = generateIpdRefNo(request.getClinicId());
+                    ipdRefNo = generateIpdRefNo(request.getDoctorId(), request.getClinicId());
                     if (ipdRefNo == null) {
                         throw new RuntimeException("Failed to generate IPD Reference Number");
                     }
@@ -265,33 +262,33 @@ public class AdmissionCardService {
      * Replicates the logic from USP_Insert_AdmissionCard stored procedure
      * Format: {PrefixChar}-{FinancialYear}-{Month}-{ZeroPaddedSequenceNumber}
      * 
+     * @param doctorId Doctor ID (required for sequence creation due to foreign key)
      * @param clinicId Clinic ID
      * @return Generated IPD Reference Number
      */
-    private String generateIpdRefNo(String clinicId) {
+    private String generateIpdRefNo(String doctorId, String clinicId) {
         try {
             // Get sequence number for IPD entity type
-            String sequenceSql = "SELECT last_sequenceno, prefix_char, total_length " +
-                    "FROM sequence_nos WHERE clinic_id = ? AND entity_type = 'IPD'";
+            Map<String, Object> sequenceData = admissionCardRepository.getSequenceForIpd(clinicId);
             
-            List<Map<String, Object>> sequenceResult = jdbcTemplate.queryForList(sequenceSql, clinicId);
-            
-            if (sequenceResult.isEmpty()) {
+            if (sequenceData == null || sequenceData.isEmpty()) {
                 // Create default sequence entry if not exists
-                String insertSequenceSql = "INSERT INTO sequence_nos " +
-                        "(doctor_id, entity_type, entity_name, prefix_char, total_length, last_sequenceno, clinic_id) " +
-                        "VALUES (?, 'IPD', 'IPD', '', 5, 0, ?)";
-                jdbcTemplate.update(insertSequenceSql, "DEFAULT", clinicId);
+                // Use try-catch to prevent transaction rollback if sequence already exists
+                try {
+                    admissionCardRepository.createDefaultIpdSequence(doctorId, clinicId);
+                } catch (Exception e) {
+                    // Sequence might already exist, try to get it again
+                    logger.debug("Sequence creation may have failed (possibly already exists): {}", e.getMessage());
+                }
                 
                 // Retry getting sequence
-                sequenceResult = jdbcTemplate.queryForList(sequenceSql, clinicId);
-                if (sequenceResult.isEmpty()) {
+                sequenceData = admissionCardRepository.getSequenceForIpd(clinicId);
+                if (sequenceData == null || sequenceData.isEmpty()) {
                     logger.error("Failed to create or retrieve IPD sequence for clinic: {}", clinicId);
                     return null;
                 }
             }
             
-            Map<String, Object> sequenceData = sequenceResult.get(0);
             Long lastSequenceNo = ((Number) sequenceData.get("last_sequenceno")).longValue();
             Integer totalLength = ((Number) sequenceData.get("total_length")).intValue();
             String prefixChar = (String) sequenceData.get("prefix_char");
@@ -324,9 +321,7 @@ public class AdmissionCardService {
             String ipdRefNo = prefixChar + "-" + financialYear + "-" + monthStr + "-" + paddedSequence;
             
             // Update sequence number
-            String updateSequenceSql = "UPDATE sequence_nos SET last_sequenceno = ? " +
-                    "WHERE clinic_id = ? AND entity_type = 'IPD'";
-            jdbcTemplate.update(updateSequenceSql, lastSequenceNo, clinicId);
+            admissionCardRepository.updateIpdSequence(lastSequenceNo, clinicId);
             
             logger.info("Generated IPD Reference Number: {} (sequence: {}, financial year: {}, month: {})", 
                     ipdRefNo, lastSequenceNo, financialYear, monthStr);
@@ -344,12 +339,7 @@ public class AdmissionCardService {
      */
     private void insertDischargeData(AdmissionCardRequest request, String ipdRefNo) {
         try {
-            String insertSql = "INSERT INTO discharge_data " +
-                    "(doctor_id, clinic_id, patient_id, ipd_refno, admission_date, admission_time, " +
-                    "treating_doctor, consulting_doctor, ipd_no, createdby_name, created_on, bedno, room, referred_doctor, visit_date) " +
-                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)";
-            
-            jdbcTemplate.update(insertSql,
+            admissionCardRepository.insertDischargeData(
                     request.getDoctorId(),
                     request.getClinicId(),
                     request.getPatientId(),
@@ -362,8 +352,7 @@ public class AdmissionCardService {
                     request.getLoginId(),
                     request.getBedNo(),
                     request.getRoomNo(),
-                    request.getReferredDoctor(),
-                    request.getAdmissionDate()
+                    request.getReferredDoctor()
             );
             
             logger.info("Inserted discharge_data record for IPD: {}", ipdRefNo);
@@ -379,20 +368,7 @@ public class AdmissionCardService {
      */
     private void updateDischargeData(AdmissionCardRequest request, String ipdRefNo) {
         try {
-            String updateSql = "UPDATE discharge_data SET " +
-                    "ipd_no = ?, " +
-                    "admission_date = ?, " +
-                    "admission_time = ?, " +
-                    "treating_doctor = ?, " +
-                    "consulting_doctor = ?, " +
-                    "bedno = ?, " +
-                    "room = ?, " +
-                    "modified_on = CURRENT_TIMESTAMP, " +
-                    "modifiedby_name = ?, " +
-                    "referred_doctor = ? " +
-                    "WHERE patient_id = ? AND clinic_id = ? AND ipd_refno = ?";
-            
-            int updated = jdbcTemplate.update(updateSql,
+            int updated = admissionCardRepository.updateDischargeData(
                     request.getIpdFileNo(),
                     request.getAdmissionDate(),
                     request.getAdmissionTime(),
@@ -492,6 +468,54 @@ public class AdmissionCardService {
             return new BigDecimal(value.toString());
         }
         return BigDecimal.ZERO;
+    }
+    
+    /**
+     * Get patient admission card data for advance collection page
+     * Replicates USP_Get_Patient_AdmissionCard_data stored procedure
+     * 
+     * Returns: Admission No, IPD File No, Admission Date, Discharge Date, 
+     * Room-Bed, Department, Insurance, Company, Hospital bill No, 
+     * Hospital bill Date, Package remarks, Total Advance
+     * 
+     * @param patientId Patient ID
+     * @param clinicId Clinic ID
+     * @param doctorId Doctor ID
+     * @param ipdRefNo IPD Reference Number
+     * @return Patient admission card data
+     */
+    @Transactional(readOnly = true)
+    public PatientAdmissionCardDataDTO getPatientAdmissionCardData(
+            String patientId, String clinicId, String doctorId, String ipdRefNo) {
+        logger.info("Getting admission card data for patient: {}, IPD: {}, doctor: {}, clinic: {}", 
+                    patientId, ipdRefNo, doctorId, clinicId);
+        
+        Map<String, Object> result = admissionCardRepository.getPatientAdmissionCardData(
+                patientId, clinicId, doctorId, ipdRefNo);
+        
+        if (result == null || result.isEmpty()) {
+            logger.warn("No admission card data found for patient: {}, IPD: {}", patientId, ipdRefNo);
+            return null;
+        }
+        
+        PatientAdmissionCardDataDTO dto = new PatientAdmissionCardDataDTO();
+        dto.setAdmissionNo(getStringValue(result, "admissionno"));
+        dto.setIpdFileNo(getStringValue(result, "ipdfileno"));
+        dto.setAdmissionDate(getStringValue(result, "admissiondate"));
+        dto.setDischargeDate(getStringValue(result, "dischargedate"));
+        dto.setRoomBed(getStringValue(result, "roombed"));
+        dto.setDepartment(getStringValue(result, "department"));
+        dto.setInsurance(getStringValue(result, "insurance"));
+        dto.setCompany(getStringValue(result, "company"));
+        dto.setHospitalBillNo(getStringValue(result, "hospitalbillno"));
+        dto.setHospitalBillDate(getStringValue(result, "hospitalbilldate"));
+        dto.setPackageRemarks(getStringValue(result, "packageremarks"));
+        dto.setTotalAdvance(getBigDecimalValue(result, "totaladvance"));
+        dto.setReasonOfAdmission(getStringValue(result, "reasonofadmission"));
+        
+        logger.info("Successfully retrieved admission card data for patient: {}, IPD: {}", 
+                    patientId, ipdRefNo);
+        return dto;
     }
 }
 

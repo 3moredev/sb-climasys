@@ -1,6 +1,7 @@
 package com.climasys.advance.web;
 
 import com.climasys.advance.dto.*;
+import com.climasys.advance.dto.PreviousAdvanceCollectionDTO;
 import com.climasys.advance.service.AdvanceCollectionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -32,11 +33,16 @@ public class AdvanceCollectionController {
     /**
      * Get advance details for a patient's IPD
      * Replicates USP_GET_AdvanceDetails
+     * Returns comprehensive data for "Previous Advance Collection Records" table
+     * Fields: Admission/IPD No, Admission Date, Discharge Date, Reason of Admission,
+     * Insurance, Advance Date, Receipt No, Amount (Rs)
      */
     @GetMapping("/details")
     @Operation(
         summary = "Get advance collection details",
-        description = "Retrieves advance payment details for a specific patient's IPD admission"
+        description = "Retrieves comprehensive advance payment details for a specific patient's IPD admission. " +
+                     "Returns data for the 'Previous Advance Collection Records' table including admission details, " +
+                     "discharge information, insurance status, advance dates, receipt numbers, and amounts."
     )
     public ResponseEntity<Map<String, Object>> getAdvanceDetails(
             @Parameter(description = "Patient ID", required = true, example = "01-10-2021-051429")
@@ -45,11 +51,11 @@ public class AdvanceCollectionController {
             @Parameter(description = "Clinic ID", required = true, example = "CL-00001")
             @RequestParam String clinicId,
             
-            @Parameter(description = "IPD Reference Number", required = true, example = "IPD-2022-08-0312")
+            @Parameter(description = "IPD Reference Number", required = true, example = "IPD-2024-01-0500")
             @RequestParam String ipdRefNo
     ) {
         try {
-            List<AdvanceCollectionDTO> details = advanceCollectionService
+            List<PreviousAdvanceCollectionDTO> details = advanceCollectionService
                     .getAdvanceDetails(patientId, clinicId, ipdRefNo);
             
             Map<String, Object> response = new HashMap<>();

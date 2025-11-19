@@ -2,6 +2,7 @@ package com.climasys.admission.web;
 
 import com.climasys.admission.dto.AdmissionCardDTO;
 import com.climasys.admission.dto.AdmissionCardRequest;
+import com.climasys.admission.dto.PatientAdmissionCardDataDTO;
 import com.climasys.admission.service.AdmissionCardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -202,6 +203,77 @@ public class AdmissionCardController {
             if (admissionData.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
             }
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+    /**
+     * Get patient admission card data for advance collection page
+     * Replicates USP_Get_Patient_AdmissionCard_data stored procedure
+     * 
+     * Returns: Admission No, IPD File No, Admission Date, Discharge Date, 
+     * Room-Bed, Department, Insurance, Company, Hospital bill No, 
+     * Hospital bill Date, Package remarks, Total Advance
+     */
+    @GetMapping("/patient-card-data")
+    @Operation(
+        summary = "Get patient admission card data",
+        description = "Fetches patient admission details for advance collection page. " +
+                     "Returns admission information including IPD details, dates, room-bed, " +
+                     "department, insurance, hospital bill, and total advance amount.",
+        responses = {
+            @ApiResponse(
+                responseCode = "200",
+                description = "Successfully retrieved admission card data"
+            ),
+            @ApiResponse(
+                responseCode = "404",
+                description = "Admission card data not found"
+            ),
+            @ApiResponse(
+                responseCode = "400",
+                description = "Invalid request parameters"
+            ),
+            @ApiResponse(
+                responseCode = "500",
+                description = "Internal server error"
+            )
+        }
+    )
+    public ResponseEntity<Map<String, Object>> getPatientAdmissionCardData(
+            @Parameter(description = "Patient ID", example = "01-10-2021-051429", required = true)
+            @RequestParam String patientId,
+            
+            @Parameter(description = "Clinic ID", example = "CL-00001", required = true)
+            @RequestParam String clinicId,
+            
+            @Parameter(description = "Doctor ID", example = "DR-00010", required = true)
+            @RequestParam String doctorId,
+            
+            @Parameter(description = "IPD Reference Number", example = "IPD-2024-01-0500", required = true)
+            @RequestParam String ipdRefNo
+    ) {
+        try {
+            PatientAdmissionCardDataDTO data = admissionCardService.getPatientAdmissionCardData(
+                    patientId, clinicId, doctorId, ipdRefNo);
+            
+            if (data == null) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "Admission card data not found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+            }
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", data);
             
             return ResponseEntity.ok(response);
             

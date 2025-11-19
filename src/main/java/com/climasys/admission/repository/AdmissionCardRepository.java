@@ -3,10 +3,13 @@ package com.climasys.admission.repository;
 import com.climasys.entity.AdmissionData;
 import com.climasys.entity.AdmissionDataId;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 
@@ -227,6 +230,194 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
         """, nativeQuery = true)
     List<Map<String, Object>> findByPatientId(
         @Param("patientId") String patientId
+    );
+    
+    /**
+     * Get patient admission card data for advance collection page
+     * Replicates USP_Get_Patient_AdmissionCard_data stored procedure
+     * 
+     * Returns: Admission No, IPD File No, Admission Date, Discharge Date, 
+     * Room-Bed, Department, Insurance, Company, Hospital bill No, 
+     * Hospital bill Date, Package remarks, Total Advance
+     * 
+     * @param patientId Patient ID
+     * @param clinicId Clinic ID
+     * @param doctorId Doctor ID
+     * @param ipdRefNo IPD Reference Number
+     * @return Patient admission card data
+     */
+    @Query(value = """
+        SELECT 
+            ad.ipd_refno AS admissionNo,
+            COALESCE(ad.ipdfileno, '') AS ipdFileNo,
+            CASE 
+                WHEN ad.admission_date IS NOT NULL THEN 
+                    TO_CHAR(ad.admission_date, 'DD Mon YYYY') || 
+                    CASE WHEN ad.admission_time IS NOT NULL 
+                        THEN ' - ' || TO_CHAR(ad.admission_time, 'HH24:MI:SS')
+                        ELSE ''
+                    END
+                ELSE ''
+            END AS admissionDate,
+            CASE 
+                WHEN dd.discharge_date IS NOT NULL THEN 
+                    TO_CHAR(dd.discharge_date, 'DD Mon YYYY') || 
+                    CASE WHEN dd.discharge_time IS NOT NULL 
+                        THEN ' - ' || TO_CHAR(dd.discharge_time, 'HH24:MI:SS')
+                        ELSE ''
+                    END
+                ELSE ''
+            END AS dischargeDate,
+            CASE 
+                WHEN ad.roomno IS NOT NULL AND ad.bedno IS NOT NULL THEN 
+                    ad.roomno || '-' || ad.bedno
+                WHEN ad.roomno IS NOT NULL THEN 
+                    ad.roomno
+                WHEN ad.bedno IS NOT NULL THEN 
+                    ad.bedno
+                ELSE ''
+            END AS roomBed,
+            COALESCE(ad.department, '') AS department,
+            CASE WHEN ad.isinsurance = true THEN 'Yes' ELSE 'No' END AS insurance,
+            COALESCE(icm.company_name, ad.insurancedetails, '') AS company,
+            COALESCE(db.bill_no, '') AS hospitalBillNo,
+            CASE 
+                WHEN db.bill_date IS NOT NULL THEN 
+                    TO_CHAR(db.bill_date, 'DD Mon YYYY')
+                ELSE ''
+            END AS hospitalBillDate,
+            COALESCE(ad.packageremarks, '') AS packageRemarks,
+            COALESCE((
+                SELECT SUM(acd.amount_received) 
+                FROM advance_collection_details acd 
+                WHERE acd.patient_id = ad.patient_id
+                  AND acd.clinic_id = ad.clinic_id
+                  AND acd.ipd_refno = ad.ipd_refno
+            ), 0.00) AS totalAdvance,
+            COALESCE(ad.reasonofadmission, '') AS reasonOfAdmission
+        FROM admission_data ad
+        LEFT JOIN discharge_data dd ON ad.ipd_refno = dd.ipd_refno 
+            AND ad.patient_id = dd.patient_id
+            AND ad.doctor_id = dd.doctor_id
+            AND ad.clinic_id = dd.clinic_id
+        LEFT JOIN insurance_company_master icm ON ad.insurance_company_id = icm.company_id
+        LEFT JOIN discharge_bill_hdr db ON ad.ipd_refno = db.ipd_refno
+            AND ad.patient_id = db.patient_id
+            AND ad.doctor_id = db.doctor_id
+            AND ad.clinic_id = db.clinic_id
+        WHERE ad.patient_id = :patientId
+          AND ad.clinic_id = :clinicId
+          AND ad.doctor_id = :doctorId
+          AND ad.ipd_refno = :ipdRefNo
+        ORDER BY ad.admission_date DESC, ad.admission_time DESC
+        LIMIT 1
+        """, nativeQuery = true)
+    Map<String, Object> getPatientAdmissionCardData(
+        @Param("patientId") String patientId,
+        @Param("clinicId") String clinicId,
+        @Param("doctorId") String doctorId,
+        @Param("ipdRefNo") String ipdRefNo
+    );
+    
+    /**
+     * Get sequence number for IPD entity type
+     * Used for generating IPD Reference Number
+     * Returns null if sequence doesn't exist
+     */
+    @Query(value = """
+        SELECT last_sequenceno, prefix_char, total_length
+        FROM sequence_nos
+        WHERE clinic_id = :clinicId AND entity_type = 'IPD'
+        LIMIT 1
+        """, nativeQuery = true)
+    Map<String, Object> getSequenceForIpd(@Param("clinicId") String clinicId);
+    
+    /**
+     * Create default sequence entry for IPD if not exists
+     * Uses doctorId from request to satisfy foreign key constraint
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        INSERT INTO sequence_nos
+        (doctor_id, entity_type, entity_name, prefix_char, total_length, last_sequenceno, clinic_id)
+        VALUES (:doctorId, 'IPD', 'IPD', '', 5, 0, :clinicId)
+        ON CONFLICT (doctor_id, entity_type, entity_name, clinic_id) DO NOTHING
+        """, nativeQuery = true)
+    void createDefaultIpdSequence(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
+    
+    /**
+     * Update sequence number for IPD entity type
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        UPDATE sequence_nos
+        SET last_sequenceno = :lastSequenceNo
+        WHERE clinic_id = :clinicId AND entity_type = 'IPD'
+        """, nativeQuery = true)
+    void updateIpdSequence(@Param("lastSequenceNo") Long lastSequenceNo, @Param("clinicId") String clinicId);
+    
+    /**
+     * Insert discharge data record
+     * Replicates the INSERT INTO discharge_data logic from USP_Insert_AdmissionCard
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        INSERT INTO discharge_data
+        (doctor_id, clinic_id, patient_id, ipd_refno, admission_date, admission_time,
+         treating_doctor, consulting_doctor, ipd_no, createdby_name, created_on, bedno, room, referred_doctor, visit_date)
+        VALUES (:doctorId, :clinicId, :patientId, :ipdRefNo, :admissionDate, :admissionTime,
+                :treatingDoctor, :consultingDoctor, :ipdFileNo, :loginId, CURRENT_TIMESTAMP, :bedNo, :roomNo, :referredDoctor, :admissionDate)
+        """, nativeQuery = true)
+    void insertDischargeData(
+        @Param("doctorId") String doctorId,
+        @Param("clinicId") String clinicId,
+        @Param("patientId") String patientId,
+        @Param("ipdRefNo") String ipdRefNo,
+        @Param("admissionDate") LocalDate admissionDate,
+        @Param("admissionTime") LocalTime admissionTime,
+        @Param("treatingDoctor") String treatingDoctor,
+        @Param("consultingDoctor") String consultingDoctor,
+        @Param("ipdFileNo") String ipdFileNo,
+        @Param("loginId") String loginId,
+        @Param("bedNo") String bedNo,
+        @Param("roomNo") String roomNo,
+        @Param("referredDoctor") String referredDoctor
+    );
+    
+    /**
+     * Update discharge data record
+     * Replicates the UPDATE discharge_data logic from USP_Insert_AdmissionCard
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        UPDATE discharge_data
+        SET ipd_no = :ipdFileNo,
+            admission_date = :admissionDate,
+            admission_time = :admissionTime,
+            treating_doctor = :treatingDoctor,
+            consulting_doctor = :consultingDoctor,
+            bedno = :bedNo,
+            room = :roomNo,
+            modified_on = CURRENT_TIMESTAMP,
+            modifiedby_name = :loginId,
+            referred_doctor = :referredDoctor
+        WHERE patient_id = :patientId
+          AND clinic_id = :clinicId
+          AND ipd_refno = :ipdRefNo
+        """, nativeQuery = true)
+    int updateDischargeData(
+        @Param("ipdFileNo") String ipdFileNo,
+        @Param("admissionDate") LocalDate admissionDate,
+        @Param("admissionTime") LocalTime admissionTime,
+        @Param("treatingDoctor") String treatingDoctor,
+        @Param("consultingDoctor") String consultingDoctor,
+        @Param("bedNo") String bedNo,
+        @Param("roomNo") String roomNo,
+        @Param("loginId") String loginId,
+        @Param("referredDoctor") String referredDoctor,
+        @Param("patientId") String patientId,
+        @Param("clinicId") String clinicId,
+        @Param("ipdRefNo") String ipdRefNo
     );
 }
 

@@ -272,7 +272,8 @@ public class PatientIpdReceiptRepository {
             String treatmentDetails,
             Short title,
             LocalDate fromDate,
-            LocalDate toDate
+            LocalDate toDate,
+            String visitType
     ) {
         // Convert LocalDate to LocalDateTime for database
         // Use paymentDate as fallback if fromDate/toDate are null (columns are NOT NULL)
@@ -327,9 +328,12 @@ public class PatientIpdReceiptRepository {
                     :doctorId, :clinicId, :patientId, :receiptNo, CAST(:paymentDate AS DATE),
                     :receiptType, :receiptAmount, CURRENT_TIMESTAMP, :userId,
                     CURRENT_TIMESTAMP, :userId, :shiftId, :treatmentDetails,
-                    :title, :fromDate, :toDate, 'A'
+                    :title, :fromDate, :toDate, :visitType
                 )
                 """;
+            
+            // Default to 'A' if visitType is null or empty
+            String finalVisitType = (visitType != null && !visitType.trim().isEmpty()) ? visitType : "A";
             
             MapSqlParameterSource insertParams = new MapSqlParameterSource()
                     .addValue("doctorId", doctorId)
@@ -344,7 +348,8 @@ public class PatientIpdReceiptRepository {
                     .addValue("treatmentDetails", treatmentDetails)
                     .addValue("title", title)
                     .addValue("fromDate", fromDateTime)
-                    .addValue("toDate", toDateTime);
+                    .addValue("toDate", toDateTime)
+                    .addValue("visitType", finalVisitType);
             
             namedParameterJdbcTemplate.update(insertSql, insertParams);
         }

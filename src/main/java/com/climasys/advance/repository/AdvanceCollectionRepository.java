@@ -22,7 +22,7 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
     
     /**
      * Get advance details for a patient's IPD
-     * Replicates USP_GET_AdvanceDetails
+     * Replicates USP_GET_AdvanceDetails (basic version - returns only Advance_Date and Amount)
      */
     @Query(value = """
         SELECT 
@@ -35,6 +35,58 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
         ORDER BY advance_date DESC
         """, nativeQuery = true)
     List<AdvanceDetail> findAdvanceDetails(
+        @Param("patientId") String patientId,
+        @Param("clinicId") String clinicId,
+        @Param("ipdRefNo") String ipdRefNo
+    );
+    
+    /**
+     * Get comprehensive advance details for "Previous Advance Collection Records" table
+     * Enhanced version that returns all fields shown in the UI table
+     * Uses AdvanceDetail interface projection for direct mapping
+     */
+    @Query(value = """
+        SELECT 
+            ADV.ipd_refno AS admissionIpdNo,
+            CASE 
+                WHEN AD.admission_date IS NOT NULL THEN 
+                    TO_CHAR(AD.admission_date, 'DD Mon YYYY') || 
+                    CASE WHEN AD.admission_time IS NOT NULL 
+                        THEN ' - ' || TO_CHAR(AD.admission_time, 'HH24:MI:SS')
+                        ELSE ''
+                    END
+                ELSE ''
+            END AS admissionDate,
+            CASE 
+                WHEN DD.discharge_date IS NOT NULL THEN 
+                    TO_CHAR(DD.discharge_date, 'DD Mon YYYY') || 
+                    CASE WHEN DD.discharge_time IS NOT NULL 
+                        THEN ' - ' || TO_CHAR(DD.discharge_time, 'HH24:MI:SS')
+                        ELSE ''
+                    END
+                ELSE ''
+            END AS dischargeDate,
+            COALESCE(AD.reasonofadmission, '') AS reasonOfAdmission,
+            CASE WHEN AD.isinsurance = true THEN 'Yes' ELSE 'No' END AS insurance,
+            CASE 
+                WHEN ADV.advance_date IS NOT NULL THEN TO_CHAR(ADV.advance_date, 'DD Mon YYYY')
+                ELSE ''
+            END AS advanceDate,
+            COALESCE(ADV.receipt_number, '') AS receiptNo,
+            ADV.amount_received AS amount
+        FROM advance_collection_details ADV
+        INNER JOIN admission_data AD ON ADV.ipd_refno = AD.ipd_refno
+            AND ADV.patient_id = AD.patient_id
+            AND ADV.clinic_id = AD.clinic_id
+        LEFT JOIN discharge_data DD ON DD.ipd_refno = AD.ipd_refno
+            AND DD.patient_id = AD.patient_id
+            AND DD.clinic_id = AD.clinic_id
+        WHERE ADV.patient_id = :patientId
+          AND ADV.clinic_id = :clinicId
+          AND ADV.ipd_refno = :ipdRefNo
+        ORDER BY ADV.advance_date DESC NULLS LAST, ADV.date DESC
+        """, nativeQuery = true)
+    List<AdvanceDetail> findComprehensiveAdvanceDetails(
         @Param("patientId") String patientId,
         @Param("clinicId") String clinicId,
         @Param("ipdRefNo") String ipdRefNo
@@ -117,6 +169,7 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
     
     /**
      * Check if advance collection already exists
+     * Matches by date only (ignoring time component) to handle date conversion issues
      */
     @Query(value = """
         SELECT COUNT(*) > 0
@@ -124,7 +177,7 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
         WHERE patient_id = :patientId
           AND clinic_id = :clinicId
           AND ipd_refno = :ipdRefNo
-          AND date = :date
+          AND CAST(date AS DATE) = CAST(:date AS DATE)
         """, nativeQuery = true)
     boolean existsByCompositeKey(
         @Param("patientId") String patientId,
@@ -164,8 +217,9 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
     
     /**
      * Update advance collection
+     * Matches by date only (ignoring time component) to handle date conversion issues
      */
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query(value = """
         UPDATE advance_collection_details
         SET amount_received = :amountReceived,
@@ -177,9 +231,9 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
         WHERE patient_id = :patientId
           AND clinic_id = :clinicId
           AND ipd_refno = :ipdRefNo
-          AND date = :date
+          AND CAST(date AS DATE) = CAST(:date AS DATE)
         """, nativeQuery = true)
-    void updateAdvanceCollection(
+    int updateAdvanceCollection(
         @Param("patientId") String patientId,
         @Param("clinicId") String clinicId,
         @Param("ipdRefNo") String ipdRefNo,
@@ -342,5 +396,42 @@ public interface AdvanceCollectionRepository extends JpaRepository<AdvanceCollec
         @Param("patientId") String patientId,
         @Param("ipdRefNo") String ipdRefNo
     );
+    
+    /**
+     * Get sequence number for IRC (Invoice Receipt) entity type
+     * Used for generating receipt numbers
+     * Returns null if sequence doesn't exist
+     */
+    @Query(value = """
+        SELECT last_sequenceno, total_length
+        FROM sequence_nos_clinic
+        WHERE clinic_id = :clinicId AND entity_type = 'IRC'
+        LIMIT 1
+        """, nativeQuery = true)
+    java.util.Map<String, Object> getSequenceForIrc(@Param("clinicId") String clinicId);
+    
+    /**
+     * Create default sequence entry for IRC if not exists
+     * Uses doctorId from request to satisfy foreign key constraint
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        INSERT INTO sequence_nos_clinic
+        (doctor_id, clinic_id, entity_type, entity_name, prefix_char, total_length, last_sequenceno)
+        VALUES (:doctorId, :clinicId, 'IRC', 'IRC', 'I-', 5, 0)
+        ON CONFLICT (doctor_id, clinic_id, entity_type, entity_name, prefix_char) DO NOTHING
+        """, nativeQuery = true)
+    void createDefaultIrcSequence(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
+    
+    /**
+     * Update sequence number for IRC entity type
+     */
+    @Modifying(clearAutomatically = true)
+    @Query(value = """
+        UPDATE sequence_nos_clinic
+        SET last_sequenceno = :lastSequenceNo
+        WHERE clinic_id = :clinicId AND entity_type = 'IRC'
+        """, nativeQuery = true)
+    void updateIrcSequence(@Param("lastSequenceNo") Long lastSequenceNo, @Param("clinicId") String clinicId);
 }
 
