@@ -610,6 +610,7 @@ public class VisitJpaService {
                     FROM patient_visit_billinginfo pvb
                     WHERE pvb.patient_id = ? AND pvb.clinic_id = ? AND pvb.doctor_id = ?
                       AND pvb.patient_visit_no = ?
+                      AND (pvb.delete_flag IS NULL OR pvb.delete_flag = false)
                 """;
                 billing = jdbcTemplate.queryForList(
                     billingSql, patientId, clinicId, doctorId, patientVisitNo);
@@ -1127,6 +1128,7 @@ public class VisitJpaService {
                     FROM patient_visit_billinginfo pvb
                     WHERE pvb.patient_id = ? AND pvb.clinic_id = ? AND pvb.doctor_id = ?
                       AND pvb.patient_visit_no = ?
+                      AND COALESCE(pvb.delete_flag,false) = false
                 """;
                 billing = jdbcTemplate.queryForList(
                     billingSql, patientId, clinicId, doctorId, patientVisitNo);
