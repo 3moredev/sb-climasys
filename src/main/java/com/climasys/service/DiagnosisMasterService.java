@@ -132,10 +132,16 @@ public class DiagnosisMasterService {
         logger.debug("Diagnosis description to update: {}, Priority value to update: {}", 
                     diagnosis.getDiagnosisDescription(), diagnosis.getPriorityValue());
         
-        // Find the existing diagnosis using the composite key
+        // Find the existing diagnosis using the composite key (try exact match first)
         DiagnosisMasterId id = new DiagnosisMasterId(shortDesc, doctorId, clinicId);
-        
         Optional<DiagnosisMaster> existingOpt = diagnosisMasterRepository.findById(id);
+        
+        // If exact match fails, try to find by normalized comparison (handles whitespace and ? prefix issues)
+        if (existingOpt.isEmpty()) {
+            logger.debug("Exact match not found, trying normalized search for: '{}'", normalizeShortDescription(shortDesc));
+            existingOpt = findDiagnosisByNormalizedShortDescription(shortDesc, doctorId, clinicId);
+        }
+        
         if (existingOpt.isEmpty()) {
             logger.warn("Diagnosis not found with shortDescription: '{}', doctorId: {}, clinicId: {}", 
                        shortDesc, doctorId, clinicId);
@@ -170,6 +176,48 @@ public class DiagnosisMasterService {
     }
 
     /**
+     * Normalize short description for comparison (trim whitespace and remove leading ?)
+     * @param shortDescription Short description to normalize
+     * @return Normalized short description
+     */
+    private String normalizeShortDescription(String shortDescription) {
+        if (shortDescription == null) {
+            return null;
+        }
+        String normalized = shortDescription.trim();
+        if (normalized.startsWith("?")) {
+            normalized = normalized.substring(1).trim();
+        }
+        return normalized;
+    }
+    
+    /**
+     * Find diagnosis by normalized short description comparison
+     * Handles cases where database has whitespace or ? prefix
+     * @param shortDescription Short description to find
+     * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
+     * @return Optional diagnosis if found
+     */
+    private Optional<DiagnosisMaster> findDiagnosisByNormalizedShortDescription(String shortDescription, String doctorId, String clinicId) {
+        String normalizedShortDesc = normalizeShortDescription(shortDescription);
+        List<DiagnosisMaster> allDiagnoses = diagnosisMasterRepository.findByDoctorIdAndClinicIdOrderByPriorityValueAscShortDescriptionAsc(doctorId, clinicId);
+        
+        for (DiagnosisMaster dm : allDiagnoses) {
+            String dbShortDesc = dm.getShortDescription();
+            if (dbShortDesc != null) {
+                String normalizedDbShortDesc = normalizeShortDescription(dbShortDesc);
+                if (normalizedShortDesc != null && normalizedShortDesc.equalsIgnoreCase(normalizedDbShortDesc)) {
+                    logger.debug("Found match using normalized comparison: '{}' matches '{}'", 
+                               shortDescription, dbShortDesc);
+                    return Optional.of(dm);
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
      * Get a diagnosis by short description, doctor ID, and clinic ID
      * @param shortDescription Short description
      * @param doctorId Doctor ID
@@ -179,8 +227,17 @@ public class DiagnosisMasterService {
     @Transactional(readOnly = true)
     public Optional<DiagnosisMaster> getDiagnosisByShortDescription(String shortDescription, String doctorId, String clinicId) {
         logger.info("Getting diagnosis by short description: {} for doctor: {} and clinic: {}", shortDescription, doctorId, clinicId);
+        
+        // Try exact match first
         DiagnosisMasterId id = new DiagnosisMasterId(shortDescription, doctorId, clinicId);
-        return diagnosisMasterRepository.findById(id);
+        Optional<DiagnosisMaster> result = diagnosisMasterRepository.findById(id);
+        
+        // If exact match fails, try normalized comparison
+        if (result.isEmpty()) {
+            result = findDiagnosisByNormalizedShortDescription(shortDescription, doctorId, clinicId);
+        }
+        
+        return result;
     }
 
     /**
@@ -195,7 +252,9 @@ public class DiagnosisMasterService {
         
         Optional<DiagnosisMaster> diagnosisOpt = getDiagnosisByShortDescription(shortDescription, doctorId, clinicId);
         if (diagnosisOpt.isPresent()) {
-            DiagnosisMasterId id = new DiagnosisMasterId(shortDescription, doctorId, clinicId);
+            DiagnosisMaster diagnosis = diagnosisOpt.get();
+            // Use the actual short description from the found diagnosis to ensure correct deletion
+            DiagnosisMasterId id = new DiagnosisMasterId(diagnosis.getShortDescription(), doctorId, clinicId);
             diagnosisMasterRepository.deleteById(id);
             return true;
         }
