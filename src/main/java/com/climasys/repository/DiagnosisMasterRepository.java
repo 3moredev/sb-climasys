@@ -1,6 +1,7 @@
 package com.climasys.repository;
 
 import com.climasys.entity.DiagnosisMaster;
+import com.climasys.entity.DiagnosisMasterId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +15,7 @@ import java.util.Map;
  * Provides data access methods for diagnosis master data
  */
 @Repository
-public interface DiagnosisMasterRepository extends JpaRepository<DiagnosisMaster, String> {
+public interface DiagnosisMasterRepository extends JpaRepository<DiagnosisMaster, DiagnosisMasterId> {
 
     /**
      * Find all diagnoses for a specific doctor and clinic
@@ -86,4 +87,42 @@ public interface DiagnosisMasterRepository extends JpaRepository<DiagnosisMaster
      * @return true if exists, false otherwise
      */
     boolean existsByDoctorIdAndShortDescription(String doctorId, String shortDescription);
+
+    /**
+     * Get all diagnosis data for a clinic in formatted way
+     * @param clinicId Clinic ID (mandatory)
+     * @param doctorId Doctor ID (optional)
+     * @return List of all diagnosis data for the clinic and optionally doctor
+     */
+    @Query(value = """
+        SELECT 
+            TRIM(short_description) || '*' || TRIM(diagnosis_description) AS id,
+            TRIM(short_description) AS short_description,
+            TRIM(diagnosis_description) AS diagnosis_description,
+            priority_value
+        FROM diagnosis_master 
+        WHERE clinic_id = :clinicId 
+        AND (:doctorId IS NULL OR doctor_id = :doctorId)
+        ORDER BY priority_value ASC, short_description ASC
+        """, nativeQuery = true)
+    List<Map<String, Object>> findAllDiagnosesForDoctorFormatted(@Param("clinicId") String clinicId, @Param("doctorId") String doctorId);
+
+    /**
+     * Search diagnoses by description for a specific doctor
+     * @param doctorId Doctor ID
+     * @param searchTerm Search term to match against short or full description
+     * @return List of matching diagnoses
+     */
+    @Query("SELECT dm FROM DiagnosisMaster dm WHERE dm.doctorId = :doctorId AND " +
+           "(LOWER(dm.shortDescription) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(dm.diagnosisDescription) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) " +
+           "ORDER BY dm.priorityValue ASC, dm.shortDescription ASC")
+    List<DiagnosisMaster> searchDiagnosesByDescription(@Param("doctorId") String doctorId, @Param("searchTerm") String searchTerm);
+
+    /**
+     * Count diagnoses for a doctor
+     * @param doctorId Doctor ID
+     * @return Number of diagnoses for the doctor
+     */
+    long countByDoctorId(String doctorId);
 }
