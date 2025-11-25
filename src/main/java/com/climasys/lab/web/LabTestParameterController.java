@@ -1,11 +1,14 @@
 package com.climasys.lab.web;
 
+import com.climasys.dto.LabTestAndParameterRequest;
+import com.climasys.entity.LabTestParameter;
 import com.climasys.lab.service.LabTestParameterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -275,6 +278,135 @@ public class LabTestParameterController {
             return ResponseEntity.internalServerError().body(Map.of(
                 "success", false,
                 "error", "Failed to get lab tests with parameters: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Insert/Update lab test and parameters
+     * This endpoint replaces the USP_Insert_LabTest_And_Parameters stored procedure functionality
+     * 
+     * The stored procedure logic:
+     * 1. MERGE operation on Lab_Test_Master (update if exists with old description, insert if not)
+     * 2. Gets the lab test ID from the inserted/updated lab test
+     * 3. Inserts parameters from the request into Lab_Test_Parameter table
+     * 
+     * @param request Request containing doctor ID, clinic ID, group name, and parameter data
+     * @return Created/updated lab test and parameters
+     */
+    @Operation(
+        summary = "Insert/Update Lab Test and Parameters",
+        description = "Inserts or updates lab test master and its parameters. " +
+                     "This replaces the USP_Insert_LabTest_And_Parameters stored procedure functionality. " +
+                     "If a lab test with the old description exists, it will be updated with the new description and priority. " +
+                     "Otherwise, a new lab test will be created. Parameters will be inserted for the lab test."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test and parameters created/updated successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid data"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PostMapping
+    public ResponseEntity<?> insertLabTestAndParameters(
+            @Parameter(description = "Request containing doctor ID, clinic ID, group name, and parameter data", required = true)
+            @Valid @RequestBody LabTestAndParameterRequest request) {
+        
+        try {
+            Map<String, Object> result = labTestParameterService.insertLabTestAndParameters(request);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to insert/update lab test and parameters: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Update an existing lab test parameter
+     * Only updates parameter name
+     * Doctor ID, ID, Lab Test ID, and Clinic ID cannot be changed (they are part of the composite key)
+     * 
+     * @param parameter Lab test parameter to update
+     * @return Updated lab test parameter
+     */
+    @Operation(
+        summary = "Update Lab Test Parameter",
+        description = "Updates an existing lab test parameter. Only updates parameter name. " +
+                     "Doctor ID, ID, Lab Test ID, and Clinic ID cannot be changed."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test parameter updated successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid data or parameter not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PutMapping
+    public ResponseEntity<?> updateLabTestParameter(@RequestBody LabTestParameter parameter) {
+        try {
+            Map<String, Object> result = labTestParameterService.updateLabTestParameter(parameter);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to update lab test parameter: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Delete a lab test parameter
+     * 
+     * @param doctorId Doctor ID
+     * @param id Parameter ID
+     * @param labTestId Lab test ID
+     * @param clinicId Clinic ID
+     * @return Success message
+     */
+    @Operation(
+        summary = "Delete Lab Test Parameter",
+        description = "Deletes a lab test parameter by doctor ID, parameter ID, lab test ID, and clinic ID."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test parameter deleted successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - parameter not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @DeleteMapping("/doctor/{doctorId}/id/{id}/lab-test/{labTestId}/clinic/{clinicId}")
+    public ResponseEntity<?> deleteLabTestParameter(
+            @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
+            @PathVariable String doctorId,
+            @Parameter(description = "Parameter ID", required = true, example = "1")
+            @PathVariable Integer id,
+            @Parameter(description = "Lab Test ID", required = true, example = "1")
+            @PathVariable Integer labTestId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @PathVariable String clinicId) {
+        
+        try {
+            Map<String, Object> result = labTestParameterService.deleteLabTestParameter(doctorId, id, labTestId, clinicId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to delete lab test parameter: " + e.getMessage()
             ));
         }
     }

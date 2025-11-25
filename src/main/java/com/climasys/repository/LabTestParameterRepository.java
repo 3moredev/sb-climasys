@@ -86,4 +86,16 @@ public interface LabTestParameterRepository extends JpaRepository<LabTestParamet
      */
     @Query("SELECT ltp FROM LabTestParameter ltp WHERE ltp.doctorId = :doctorId AND ltp.labTestId = :labTestId AND ltp.clinicId = :clinicId ORDER BY ltp.id")
     List<LabTestParameter> findByDoctorIdAndLabTestIdAndClinicId(@Param("doctorId") String doctorId, @Param("labTestId") Integer labTestId, @Param("clinicId") String clinicId);
+    
+    /**
+     * Get the maximum ID for a specific doctor, lab test, and clinic
+     * Used to generate the next parameter ID
+     * 
+     * @param doctorId Doctor ID
+     * @param labTestId Lab test ID
+     * @param clinicId Clinic ID
+     * @return Maximum ID or null if no parameters exist
+     */
+    @Query("SELECT MAX(ltp.id) FROM LabTestParameter ltp WHERE ltp.doctorId = :doctorId AND ltp.labTestId = :labTestId AND ltp.clinicId = :clinicId")
+    Integer findMaxIdByDoctorIdAndLabTestIdAndClinicId(@Param("doctorId") String doctorId, @Param("labTestId") Integer labTestId, @Param("clinicId") String clinicId);
 }

@@ -98,4 +98,15 @@ public interface LabTestMasterRepository extends JpaRepository<LabTestMaster, La
      */
     @Query("SELECT ltm FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.clinicId = :clinicId AND ltm.groupName = :groupName ORDER BY ltm.priorityValue ASC, ltm.labTestDescription ASC")
     List<LabTestMaster> findByDoctorIdAndClinicIdAndGroupName(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId, @Param("groupName") String groupName);
+    
+    /**
+     * Get the maximum ID for a specific doctor and clinic
+     * Used to auto-generate the next ID when creating a new lab test
+     * 
+     * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
+     * @return Maximum ID or null if no records exist
+     */
+    @Query("SELECT MAX(ltm.id) FROM LabTestMaster ltm WHERE ltm.doctorId = :doctorId AND ltm.clinicId = :clinicId")
+    Integer findMaxIdByDoctorIdAndClinicId(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
 }

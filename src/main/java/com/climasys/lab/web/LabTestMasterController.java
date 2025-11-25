@@ -1,5 +1,6 @@
 package com.climasys.lab.web;
 
+import com.climasys.entity.LabTestMaster;
 import com.climasys.lab.service.LabTestMasterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -269,6 +270,121 @@ public class LabTestMasterController {
             return ResponseEntity.internalServerError().body(Map.of(
                 "success", false,
                 "error", "Failed to get lab tests by group: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Create a new lab test
+     * 
+     * @param labTest Lab test to create (must include doctorId, clinicId, and labTestDescription)
+     * @return Created lab test
+     */
+    @Operation(
+        summary = "Create Lab Test",
+        description = "Creates a new lab test. Requires doctorId, clinicId, and labTestDescription. " +
+                     "ID will be auto-generated if not provided. Group name and priority value are optional."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "201", description = "Lab test created successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid data or lab test already exists"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PostMapping("/tests")
+    public ResponseEntity<?> createLabTest(@RequestBody LabTestMaster labTest) {
+        try {
+            Map<String, Object> result = labTestMasterService.createLabTest(labTest);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.status(201).body(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to create lab test: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Update an existing lab test
+     * Only updates lab test description, group name, and priority value
+     * Doctor ID, ID, and Clinic ID cannot be changed (they are part of the composite key)
+     * 
+     * @param labTest Lab test to update
+     * @return Updated lab test
+     */
+    @Operation(
+        summary = "Update Lab Test",
+        description = "Updates an existing lab test. Only updates description, group name, and priority value. " +
+                     "Doctor ID, ID, and Clinic ID cannot be changed."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test updated successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid data or lab test not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @PutMapping("/tests")
+    public ResponseEntity<?> updateLabTest(@RequestBody LabTestMaster labTest) {
+        try {
+            Map<String, Object> result = labTestMasterService.updateLabTest(labTest);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to update lab test: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Delete a lab test
+     * 
+     * @param doctorId Doctor ID
+     * @param id Lab test ID
+     * @param clinicId Clinic ID
+     * @return Success message
+     */
+    @Operation(
+        summary = "Delete Lab Test",
+        description = "Deletes a lab test by doctor ID, lab test ID, and clinic ID."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test deleted successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - lab test not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @DeleteMapping("/tests/doctor/{doctorId}/id/{id}/clinic/{clinicId}")
+    public ResponseEntity<?> deleteLabTest(
+            @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
+            @PathVariable String doctorId,
+            @Parameter(description = "Lab Test ID", required = true, example = "1")
+            @PathVariable Integer id,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @PathVariable String clinicId) {
+        
+        try {
+            Map<String, Object> result = labTestMasterService.deleteLabTest(doctorId, id, clinicId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to delete lab test: " + e.getMessage()
             ));
         }
     }
