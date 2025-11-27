@@ -1,6 +1,7 @@
 package com.climasys.repository;
 
 import com.climasys.entity.MedicineMaster;
+import com.climasys.entity.MedicineMasterId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +15,7 @@ import java.util.Map;
  * Provides data access methods for medicine master data
  */
 @Repository
-public interface MedicineMasterRepository extends JpaRepository<MedicineMaster, String> {
+public interface MedicineMasterRepository extends JpaRepository<MedicineMaster, MedicineMasterId> {
 
     /**
      * Find all active medicines for a specific doctor and clinic
@@ -144,4 +145,46 @@ public interface MedicineMasterRepository extends JpaRepository<MedicineMaster, 
      * @return true if exists, false otherwise
      */
     boolean existsByShortDescription(String shortDescription);
+
+    /**
+     * Find all medicines for a specific doctor (backward compatibility)
+     * @param doctorId Doctor ID
+     * @return List of medicines for the doctor
+     */
+    List<MedicineMaster> findByDoctorIdOrderByPriorityValueAscShortDescriptionAsc(String doctorId);
+
+    /**
+     * Search medicines by short description, medicine description, or priority for a specific doctor
+     * @param doctorId Doctor ID
+     * @param searchTerm Search term to match against short description, medicine description, or priority
+     * @return List of matching medicines
+     */
+    @Query("SELECT mm FROM MedicineMaster mm WHERE mm.doctorId = :doctorId AND " +
+           "(LOWER(mm.shortDescription) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(mm.medicineDescription) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "CAST(mm.priorityValue AS string) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) " +
+           "ORDER BY mm.priorityValue ASC, mm.shortDescription ASC")
+    List<MedicineMaster> searchMedicinesByDescriptionOrPriority(@Param("doctorId") String doctorId, @Param("searchTerm") String searchTerm);
+
+    /**
+     * Search medicines by short description, medicine description, or priority for a specific doctor and clinic
+     * @param doctorId Doctor ID
+     * @param clinicId Clinic ID
+     * @param searchTerm Search term to match against short description, medicine description, or priority
+     * @return List of matching medicines
+     */
+    @Query("SELECT mm FROM MedicineMaster mm WHERE mm.doctorId = :doctorId AND mm.clinicId = :clinicId AND " +
+           "(LOWER(mm.shortDescription) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "LOWER(mm.medicineDescription) LIKE LOWER(CONCAT('%', :searchTerm, '%')) OR " +
+           "CAST(mm.priorityValue AS string) LIKE LOWER(CONCAT('%', :searchTerm, '%'))) " +
+           "ORDER BY mm.priorityValue ASC, mm.shortDescription ASC")
+    List<MedicineMaster> searchMedicinesByDescriptionOrPriorityAndClinic(@Param("doctorId") String doctorId, @Param("clinicId") String clinicId, @Param("searchTerm") String searchTerm);
+
+    /**
+     * Check if medicine exists for doctor
+     * @param doctorId Doctor ID
+     * @param shortDescription Short description
+     * @return true if exists, false otherwise
+     */
+    boolean existsByDoctorIdAndShortDescription(String doctorId, String shortDescription);
 }
