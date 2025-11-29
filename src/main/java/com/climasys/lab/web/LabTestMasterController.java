@@ -28,8 +28,50 @@ public class LabTestMasterController {
     private LabTestMasterService labTestMasterService;
     
     /**
-     * Get lab tests for a specific doctor and clinic
+     * Get lab tests for a specific doctor
      * This endpoint replaces the USP_Get_LabTest stored procedure call
+     * Stored procedure signature: USP_Get_LabTest(@p_var_Doctor_ID)
+     * Used to populate the lab test dropdown in the modal
+     * 
+     * @param doctorId Doctor ID to get lab tests for
+     * @return List of lab tests for the doctor
+     */
+    @Operation(
+        summary = "Get Lab Tests by Doctor",
+        description = "Retrieves all lab tests available for a specific doctor, ordered by priority and description. " +
+                     "This replaces the USP_Get_LabTest stored procedure functionality. " +
+                     "Stored procedure signature: USP_Get_LabTest(@p_var_Doctor_ID)"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab tests retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid doctor ID"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @GetMapping("/tests/doctor/{doctorId}")
+    public ResponseEntity<?> getLabTestsByDoctor(
+            @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
+            @PathVariable String doctorId) {
+        
+        try {
+            Map<String, Object> result = labTestMasterService.getLabTestsForDoctor(doctorId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to get lab tests: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Get lab tests for a specific doctor and clinic
+     * This endpoint replaces the USP_Get_LabTest stored procedure call (extended version with clinic)
      * Used to populate the lab test dropdown in the modal
      * 
      * @param doctorId Doctor ID to get lab tests for
@@ -39,7 +81,7 @@ public class LabTestMasterController {
     @Operation(
         summary = "Get Lab Tests by Doctor and Clinic",
         description = "Retrieves all lab tests available for a specific doctor and clinic, ordered by priority and description. " +
-                     "This replaces the USP_Get_LabTest stored procedure functionality."
+                     "This replaces the USP_Get_LabTest stored procedure functionality (extended version with clinic)."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lab tests retrieved successfully"),

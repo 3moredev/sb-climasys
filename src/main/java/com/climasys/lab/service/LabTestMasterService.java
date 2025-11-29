@@ -28,8 +28,57 @@ public class LabTestMasterService {
     private LabTestMasterRepository labTestMasterRepository;
     
     /**
-     * Get lab tests for a specific doctor and clinic
+     * Get lab tests for a specific doctor
      * This method replaces the USP_Get_LabTest stored procedure call
+     * Stored procedure signature: USP_Get_LabTest(@p_var_Doctor_ID)
+     * 
+     * @param doctorId Doctor ID to get lab tests for
+     * @return Map containing lab tests and additional data (matching stored procedure response)
+     */
+    public Map<String, Object> getLabTestsForDoctor(String doctorId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            logger.info("Getting lab tests for doctor: {}", doctorId);
+            
+            // Get all lab tests for the doctor (across all clinics)
+            List<LabTestMaster> allLabTests = labTestMasterRepository.findAll().stream()
+                .filter(lt -> lt.getDoctorId().equals(doctorId))
+                .sorted((a, b) -> {
+                    // Sort by priority, then by description
+                    int priorityCompare = Integer.compare(
+                        a.getPriorityValue() != null ? a.getPriorityValue() : 999,
+                        b.getPriorityValue() != null ? b.getPriorityValue() : 999
+                    );
+                    if (priorityCompare != 0) return priorityCompare;
+                    return a.getLabTestDescription().compareTo(b.getLabTestDescription());
+                })
+                .toList();
+            
+            // Convert to response format matching the stored procedure output
+            List<Map<String, Object>> labTestList = allLabTests.stream()
+                .map(this::convertToMap)
+                .toList();
+            
+            response.put("success", true);
+            response.put("labTests", labTestList);
+            response.put("doctorId", doctorId);
+            response.put("totalCount", allLabTests.size());
+            
+            logger.info("Found {} lab tests for doctor: {}", allLabTests.size(), doctorId);
+            
+        } catch (Exception e) {
+            logger.error("Error getting lab tests for doctor {}: {}", doctorId, e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to get lab tests: " + e.getMessage());
+        }
+        
+        return response;
+    }
+    
+    /**
+     * Get lab tests for a specific doctor and clinic
+     * This method replaces the USP_Get_LabTest stored procedure call (extended version with clinic)
      * 
      * @param doctorId Doctor ID to get lab tests for
      * @param clinicId Clinic ID to filter lab tests

@@ -28,8 +28,96 @@ public class LabTestParameterController {
     private LabTestParameterService labTestParameterService;
     
     /**
-     * Get lab test parameters for a specific doctor, clinic and lab test description
+     * Get lab test and parameters for editing
      * This endpoint replaces the USP_Get_LabTestAndParameter stored procedure call
+     * Stored procedure signature: USP_Get_LabTestAndParameter(@p_var_DoctorID, @p_var_LabTestId)
+     * 
+     * @param doctorId Doctor ID to get lab test parameters for
+     * @param labTestId Lab test ID to get parameters for
+     * @return Lab test and its parameters
+     */
+    @Operation(
+        summary = "Get Lab Test and Parameters by Doctor and Test ID",
+        description = "Retrieves a lab test and its parameters for editing. " +
+                     "This replaces the USP_Get_LabTestAndParameter stored procedure functionality. " +
+                     "Stored procedure signature: USP_Get_LabTestAndParameter(@p_var_DoctorID, @p_var_LabTestId)"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test and parameters retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid parameters"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @GetMapping("/doctor/{doctorId}/test/{labTestId}")
+    public ResponseEntity<?> getLabTestAndParameter(
+            @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
+            @PathVariable String doctorId,
+            @Parameter(description = "Lab Test ID", required = true, example = "1")
+            @PathVariable Integer labTestId) {
+        
+        try {
+            Map<String, Object> result = labTestParameterService.getLabTestAndParameter(doctorId, labTestId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to get lab test and parameters: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Get lab test parameters for a specific lab test
+     * This endpoint replaces the USP_Get_LabTestParameter stored procedure call
+     * Stored procedure signature: USP_Get_LabTestParameter(@p_var_DoctorID, @p_var_LabTestId)
+     * 
+     * @param doctorId Doctor ID to get lab test parameters for
+     * @param labTestId Lab test ID to get parameters for
+     * @return List of lab test parameters
+     */
+    @Operation(
+        summary = "Get Lab Test Parameters by Doctor and Test ID",
+        description = "Retrieves all parameters for a specific lab test. " +
+                     "This replaces the USP_Get_LabTestParameter stored procedure functionality. " +
+                     "Stored procedure signature: USP_Get_LabTestParameter(@p_var_DoctorID, @p_var_LabTestId)"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test parameters retrieved successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - invalid parameters"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @GetMapping("/doctor/{doctorId}/test/{labTestId}/parameters")
+    public ResponseEntity<?> getLabTestParameter(
+            @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
+            @PathVariable String doctorId,
+            @Parameter(description = "Lab Test ID", required = true, example = "1")
+            @PathVariable Integer labTestId) {
+        
+        try {
+            Map<String, Object> result = labTestParameterService.getLabTestParameter(doctorId, labTestId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to get lab test parameters: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Get lab test parameters for a specific doctor, clinic and lab test description
+     * This endpoint replaces the USP_Get_LabTestAndParameter stored procedure call (alternative signature)
      * 
      * @param doctorId Doctor ID to get lab test parameters for
      * @param clinicId Clinic ID to filter lab test parameters
@@ -39,7 +127,7 @@ public class LabTestParameterController {
     @Operation(
         summary = "Get Lab Test Parameters by Doctor, Clinic and Test Description",
         description = "Retrieves all lab test parameters for a specific doctor, clinic and lab test description. " +
-                     "This replaces the USP_Get_LabTestAndParameter stored procedure functionality."
+                     "This replaces the USP_Get_LabTestAndParameter stored procedure functionality (alternative signature)."
     )
     @ApiResponses(value = {
         @ApiResponse(responseCode = "200", description = "Lab test parameters retrieved successfully"),
@@ -366,7 +454,115 @@ public class LabTestParameterController {
     }
     
     /**
-     * Delete a lab test parameter
+     * Delete a parameter from a lab test
+     * This endpoint replaces the USP_Delete_Parameters stored procedure call
+     * Stored procedure signature: USP_Delete_Parameters(@p_var_ID, @p_var_labtest_id)
+     * 
+     * @param id Parameter ID
+     * @param labTestId Lab test ID
+     * @return Success message
+     */
+    @Operation(
+        summary = "Delete Parameter",
+        description = "Deletes a parameter from a lab test. " +
+                     "This replaces the USP_Delete_Parameters stored procedure functionality. " +
+                     "Stored procedure signature: USP_Delete_Parameters(@p_var_ID, @p_var_labtest_id)"
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Parameter deleted successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - parameter not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @DeleteMapping("/parameter/id/{id}/lab-test/{labTestId}")
+    public ResponseEntity<?> deleteParameter(
+            @Parameter(description = "Parameter ID", required = true, example = "1")
+            @PathVariable Integer id,
+            @Parameter(description = "Lab Test ID", required = true, example = "1")
+            @PathVariable Integer labTestId) {
+        
+        try {
+            Map<String, Object> result = labTestParameterService.deleteParameter(id, labTestId);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to delete parameter: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Delete a lab test parameter (with visit context)
+     * This endpoint replaces the USP_Delete_LabtestParameter stored procedure call
+     * Stored procedure signature: USP_Delete_LabtestParameter(@p_var_Visit_Date, @p_var_Patient_Visit_No, 
+     * @p_var_Shift_Id, @p_var_Clinic_Id, @p_var_Doctor_Id, @p_var_Patient_Id, @p_var_LabTest_Description, @p_var_ParameterName)
+     * 
+     * @param visitDate Visit date
+     * @param patientVisitNo Patient visit number
+     * @param shiftId Shift ID
+     * @param clinicId Clinic ID
+     * @param doctorId Doctor ID
+     * @param patientId Patient ID
+     * @param labTestDescription Lab test description
+     * @param parameterName Parameter name
+     * @return Success message
+     */
+    @Operation(
+        summary = "Delete Lab Test Parameter (with Visit Context)",
+        description = "Deletes a lab test parameter with visit context. " +
+                     "This replaces the USP_Delete_LabtestParameter stored procedure functionality."
+    )
+    @ApiResponses(value = {
+        @ApiResponse(responseCode = "200", description = "Lab test parameter deleted successfully"),
+        @ApiResponse(responseCode = "400", description = "Bad request - parameter not found"),
+        @ApiResponse(responseCode = "500", description = "Internal server error")
+    })
+    @DeleteMapping("/labtest-parameter")
+    public ResponseEntity<?> deleteLabtestParameter(
+            @Parameter(description = "Visit Date", required = true, example = "2024-01-15")
+            @RequestParam String visitDate,
+            @Parameter(description = "Patient Visit Number", required = true, example = "V001")
+            @RequestParam String patientVisitNo,
+            @Parameter(description = "Shift ID", required = true, example = "SHIFT001")
+            @RequestParam String shiftId,
+            @Parameter(description = "Clinic ID", required = true, example = "CLINIC001")
+            @RequestParam String clinicId,
+            @Parameter(description = "Doctor ID", required = true, example = "DR-00001")
+            @RequestParam String doctorId,
+            @Parameter(description = "Patient ID", required = true, example = "P001")
+            @RequestParam String patientId,
+            @Parameter(description = "Lab Test Description", required = true, example = "Complete Blood Count")
+            @RequestParam String labTestDescription,
+            @Parameter(description = "Parameter Name", required = true, example = "Hemoglobin")
+            @RequestParam String parameterName) {
+        
+        try {
+            Map<String, Object> result = labTestParameterService.deleteLabtestParameter(
+                visitDate, patientVisitNo, shiftId, clinicId, doctorId, patientId, 
+                labTestDescription, parameterName);
+            
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+            
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of(
+                "success", false,
+                "error", "Failed to delete lab test parameter: " + e.getMessage()
+            ));
+        }
+    }
+    
+    /**
+     * Delete a lab test parameter (with full composite key)
      * 
      * @param doctorId Doctor ID
      * @param id Parameter ID
@@ -375,7 +571,7 @@ public class LabTestParameterController {
      * @return Success message
      */
     @Operation(
-        summary = "Delete Lab Test Parameter",
+        summary = "Delete Lab Test Parameter (Full Context)",
         description = "Deletes a lab test parameter by doctor ID, parameter ID, lab test ID, and clinic ID."
     )
     @ApiResponses(value = {

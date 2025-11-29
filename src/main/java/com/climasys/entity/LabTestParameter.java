@@ -22,7 +22,7 @@ public class LabTestParameter {
     private String doctorId;
     
     @Id
-    @Column(name = "id")
+    @Column(name = "id", insertable = false, updatable = false)
     private Integer id;
     
     @Id

@@ -6,11 +6,13 @@ import com.climasys.entity.LabTestParameter;
 import com.climasys.entity.LabTestParameterId;
 import com.climasys.repository.LabTestMasterRepository;
 import com.climasys.repository.LabTestParameterRepository;
+import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -34,9 +36,88 @@ public class LabTestParameterService {
     @Autowired
     private LabTestMasterRepository labTestMasterRepository;
     
+    @Autowired
+    private EntityManager entityManager;
+    
+    /**
+     * Get lab test and parameters for editing
+     * This method replaces the USP_Get_LabTestAndParameter stored procedure call
+     * Stored procedure signature: USP_Get_LabTestAndParameter(@p_var_DoctorID, @p_var_LabTestId)
+     * 
+     * @param doctorId Doctor ID to get lab test parameters for
+     * @param labTestId Lab test ID to get parameters for
+     * @return Map containing lab test and its parameters (matching stored procedure response)
+     */
+    public Map<String, Object> getLabTestAndParameter(String doctorId, Integer labTestId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            logger.info("Getting lab test and parameters for doctor: {} and lab test ID: {}", doctorId, labTestId);
+            
+            // Find lab test by doctor ID and lab test ID (may need to search across clinics)
+            // Since stored procedure only takes doctorId and labTestId, we search for the first match
+            List<LabTestMaster> labTests = labTestMasterRepository.findAll().stream()
+                .filter(lt -> lt.getDoctorId().equals(doctorId) && lt.getId().equals(labTestId))
+                .toList();
+            
+            LabTestMaster labTest = null;
+            if (!labTests.isEmpty()) {
+                labTest = labTests.get(0);
+            }
+            
+            if (labTest == null) {
+                response.put("success", false);
+                response.put("error", "Lab test not found with doctor ID: " + doctorId + " and lab test ID: " + labTestId);
+                return response;
+            }
+            
+            String clinicId = labTest.getClinicId();
+            
+            // Get parameters for this lab test
+            List<LabTestParameter> parameters = labTestParameterRepository
+                    .findByDoctorIdAndClinicIdAndLabTestId(doctorId, clinicId, labTestId);
+            
+            // Convert to response format
+            Map<String, Object> labTestMap = new HashMap<>();
+            labTestMap.put("ID", labTest.getId());
+            labTestMap.put("Lab_Test_Description", labTest.getLabTestDescription());
+            labTestMap.put("Priority_Value", labTest.getPriorityValue());
+            labTestMap.put("Doctor_ID", labTest.getDoctorId());
+            labTestMap.put("Clinic_ID", labTest.getClinicId());
+            labTestMap.put("Group_Name", labTest.getGroupName());
+            labTestMap.put("Created_On", labTest.getCreatedOn());
+            labTestMap.put("Createdby_Name", labTest.getCreatedbyName());
+            labTestMap.put("Modified_On", labTest.getModifiedOn());
+            labTestMap.put("Modifiedby_Name", labTest.getModifiedbyName());
+            
+            List<Map<String, Object>> parameterList = parameters.stream()
+                    .map(this::convertParameterToMap)
+                    .toList();
+            
+            response.put("success", true);
+            response.put("labTest", labTestMap);
+            response.put("parameters", parameterList);
+            response.put("doctorId", doctorId);
+            response.put("labTestId", labTestId);
+            response.put("clinicId", clinicId);
+            response.put("totalParameterCount", parameterList.size());
+            
+            logger.info("Found lab test and {} parameters for doctor: {} and lab test ID: {}", 
+                    parameterList.size(), doctorId, labTestId);
+            
+        } catch (Exception e) {
+            logger.error("Error getting lab test and parameters for doctor {} and lab test ID {}: {}", 
+                    doctorId, labTestId, e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to get lab test and parameters: " + e.getMessage());
+        }
+        
+        return response;
+    }
+    
     /**
      * Get lab test and parameters for a specific doctor, clinic and lab test description
-     * This method replaces the USP_Get_LabTestAndParameter stored procedure call
+     * This method replaces the USP_Get_LabTestAndParameter stored procedure call (alternative signature)
      * 
      * @param doctorId Doctor ID to get lab test parameters for
      * @param clinicId Clinic ID to filter lab test parameters
@@ -71,6 +152,61 @@ public class LabTestParameterService {
         } catch (Exception e) {
             logger.error("Error getting lab test parameters for doctor {} and clinic {} and lab test {}: {}", 
                     doctorId, clinicId, labTestDescription, e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to get lab test parameters: " + e.getMessage());
+        }
+        
+        return response;
+    }
+    
+    /**
+     * Get lab test parameters for a specific lab test
+     * This method replaces the USP_Get_LabTestParameter stored procedure call
+     * Stored procedure signature: USP_Get_LabTestParameter(@p_var_DoctorID, @p_var_LabTestId)
+     * 
+     * @param doctorId Doctor ID
+     * @param labTestId Lab test ID
+     * @return Map containing lab test parameters
+     */
+    public Map<String, Object> getLabTestParameter(String doctorId, Integer labTestId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            logger.info("Getting lab test parameters for doctor: {} and lab test ID: {}", doctorId, labTestId);
+            
+            // Find lab test to get clinic ID
+            List<LabTestMaster> labTests = labTestMasterRepository.findAll().stream()
+                .filter(lt -> lt.getDoctorId().equals(doctorId) && lt.getId().equals(labTestId))
+                .toList();
+            
+            if (labTests.isEmpty()) {
+                response.put("success", false);
+                response.put("error", "Lab test not found with doctor ID: " + doctorId + " and lab test ID: " + labTestId);
+                return response;
+            }
+            
+            String clinicId = labTests.get(0).getClinicId();
+            
+            List<LabTestParameter> parameters = labTestParameterRepository
+                    .findByDoctorIdAndClinicIdAndLabTestId(doctorId, clinicId, labTestId);
+            
+            List<Map<String, Object>> parameterList = parameters.stream()
+                    .map(this::convertParameterToMap)
+                    .toList();
+            
+            response.put("success", true);
+            response.put("labTestParameters", parameterList);
+            response.put("doctorId", doctorId);
+            response.put("labTestId", labTestId);
+            response.put("clinicId", clinicId);
+            response.put("totalCount", parameterList.size());
+            
+            logger.info("Found {} lab test parameters for doctor: {} and lab test ID: {}", 
+                    parameterList.size(), doctorId, labTestId);
+            
+        } catch (Exception e) {
+            logger.error("Error getting lab test parameters for doctor {} and lab test ID {}: {}", 
+                    doctorId, labTestId, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to get lab test parameters: " + e.getMessage());
         }
@@ -333,7 +469,143 @@ public class LabTestParameterService {
     }
     
     /**
-     * Delete a lab test parameter
+     * Delete a parameter from a lab test
+     * This method replaces the USP_Delete_Parameters stored procedure call
+     * Stored procedure signature: USP_Delete_Parameters(@p_var_ID, @p_var_labtest_id)
+     * 
+     * @param id Parameter ID
+     * @param labTestId Lab test ID
+     * @return Map containing success status and message
+     */
+    @Transactional
+    public Map<String, Object> deleteParameter(Integer id, Integer labTestId) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            logger.info("Deleting parameter with ID: {} for lab test ID: {}", id, labTestId);
+            
+            // Find the parameter by ID and lab test ID (need to search across all doctors/clinics)
+            List<LabTestParameter> parameters = labTestParameterRepository.findAll().stream()
+                .filter(p -> p.getId().equals(id) && p.getLabTestId().equals(labTestId))
+                .toList();
+            
+            if (parameters.isEmpty()) {
+                logger.warn("Parameter not found with ID: {} and lab test ID: {}", id, labTestId);
+                response.put("success", false);
+                response.put("error", "Parameter not found with ID: " + id + " and lab test ID: " + labTestId);
+                return response;
+            }
+            
+            LabTestParameter parameter = parameters.get(0);
+            LabTestParameterId parameterId = new LabTestParameterId(
+                parameter.getDoctorId(), 
+                parameter.getId(), 
+                parameter.getLabTestId(), 
+                parameter.getClinicId()
+            );
+            
+            labTestParameterRepository.deleteById(parameterId);
+            
+            response.put("success", true);
+            response.put("message", "Parameter deleted successfully");
+            response.put("id", id);
+            response.put("labTestId", labTestId);
+            
+            logger.info("Parameter deleted successfully with ID: {} for lab test ID: {}", id, labTestId);
+            
+        } catch (Exception e) {
+            logger.error("Error deleting parameter with ID: {} for lab test ID: {}: {}", 
+                        id, labTestId, e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to delete parameter: " + e.getMessage());
+        }
+        
+        return response;
+    }
+    
+    /**
+     * Delete a lab test parameter (with full context)
+     * This method replaces the USP_Delete_LabtestParameter stored procedure call
+     * Stored procedure signature: USP_Delete_LabtestParameter(@p_var_Visit_Date, @p_var_Patient_Visit_No, 
+     * @p_var_Shift_Id, @p_var_Clinic_Id, @p_var_Doctor_Id, @p_var_Patient_Id, @p_var_LabTest_Description, @p_var_ParameterName)
+     * 
+     * @param visitDate Visit date
+     * @param patientVisitNo Patient visit number
+     * @param shiftId Shift ID
+     * @param clinicId Clinic ID
+     * @param doctorId Doctor ID
+     * @param patientId Patient ID
+     * @param labTestDescription Lab test description
+     * @param parameterName Parameter name
+     * @return Map containing success status and message
+     */
+    @Transactional
+    public Map<String, Object> deleteLabtestParameter(String visitDate, String patientVisitNo, String shiftId, 
+                                                      String clinicId, String doctorId, String patientId,
+                                                      String labTestDescription, String parameterName) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            logger.info("Deleting lab test parameter for visit date: {}, visit no: {}, doctor: {}, clinic: {}, " +
+                       "lab test: {}, parameter: {}", visitDate, patientVisitNo, doctorId, clinicId, 
+                       labTestDescription, parameterName);
+            
+            // Find the lab test by description
+            LabTestMaster labTest = labTestMasterRepository.findByDoctorIdAndClinicIdAndDescription(
+                doctorId, clinicId, labTestDescription);
+            
+            if (labTest == null) {
+                response.put("success", false);
+                response.put("error", "Lab test not found with description: " + labTestDescription);
+                return response;
+            }
+            
+            // Find the parameter by name
+            List<LabTestParameter> parameters = labTestParameterRepository
+                .findByDoctorIdAndClinicIdAndLabTestId(doctorId, clinicId, labTest.getId()).stream()
+                .filter(p -> parameterName.equals(p.getParameterName()))
+                .toList();
+            
+            if (parameters.isEmpty()) {
+                response.put("success", false);
+                response.put("error", "Parameter not found with name: " + parameterName);
+                return response;
+            }
+            
+            LabTestParameter parameter = parameters.get(0);
+            LabTestParameterId parameterId = new LabTestParameterId(
+                parameter.getDoctorId(), 
+                parameter.getId(), 
+                parameter.getLabTestId(), 
+                parameter.getClinicId()
+            );
+            
+            labTestParameterRepository.deleteById(parameterId);
+            
+            response.put("success", true);
+            response.put("message", "Lab test parameter deleted successfully");
+            response.put("visitDate", visitDate);
+            response.put("patientVisitNo", patientVisitNo);
+            response.put("shiftId", shiftId);
+            response.put("clinicId", clinicId);
+            response.put("doctorId", doctorId);
+            response.put("patientId", patientId);
+            response.put("labTestDescription", labTestDescription);
+            response.put("parameterName", parameterName);
+            
+            logger.info("Lab test parameter deleted successfully");
+            
+        } catch (Exception e) {
+            logger.error("Error deleting lab test parameter: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to delete lab test parameter: " + e.getMessage());
+        }
+        
+        return response;
+    }
+    
+    /**
+     * Delete a lab test parameter (with full composite key)
      * 
      * @param doctorId Doctor ID
      * @param id Parameter ID
@@ -397,7 +669,7 @@ public class LabTestParameterService {
      * @param request Request containing doctor ID, clinic ID, group name, and parameter data
      * @return Map containing the created/updated lab test and parameters or error message
      */
-    @Transactional
+    @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> insertLabTestAndParameters(LabTestAndParameterRequest request) {
         Map<String, Object> response = new HashMap<>();
         
@@ -425,6 +697,10 @@ public class LabTestParameterService {
                 return response;
             }
             
+            // Get lab test description from root level (frontend sends Description/New_Description at root)
+            String rootNewDescription = request.description();
+            String rootOldDescription = request.oldDescription();
+            
             if (parameterDataList == null || parameterDataList.isEmpty()) {
                 response.put("success", false);
                 response.put("error", "Parameter data is required");
@@ -434,17 +710,46 @@ public class LabTestParameterService {
             // Get distinct old/new lab test pairs from parameter data (for MERGE operation)
             // This matches the stored procedure logic: SELECT DISTINCT Old_Lab_Test, New_Lab_Test, Old_Priority, New_Priority
             Map<String, LabTestAndParameterRequest.LabTestParameterData> distinctLabTests = new HashMap<>();
-            for (LabTestAndParameterRequest.LabTestParameterData paramData : parameterDataList) {
-                String key = (paramData.oldLabTest() != null ? paramData.oldLabTest() : "") + "|" + 
-                            (paramData.newLabTest() != null ? paramData.newLabTest() : "");
-                if (!distinctLabTests.containsKey(key) && paramData.newLabTest() != null && !paramData.newLabTest().trim().isEmpty()) {
-                    distinctLabTests.put(key, paramData);
+            
+            // If root-level description is provided, use it (frontend sends Description/New_Description at root)
+            if (rootNewDescription != null && !rootNewDescription.trim().isEmpty()) {
+                // Create a synthetic entry with root-level values
+                LabTestAndParameterRequest.LabTestParameterData rootLabTestData = 
+                    new LabTestAndParameterRequest.LabTestParameterData(
+                        null, // parameterName - will be set from parameters array
+                        rootOldDescription,
+                        rootNewDescription,
+                        null, // oldPriority
+                        priority
+                    );
+                String key = (rootOldDescription != null ? rootOldDescription : "") + "|" + rootNewDescription;
+                distinctLabTests.put(key, rootLabTestData);
+            } else {
+                // Extract from parameter data if root-level is not provided
+                for (LabTestAndParameterRequest.LabTestParameterData paramData : parameterDataList) {
+                    String newLabTest = paramData.newLabTest();
+                    String oldLabTest = paramData.oldLabTest();
+                    
+                    // Use root-level values if parameter-level values are missing
+                    if (newLabTest == null || newLabTest.trim().isEmpty()) {
+                        newLabTest = rootNewDescription;
+                    }
+                    if (oldLabTest == null || oldLabTest.trim().isEmpty()) {
+                        oldLabTest = rootOldDescription;
+                    }
+                    
+                    if (newLabTest != null && !newLabTest.trim().isEmpty()) {
+                        String key = (oldLabTest != null ? oldLabTest : "") + "|" + newLabTest;
+                        if (!distinctLabTests.containsKey(key)) {
+                            distinctLabTests.put(key, paramData);
+                        }
+                    }
                 }
             }
             
             if (distinctLabTests.isEmpty()) {
                 response.put("success", false);
-                response.put("error", "At least one new lab test description is required");
+                response.put("error", "At least one new lab test description is required. Please provide 'Description' or 'New_Description' at root level, or 'newLabTest' in parameter data.");
                 return response;
             }
             
@@ -529,30 +834,46 @@ public class LabTestParameterService {
                         continue;
                     }
                     
-                    // Get the next parameter ID for this doctor, lab test, and clinic combination
-                    Integer maxParamId = labTestParameterRepository.findMaxIdByDoctorIdAndLabTestIdAndClinicId(
-                            doctorId, finalLabTestId, clinicId);
-                    Integer nextParamId = (maxParamId == null) ? 1 : maxParamId + 1;
+                    // Insert parameter using native query to exclude id column
+                    // The id column is GENERATED ALWAYS, so we must not include it in INSERT
+                    String insertSql = """
+                        INSERT INTO lab_test_parameter (
+                            doctor_id, clinic_id, lab_test_id, parameter_name,
+                            created_on, createdby_name, modified_on, modifiedby_name
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """;
                     
-                    // Create new parameter
-                    LabTestParameter newParameter = new LabTestParameter();
-                    newParameter.setDoctorId(doctorId);
-                    newParameter.setClinicId(clinicId);
-                    newParameter.setLabTestId(finalLabTestId);
-                    newParameter.setId(nextParamId);
-                    newParameter.setParameterName(parameterName.trim());
-                    newParameter.setCreatedOn(now);
-                    newParameter.setModifiedOn(now);
+                    entityManager.createNativeQuery(insertSql)
+                            .setParameter(1, doctorId)
+                            .setParameter(2, clinicId)
+                            .setParameter(3, finalLabTestId)
+                            .setParameter(4, parameterName.trim())
+                            .setParameter(5, now)
+                            .setParameter(6, createdBy)
+                            .setParameter(7, now)
+                            .setParameter(8, modifiedBy)
+                            .executeUpdate();
                     
-                    if (createdBy != null && !createdBy.trim().isEmpty()) {
-                        newParameter.setCreatedbyName(createdBy.trim());
+                    // Flush to execute the INSERT
+                    entityManager.flush();
+                    
+                    // Query back to get the generated ID using the other composite key fields
+                    List<LabTestParameter> foundParams = labTestParameterRepository
+                            .findByDoctorIdAndLabTestIdAndClinicId(doctorId, finalLabTestId, clinicId);
+                    
+                    // Find the parameter we just inserted by matching parameter name and timestamps
+                    LabTestParameter savedWithId = foundParams.stream()
+                            .filter(p -> parameterName.trim().equals(p.getParameterName()) &&
+                                       p.getCreatedOn() != null &&
+                                       Math.abs(java.time.Duration.between(p.getCreatedOn(), now).getSeconds()) < 5)
+                            .findFirst()
+                            .orElse(null);
+                    
+                    if (savedWithId != null) {
+                        savedParameters.add(savedWithId);
+                    } else {
+                        logger.warn("Could not find inserted parameter with name: {} after insert", parameterName);
                     }
-                    if (modifiedBy != null && !modifiedBy.trim().isEmpty()) {
-                        newParameter.setModifiedbyName(modifiedBy.trim());
-                    }
-                    
-                    LabTestParameter saved = labTestParameterRepository.save(newParameter);
-                    savedParameters.add(saved);
                 }
                 
                 response.put("success", true);
@@ -571,8 +892,21 @@ public class LabTestParameterService {
             
         } catch (Exception e) {
             logger.error("Error inserting/updating lab test and parameters: {}", e.getMessage(), e);
+            
+            // Log the full stack trace for debugging
+            if (e.getCause() != null) {
+                logger.error("Root cause: {}", e.getCause().getMessage(), e.getCause());
+            }
+            
+            // Mark transaction for rollback
+            TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
+            
             response.put("success", false);
-            response.put("error", "Failed to insert/update lab test and parameters: " + e.getMessage());
+            String errorMessage = e.getMessage();
+            if (e.getCause() != null) {
+                errorMessage += " - Root cause: " + e.getCause().getMessage();
+            }
+            response.put("error", "Failed to insert/update lab test and parameters: " + errorMessage);
         }
         
         return response;
