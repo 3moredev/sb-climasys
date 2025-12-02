@@ -374,11 +374,35 @@ public class LabTestMasterService {
                 return response;
             }
             
-            // Check if lab test already exists
-            if (labTestExists(doctorId, clinicId, labTestDescription)) {
-                logger.warn("Lab test already exists for doctor: {}, clinic: {}, description: {}", doctorId, clinicId, labTestDescription);
-                response.put("success", false);
-                response.put("error", "Lab test already exists with the same description for this doctor and clinic");
+            // Log exactly what we're about to check for duplicates
+            logger.info("Duplicate check before create: doctorId={}, clinicId={}, desc='{}' (len={})",
+                    doctorId,
+                    clinicId,
+                    labTestDescription,
+                    labTestDescription != null ? labTestDescription.length() : null);
+
+            // Check if lab test already exists (exact match on description for this doctor & clinic)
+            boolean alreadyExists = labTestExists(doctorId, clinicId, labTestDescription);
+            logger.info("Duplicate check result for doctorId={}, clinicId={}, desc='{}' -> {}",
+                    doctorId, clinicId, labTestDescription, alreadyExists);
+
+            // Make createLabTest idempotent: if an exact record already exists, just return it instead of inserting a duplicate
+            if (alreadyExists) {
+                logger.warn("Lab test already exists for doctor: {}, clinic: {}, description: {}. Returning existing record without creating a new one.",
+                        doctorId, clinicId, labTestDescription);
+
+                LabTestMaster existing = getLabTestByDoctorAndDescription(doctorId, clinicId, labTestDescription);
+
+                if (existing != null) {
+                    response.put("success", true);
+                    response.put("labTest", convertToMap(existing));
+                    response.put("message", "Lab test already exists; returning existing record");
+                } else {
+                    // Fallback: exists check said true but we couldn't fetch the record
+                    response.put("success", false);
+                    response.put("error", "Lab test already exists with the same description for this doctor and clinic");
+                }
+
                 return response;
             }
             
