@@ -188,6 +188,9 @@ public class DoctorManagementService {
         doctorMap.put("email", doctor.getEmailid());
         doctorMap.put("is_active", true); // All doctors are considered active in this schema
         doctorMap.put("address", doctor.getResidentialAdd1()); // Use residential address
+        // OPD/IPD doctor flags
+        doctorMap.put("opd_dr", doctor.getOpdDr() != null ? doctor.getOpdDr() : false);
+        doctorMap.put("ipd_dr", doctor.getIpdDr() != null ? doctor.getIpdDr() : false);
         
         return doctorMap;
     }
