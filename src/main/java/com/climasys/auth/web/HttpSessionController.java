@@ -237,4 +237,35 @@ public class HttpSessionController {
             return ResponseEntity.status(500).body(errorResponse);
         }
     }
+
+    @Operation(
+        summary = "Keep Session Alive",
+        description = "Update session last accessed time to prevent timeout due to user activity"
+    )
+    @PostMapping("/keepalive")
+    public ResponseEntity<Map<String, Object>> keepSessionAlive(HttpSession session) {
+        try {
+            // Simply accessing the session updates its lastAccessedTime
+            // This is enough to reset the session timeout
+            if (session != null && httpSessionService.isValidSession(session)) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("message", "Session keepalive successful");
+                response.put("sessionId", session.getId());
+                response.put("lastAccessedTime", session.getLastAccessedTime());
+                response.put("maxInactiveInterval", session.getMaxInactiveInterval());
+                response.put("status", "success");
+                
+                return ResponseEntity.ok(response);
+            } else {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "No active session");
+                errorResponse.put("status", "error");
+                return ResponseEntity.status(401).body(errorResponse);
+            }
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Error keeping session alive: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
 }

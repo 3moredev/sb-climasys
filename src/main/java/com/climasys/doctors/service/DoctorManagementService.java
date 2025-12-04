@@ -252,6 +252,10 @@ public class DoctorManagementService {
             doctorMap.put("clinic_name", ""); // Fallback
         }
 
+        // OPD/IPD doctor flags
+        doctorMap.put("opd_dr", doctor.getOpdDr() != null ? doctor.getOpdDr() : false);
+        doctorMap.put("ipd_dr", doctor.getIpdDr() != null ? doctor.getIpdDr() : false);
+        
         return doctorMap;
     }
 }
