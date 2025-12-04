@@ -2606,7 +2606,8 @@ public class VisitController {
                 request.comment(),
                 request.paymentById(),
                 request.paymentRemark(),
-                request.discount()
+                request.discount(),
+                request.reason()
             );
             
             if (Boolean.TRUE.equals(result.get("success"))) {

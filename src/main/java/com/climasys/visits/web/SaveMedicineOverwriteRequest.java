@@ -71,7 +71,10 @@ public record SaveMedicineOverwriteRequest(
         String paymentRemark,
         
         @JsonProperty("discount")
-        BigDecimal discount
+        BigDecimal discount,
+        
+        @JsonProperty("reason")
+        String reason
 ) {
 }
 

@@ -2280,7 +2280,8 @@ public class VisitJpaService {
             String comment,
             Short paymentById,
             String paymentRemark,
-            BigDecimal discount) {
+            BigDecimal discount,
+            String reason) {
         
         try {
             LocalDateTime now = LocalDateTime.now();
@@ -2444,6 +2445,7 @@ public class VisitJpaService {
                     visit.setBloodPressure(bloodPressure);
                     visit.setAllergyDtls(allergyDetails);
                     visit.setHabitsComments(habitDetails);
+                    visit.setOfflineReason(reason);
                     visit.setModifiedOn(now);
                     visit.setModifiedbyName(userId);
                 } else {
@@ -2458,6 +2460,7 @@ public class VisitJpaService {
                     // Set paymentById to null if it's 0 (0 doesn't exist in payment_type_master)
                     visit.setPaymentById(paymentById != null && paymentById > 0 ? paymentById : null);
                     visit.setPaymentRemark(paymentRemark);
+                    visit.setOfflineReason(reason);
                     visit.setModifiedOn(now);
                     visit.setModifiedbyName(userId);
                     visit.setDiscount(discount);
