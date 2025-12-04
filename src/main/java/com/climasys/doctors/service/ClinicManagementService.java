@@ -24,6 +24,12 @@ public class ClinicManagementService {
     @Autowired
     private com.climasys.repository.ClinicRepository clinicRepository;
 
+    @Autowired
+    private com.climasys.repository.CityTranslationRepository cityTranslationRepository;
+
+    @Autowired
+    private com.climasys.repository.LicenceKeyRepository licenceKeyRepository;
+
     @Value("${app.api.base-url:http://localhost:8080/api}")
     private String baseUrl;
 
@@ -91,7 +97,48 @@ public class ClinicManagementService {
      * Get all clinics
      */
     public List<com.climasys.entity.Clinic> getAllClinics() {
-        return clinicRepository.findUniqueClinics();
+        List<com.climasys.entity.Clinic> clinics = clinicRepository.findUniqueClinics();
+
+        if (clinics != null && !clinics.isEmpty()) {
+            List<String> cityIds = clinics.stream()
+                    .map(com.climasys.entity.Clinic::getCityId)
+                    .distinct()
+                    .collect(java.util.stream.Collectors.toList());
+
+            // Assuming languageId 1 for English/Default
+            List<com.climasys.entity.CityTranslation> cityTranslations = cityTranslationRepository
+                    .findByIdCityIdInAndIdLanguageId(cityIds, 1);
+
+            Map<String, String> cityMap = cityTranslations.stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            ct -> ct.getId().getCityId(),
+                            com.climasys.entity.CityTranslation::getCityName,
+                            (existing, replacement) -> existing));
+
+            List<String> clinicIds = clinics.stream()
+                    .map(com.climasys.entity.Clinic::getClinicId)
+                    .distinct()
+                    .collect(java.util.stream.Collectors.toList());
+
+            List<com.climasys.entity.LicenceKey> licenceKeys = licenceKeyRepository.findByClinicIdIn(clinicIds);
+
+            Map<String, java.time.LocalDateTime> licenseValidToMap = licenceKeys.stream()
+                    .collect(java.util.stream.Collectors.toMap(
+                            com.climasys.entity.LicenceKey::getClinicId,
+                            com.climasys.entity.LicenceKey::getValidTo,
+                            (existing, replacement) -> existing));
+
+            clinics.forEach(clinic -> {
+                if (clinic.getCityId() != null) {
+                    clinic.setCityName(cityMap.get(clinic.getCityId()));
+                }
+                if (clinic.getClinicId() != null) {
+                    clinic.setLicenseValidTo(licenseValidToMap.get(clinic.getClinicId()));
+                }
+            });
+        }
+
+        return clinics;
     }
 
     /**

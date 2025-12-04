@@ -292,11 +292,11 @@ public class ReferenceDataService {
         return result;
     }
     
-    public List<City> getCities(String stateId) {
+    public List<CityTranslation> getCities(String stateId) {
         if (stateId != null && !stateId.isEmpty()) {
-            return cityRepository.findByStateId(stateId);
+            return cityTranslationRepository.findByStateId(stateId);
         }
-        return cityRepository.findAllOrdered();
+        return cityTranslationRepository.findAllOrdered();
     }
     
     public List<Map<String, Object>> searchCities(String searchStr, Integer languageId) {
@@ -324,15 +324,18 @@ public class ReferenceDataService {
         return result;
     }
     
-    public List<State> getStates(String countryId) {
+    public List<StateTranslation> getStates(String countryId, Integer languageId) {
+        List<StateTranslation> stateTranslations;
         if (countryId != null && !countryId.isEmpty()) {
-            return stateRepository.findByCountryId(countryId);
+            stateTranslations = stateTranslationRepository.findByCountryIdAndLanguageId(countryId, languageId);
+        } else {
+            stateTranslations = stateTranslationRepository.findByLanguageId(languageId);
         }
-        return stateRepository.findAllOrdered();
+        return stateTranslations;
     }
     
-    public List<Country> getCountries() {
-        return countryRepository.findAllOrdered();
+    public List<CountryTranslation> getCountries() {
+        return countryTranslationRepository.findAll();
     }
     
     // =====================================================

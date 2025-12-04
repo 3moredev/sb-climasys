@@ -11,10 +11,14 @@ import java.util.List;
 
 @Repository
 public interface CountryTranslationRepository extends JpaRepository<CountryTranslation, CountryTranslationId> {
-    
+
     @Query("SELECT ct FROM CountryTranslation ct WHERE ct.id.countryId = :countryId AND ct.id.languageId = :languageId")
-    CountryTranslation findByCountryIdAndLanguageId(@Param("countryId") String countryId, @Param("languageId") Integer languageId);
-    
+    CountryTranslation findByCountryIdAndLanguageId(@Param("countryId") String countryId,
+            @Param("languageId") Integer languageId);
+
     @Query("SELECT ct FROM CountryTranslation ct WHERE ct.id.countryId = :countryId")
     List<CountryTranslation> findByCountryId(@Param("countryId") String countryId);
+
+    @Query("SELECT ct FROM CountryTranslation ct WHERE ct.id.languageId = :languageId")
+    List<CountryTranslation> findByLanguageId(@Param("languageId") Integer languageId);
 }

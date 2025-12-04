@@ -240,7 +240,7 @@ public class ReferenceController {
     @GetMapping("/states")
     public ResponseEntity<?> getStates(@RequestParam(required = false) String countryId) {
         try {
-            List<?> result = referenceDataService.getStates(countryId);
+            List<?> result = referenceDataService.getStates(countryId, 1);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
