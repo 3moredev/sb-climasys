@@ -21,6 +21,9 @@ public class ClinicManagementService {
     @Autowired
     private RestTemplate restTemplate;
 
+    @Autowired
+    private com.climasys.repository.ClinicRepository clinicRepository;
+
     @Value("${app.api.base-url:http://localhost:8080/api}")
     private String baseUrl;
 
@@ -30,13 +33,13 @@ public class ClinicManagementService {
     public List<Map<String, Object>> getClinicDetails(String clinicId) {
         try {
             String url = baseUrl + "/doctors/stored-procs/clinic-details/" + clinicId;
-            
+
             ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
-                    url, 
-                    HttpMethod.GET, 
-                    null, 
-                    new ParameterizedTypeReference<List<Map<String, Object>>>() {}
-            );
+                    url,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<Map<String, Object>>>() {
+                    });
             return response.getBody();
         } catch (Exception e) {
             throw new RuntimeException("Failed to get clinic details: " + e.getMessage(), e);
@@ -49,13 +52,13 @@ public class ClinicManagementService {
     public List<Map<String, Object>> getClinicShifts(String clinicId) {
         try {
             String url = baseUrl + "/doctors/stored-procs/clinic-shifts/" + clinicId;
-            
+
             ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
-                    url, 
-                    HttpMethod.GET, 
-                    null, 
-                    new ParameterizedTypeReference<List<Map<String, Object>>>() {}
-            );
+                    url,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<Map<String, Object>>>() {
+                    });
             return response.getBody();
         } catch (Exception e) {
             throw new RuntimeException("Failed to get clinic shifts: " + e.getMessage(), e);
@@ -71,16 +74,30 @@ public class ClinicManagementService {
                     .queryParam("clinicId", clinicId)
                     .queryParam("shiftDay", shiftDay)
                     .toUriString();
-            
+
             ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
-                    url, 
-                    HttpMethod.GET, 
-                    null, 
-                    new ParameterizedTypeReference<List<Map<String, Object>>>() {}
-            );
+                    url,
+                    HttpMethod.GET,
+                    null,
+                    new ParameterizedTypeReference<List<Map<String, Object>>>() {
+                    });
             return response.getBody();
         } catch (Exception e) {
             throw new RuntimeException("Failed to get clinic shift timings: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Get all clinics
+     */
+    public List<com.climasys.entity.Clinic> getAllClinics() {
+        return clinicRepository.findUniqueClinics();
+    }
+
+    /**
+     * Get count of all clinics
+     */
+    public long getClinicCount() {
+        return clinicRepository.countUniqueClinics();
     }
 }

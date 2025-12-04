@@ -46,4 +46,22 @@ public class ClinicManagementController {
         List<Map<String, Object>> result = clinicManagementService.getClinicShiftTimings(clinicId, shiftDay);
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * Get all clinics
+     */
+    @GetMapping("/all")
+    public ResponseEntity<List<com.climasys.entity.Clinic>> getAllClinics() {
+        List<com.climasys.entity.Clinic> result = clinicManagementService.getAllClinics();
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Get count of all clinics
+     */
+    @GetMapping("/count")
+    public ResponseEntity<Map<String, Long>> getClinicCount() {
+        long count = clinicManagementService.getClinicCount();
+        return ResponseEntity.ok(Map.of("clinicCount", count));
+    }
 }

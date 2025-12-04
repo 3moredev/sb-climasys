@@ -98,4 +98,35 @@ public class DoctorManagementController {
         List<Map<String, Object>> result = doctorManagementService.getFeesToCollectByDoctor(doctorId);
         return ResponseEntity.ok(result);
     }
+
+    /**
+     * Delete a doctor
+     */
+    @DeleteMapping("/delete/{doctorId}")
+    public ResponseEntity<Void> deleteDoctor(@PathVariable String doctorId) {
+        doctorManagementService.deleteDoctor(doctorId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Create or update a doctor
+     */
+    @PostMapping("/save")
+    public ResponseEntity<com.climasys.auth.entity.AuthDoctorMaster> saveDoctor(
+            @RequestBody com.climasys.auth.entity.AuthDoctorMaster doctor) {
+        com.climasys.auth.entity.AuthDoctorMaster savedDoctor = doctorManagementService.saveDoctor(doctor);
+        return ResponseEntity.ok(savedDoctor);
+    }
+
+    /**
+     * Update a doctor
+     */
+    @PutMapping("/update/{doctorId}")
+    public ResponseEntity<com.climasys.auth.entity.AuthDoctorMaster> updateDoctor(
+            @PathVariable String doctorId,
+            @RequestBody com.climasys.auth.entity.AuthDoctorMaster doctor) {
+        doctor.setDoctorId(doctorId);
+        com.climasys.auth.entity.AuthDoctorMaster updatedDoctor = doctorManagementService.saveDoctor(doctor);
+        return ResponseEntity.ok(updatedDoctor);
+    }
 }

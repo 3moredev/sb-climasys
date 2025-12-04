@@ -20,6 +20,12 @@ public class DoctorManagementService {
     @Autowired
     private AuthDoctorMasterRepository doctorMasterRepository;
 
+    @Autowired
+    private com.climasys.repository.DoctorClinicShiftRepository doctorClinicShiftRepository;
+
+    @Autowired
+    private com.climasys.repository.ClinicRepository clinicRepository;
+
     /**
      * Get all available doctors in the system
      * Based on stored procedure: usp_get_all_doctors()
@@ -27,7 +33,7 @@ public class DoctorManagementService {
     public List<Map<String, Object>> getAllDoctors() {
         try {
             List<AuthDoctorMaster> doctors = doctorMasterRepository.findAll();
-            
+
             return doctors.stream()
                     .map(this::convertDoctorToMap)
                     .collect(Collectors.toList());
@@ -38,7 +44,8 @@ public class DoctorManagementService {
 
     /**
      * Get doctors available for adhoc appointments
-     * Based on stored procedure logic: doctors who are active and available for adhoc
+     * Based on stored procedure logic: doctors who are active and available for
+     * adhoc
      */
     public List<Map<String, Object>> getDoctorsForAdhocAppointments() {
         try {
@@ -88,13 +95,13 @@ public class DoctorManagementService {
             long totalDoctors = allDoctors.size();
             long activeDoctors = allDoctors.size(); // All doctors are considered active in this schema
             long inactiveDoctors = totalDoctors - activeDoctors;
-            
+
             Map<String, Object> countData = new HashMap<>();
             countData.put("total_doctors", totalDoctors);
             countData.put("active_doctors", activeDoctors);
             countData.put("inactive_doctors", inactiveDoctors);
             countData.put("doctors_with_clinics", activeDoctors); // Simplified for now
-            
+
             return List.of(countData);
         } catch (Exception e) {
             throw new RuntimeException("Failed to get doctor count: " + e.getMessage(), e);
@@ -123,11 +130,10 @@ public class DoctorManagementService {
         try {
             // Return common doctor status options
             return List.of(
-                Map.of("status_id", 1, "status_name", "Active"),
-                Map.of("status_id", 2, "status_name", "Inactive"),
-                Map.of("status_id", 3, "status_name", "On Leave"),
-                Map.of("status_id", 4, "status_name", "Retired")
-            );
+                    Map.of("status_id", 1, "status_name", "Active"),
+                    Map.of("status_id", 2, "status_name", "Inactive"),
+                    Map.of("status_id", 3, "status_name", "On Leave"),
+                    Map.of("status_id", 4, "status_name", "Retired"));
         } catch (Exception e) {
             throw new RuntimeException("Failed to get doctor status reference: " + e.getMessage(), e);
         }
@@ -162,33 +168,90 @@ public class DoctorManagementService {
     }
 
     /**
+     * Delete a doctor by ID
+     */
+    public void deleteDoctor(String doctorId) {
+        try {
+            doctorMasterRepository.deleteById(doctorId);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to delete doctor: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Create or update a doctor
+     */
+    public AuthDoctorMaster saveDoctor(AuthDoctorMaster doctor) {
+        try {
+            return doctorMasterRepository.save(doctor);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to save doctor: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Helper method to convert AuthDoctorMaster entity to Map
      * Based on stored procedure output format
      */
     private Map<String, Object> convertDoctorToMap(AuthDoctorMaster doctor) {
         Map<String, Object> doctorMap = new HashMap<>();
         doctorMap.put("doctor_id", doctor.getDoctorId());
-        
+
         // Build full name like in stored procedure
         StringBuilder fullName = new StringBuilder();
-        if (doctor.getFirstName() != null) fullName.append(doctor.getFirstName());
+        if (doctor.getFirstName() != null)
+            fullName.append(doctor.getFirstName());
         if (doctor.getMiddleName() != null) {
-            if (fullName.length() > 0) fullName.append(" ");
+            if (fullName.length() > 0)
+                fullName.append(" ");
             fullName.append(doctor.getMiddleName());
         }
         if (doctor.getLastName() != null) {
-            if (fullName.length() > 0) fullName.append(" ");
+            if (fullName.length() > 0)
+                fullName.append(" ");
             fullName.append(doctor.getLastName());
         }
         doctorMap.put("doctor_name", fullName.toString());
-        
+
         doctorMap.put("qualification", doctor.getDoctorQual());
         doctorMap.put("specialization", doctor.getSpeciality());
         doctorMap.put("phone", doctor.getMobile1());
         doctorMap.put("email", doctor.getEmailid());
         doctorMap.put("is_active", true); // All doctors are considered active in this schema
         doctorMap.put("address", doctor.getResidentialAdd1()); // Use residential address
-        
+
+        // New fields
+        doctorMap.put("registration_no", doctor.getRegistrationNo());
+
+        // OPD/IPD logic
+        String opdIpd = "";
+        if (Boolean.TRUE.equals(doctor.getOpdDr()) && Boolean.TRUE.equals(doctor.getIpdDr())) {
+            opdIpd = "OPD/IPD";
+        } else if (Boolean.TRUE.equals(doctor.getOpdDr())) {
+            opdIpd = "OPD";
+        } else if (Boolean.TRUE.equals(doctor.getIpdDr())) {
+            opdIpd = "IPD";
+        }
+        doctorMap.put("opd_ipd", opdIpd);
+
+        // Clinic Names
+        try {
+            List<com.climasys.entity.DoctorClinicShift> shifts = doctorClinicShiftRepository
+                    .findByDoctorId(doctor.getDoctorId());
+            String clinicNames = shifts.stream()
+                    .map(shift -> shift.getId().getClinicId())
+                    .distinct()
+                    .map(clinicId -> clinicRepository
+                            .findById(new com.climasys.entity.ClinicId(doctor.getDoctorId(), clinicId))
+                            .map(com.climasys.entity.Clinic::getClinicName)
+                            .orElse(""))
+                    .filter(name -> !name.isEmpty())
+                    .collect(Collectors.joining(", "));
+            doctorMap.put("clinic_name", clinicNames);
+        } catch (Exception e) {
+            doctorMap.put("clinic_name", ""); // Fallback
+        }
+
         return doctorMap;
     }
 }
