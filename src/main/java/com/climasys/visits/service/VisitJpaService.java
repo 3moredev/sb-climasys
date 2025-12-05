@@ -996,7 +996,7 @@ public class VisitJpaService {
                        COALESCE(pv.in_person,false) AS in_person,
                        pv.payment_by_id, pv.payment_remark, pv.fees_collected, pv.receipt_number,
                        pv.follow_up, pv.follow_up_type, pv.follow_up_date,
-                       pv.thtext
+                       pv.thtext, pv.offline_reason, pv.comment
                 FROM patient_visits pv
                 WHERE pv.patient_id = ? AND pv.shift_id = ? AND pv.clinic_id = ?
                   AND pv.doctor_id = ? AND DATE(pv.visit_date) = ? AND pv.patient_visit_no = ?
@@ -1241,6 +1241,19 @@ public class VisitJpaService {
                 uiFields.put("paymentBy", v.get("payment_by_id"));
                 uiFields.put("paymentRemark", v.get("payment_remark"));
                 uiFields.put("receiptNo", v.get("receipt_number"));
+
+                // Reason field - use offline_reason or comment as fallback
+                String reason = "";
+                Object offlineReasonObj = v.get("offline_reason");
+                if (offlineReasonObj != null) {
+                    reason = offlineReasonObj.toString();
+                } else {
+                    Object commentObj = v.get("comment");
+                    if (commentObj != null) {
+                        reason = commentObj.toString();
+                    }
+                }
+                uiFields.put("reason", reason);
 
                 // Optional: receipt details (date/amount) from receipts table
                 if (v.get("receipt_number") != null) {
