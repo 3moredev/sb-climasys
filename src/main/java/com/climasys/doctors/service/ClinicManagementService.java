@@ -9,6 +9,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import jakarta.persistence.Column;
+
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -146,5 +149,53 @@ public class ClinicManagementService {
      */
     public long getClinicCount() {
         return clinicRepository.countUniqueClinics();
+    }
+
+    /**
+     * Save a new clinic
+     */
+    public com.climasys.entity.Clinic saveClinic(com.climasys.entity.Clinic clinic) {
+        clinic.setCreatedOn(java.time.LocalDateTime.now());
+        clinic.setCreatedbyName("Admin");
+        clinic.setModifiedOn(java.time.LocalDateTime.now());
+        clinic.setModifiedbyName("Admin");
+        clinic.setIsPrint(false);
+        return clinicRepository.save(clinic);
+    }
+
+    /**
+     * Update an existing clinic
+     */
+    public com.climasys.entity.Clinic updateClinic(String clinicId, com.climasys.entity.Clinic clinic) {
+        // Ensure the clinicId matches the path variable
+        if (!clinicId.equals(clinic.getClinicId())) {
+            throw new IllegalArgumentException("Clinic ID in path does not match request body");
+        }
+
+        // Update modified info
+        clinic.setModifiedOn(java.time.LocalDateTime.now());
+        clinic.setModifiedbyName("Admin");
+
+        return clinicRepository.save(clinic);
+    }
+
+    /**
+     * Delete a clinic by ID
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void deleteClinic(String clinicId) {
+        clinicRepository.deleteByClinicId(clinicId);
+    }
+
+    /**
+     * Get clinic by ID
+     */
+    public com.climasys.entity.Clinic getClinicById(String clinicId) {
+        List<com.climasys.entity.Clinic> clinics = clinicRepository.findByClinicId(clinicId);
+        if (clinics != null && !clinics.isEmpty()) {
+            // Return the first one found
+            return clinics.get(0);
+        }
+        return null;
     }
 }

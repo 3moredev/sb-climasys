@@ -64,4 +64,46 @@ public class ClinicManagementController {
         long count = clinicManagementService.getClinicCount();
         return ResponseEntity.ok(Map.of("clinicCount", count));
     }
+
+    /**
+     * Save a new clinic
+     */
+    @PostMapping("/save")
+    public ResponseEntity<com.climasys.entity.Clinic> saveClinic(@RequestBody com.climasys.entity.Clinic clinic) {
+        com.climasys.entity.Clinic savedClinic = clinicManagementService.saveClinic(clinic);
+        return ResponseEntity.ok(savedClinic);
+    }
+
+    /**
+     * Update an existing clinic
+     */
+    @PutMapping("update/{clinicId}")
+    public ResponseEntity<com.climasys.entity.Clinic> updateClinic(
+            @PathVariable String clinicId,
+            @RequestBody com.climasys.entity.Clinic clinic) {
+        com.climasys.entity.Clinic updatedClinic = clinicManagementService.updateClinic(clinicId, clinic);
+        return ResponseEntity.ok(updatedClinic);
+    }
+
+    /**
+     * Delete a clinic
+     */
+    @DeleteMapping("delete/{clinicId}")
+    public ResponseEntity<Void> deleteClinic(@PathVariable String clinicId) {
+        clinicManagementService.deleteClinic(clinicId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Get clinic by ID
+     */
+    @GetMapping("/{clinicId}")
+    public ResponseEntity<com.climasys.entity.Clinic> getClinicById(@PathVariable String clinicId) {
+        com.climasys.entity.Clinic clinic = clinicManagementService.getClinicById(clinicId);
+        if (clinic != null) {
+            return ResponseEntity.ok(clinic);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
 }

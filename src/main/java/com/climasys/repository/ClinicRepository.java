@@ -16,4 +16,8 @@ public interface ClinicRepository extends JpaRepository<Clinic, ClinicId> {
 
     @Query("SELECT COUNT(DISTINCT c.clinicId) FROM Clinic c")
     long countUniqueClinics();
+
+    void deleteByClinicId(String clinicId);
+
+    List<Clinic> findByClinicId(String clinicId);
 }
