@@ -109,6 +109,19 @@ public class DoctorManagementController {
     }
 
     /**
+     * Get doctor by ID
+     */
+    @GetMapping("/{doctorId}")
+    public ResponseEntity<com.climasys.auth.entity.AuthDoctorMaster> getDoctorById(@PathVariable String doctorId) {
+        com.climasys.auth.entity.AuthDoctorMaster doctor = doctorManagementService.getDoctorById(doctorId);
+        if (doctor != null) {
+            return ResponseEntity.ok(doctor);
+        } else {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
      * Create or update a doctor
      */
     @PostMapping("/save")

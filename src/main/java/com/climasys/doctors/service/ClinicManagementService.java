@@ -155,6 +155,11 @@ public class ClinicManagementService {
      * Save a new clinic
      */
     public com.climasys.entity.Clinic saveClinic(com.climasys.entity.Clinic clinic) {
+        if (clinic.getClinicId() == null || clinic.getClinicId().isEmpty()) {
+            // Generate 10-char unique ID (uppercase alphanumeric)
+            clinic.setClinicId(java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase());
+        }
+
         clinic.setCreatedOn(java.time.LocalDateTime.now());
         clinic.setCreatedbyName("Admin");
         clinic.setModifiedOn(java.time.LocalDateTime.now());

@@ -179,14 +179,48 @@ public class DoctorManagementService {
     }
 
     /**
+     * Get doctor by ID
+     */
+    public AuthDoctorMaster getDoctorById(String doctorId) {
+        try {
+            return doctorMasterRepository.findByDoctorId(doctorId).orElse(null);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to get doctor by ID: " + e.getMessage(), e);
+        }
+    }
+
+    /**
      * Create or update a doctor
      */
     public AuthDoctorMaster saveDoctor(AuthDoctorMaster doctor) {
         try {
+            if (doctor.getDoctorId() == null || doctor.getDoctorId().isEmpty()) {
+                // Generate 10-char unique ID (uppercase alphanumeric)
+                doctor.setDoctorId(
+                        java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase());
+            }
+            doctor.setPrefix("Dr.");
+            doctor.setCreatedOn(java.time.LocalDateTime.now());
+            doctor.setCreatedbyName("Admin");
+            doctor.setModifiedOn(java.time.LocalDateTime.now());
+            doctor.setModifiedbyName("Admin");
             return doctorMasterRepository.save(doctor);
         } catch (Exception e) {
             throw new RuntimeException("Failed to save doctor: " + e.getMessage(), e);
         }
+    }
+
+    public AuthDoctorMaster updateDoctor(String doctorId, AuthDoctorMaster doctor) {
+        // Ensure the clinicId matches the path variable
+        if (!doctorId.equals(doctor.getDoctorId())) {
+            throw new IllegalArgumentException("Doctor ID in path does not match request body");
+        }
+
+        // Update modified info
+        doctor.setModifiedOn(java.time.LocalDateTime.now());
+        doctor.setModifiedbyName("Admin");
+
+        return doctorMasterRepository.save(doctor);
     }
 
     /**
@@ -255,7 +289,7 @@ public class DoctorManagementService {
         // OPD/IPD doctor flags
         doctorMap.put("opd_dr", doctor.getOpdDr() != null ? doctor.getOpdDr() : false);
         doctorMap.put("ipd_dr", doctor.getIpdDr() != null ? doctor.getIpdDr() : false);
-        
+
         return doctorMap;
     }
 }
