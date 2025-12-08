@@ -1,6 +1,7 @@
 package com.climasys.doctors.web;
 
 import com.climasys.doctors.service.DoctorManagementService;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,10 +21,51 @@ public class DoctorManagementController {
 
     /**
      * Get all available doctors in the system
+     * Matches USP_Get_AllDoctors stored procedure logic from climasys2.0
+     * 
+     * Filters doctors by:
+     * - Language ID (optional)
+     * - Clinic ID (optional)
+     * - OPD_DR = 1 (only OPD doctors)
+     * - Is_Active = 1 (active users)
+     * - Role_Id = 2 (doctor role)
+     * - Is_Default_Clinic = 1 (default clinic)
+     * 
+     * The defaultDoctorId (if provided) will be sorted to appear first in the results.
+     * 
+     * @param languageId Optional language ID filter
+     * @param clinicId Optional clinic ID filter
+     * @param defaultDoctorId Optional doctor ID to sort first (typically the logged-in user's doctor)
+     * @return List of doctors matching the criteria, with default doctor first if specified
      */
     @GetMapping("/all")
-    public ResponseEntity<List<Map<String, Object>>> getAllDoctors() {
-        List<Map<String, Object>> result = doctorManagementService.getAllDoctors();
+    public ResponseEntity<List<Map<String, Object>>> getAllDoctors(
+            @RequestParam(required = false) Integer languageId,
+            @RequestParam(required = false) String clinicId,
+            @RequestParam(required = false) String defaultDoctorId,
+            HttpSession session) {
+        System.out.println("=== GET /api/doctors/all ===");
+        System.out.println("languageId: " + languageId);
+        System.out.println("clinicId: " + clinicId);
+        System.out.println("defaultDoctorId param: " + defaultDoctorId);
+        
+        // Get default doctor from user_master table using the logged-in user's session
+        String defaultDoctorFromUser = doctorManagementService.getDefaultDoctorFromUser(session);
+        System.out.println("defaultDoctor from user_master: " + defaultDoctorFromUser);
+        
+        // Use defaultDoctorFromUser if available, otherwise fall back to parameter
+        String effectiveDefaultDoctorId = (defaultDoctorFromUser != null && !defaultDoctorFromUser.isEmpty()) 
+            ? defaultDoctorFromUser 
+            : defaultDoctorId;
+        
+        System.out.println("Effective defaultDoctorId: " + effectiveDefaultDoctorId);
+        
+        List<Map<String, Object>> result = doctorManagementService.getAllDoctors(languageId, clinicId, effectiveDefaultDoctorId);
+        System.out.println("Returning " + result.size() + " doctors");
+        if (!result.isEmpty() && effectiveDefaultDoctorId != null && !effectiveDefaultDoctorId.isEmpty()) {
+            String firstDoctorId = String.valueOf(result.get(0).get("id") != null ? result.get(0).get("id") : result.get(0).get("doctor_id"));
+            System.out.println("First doctor ID: " + firstDoctorId + " (matches default: " + effectiveDefaultDoctorId.equals(firstDoctorId) + ")");
+        }
         return ResponseEntity.ok(result);
     }
 

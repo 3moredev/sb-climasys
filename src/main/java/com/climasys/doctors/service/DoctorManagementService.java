@@ -2,12 +2,17 @@ package com.climasys.doctors.service;
 
 import com.climasys.auth.entity.AuthDoctorMaster;
 import com.climasys.auth.repository.AuthDoctorMasterRepository;
+import com.climasys.auth.service.HttpSessionService;
+import com.climasys.auth.repository.UserMasterRepository;
+import com.climasys.entity.User;
+import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -19,21 +24,152 @@ public class DoctorManagementService {
 
     @Autowired
     private AuthDoctorMasterRepository doctorMasterRepository;
+    
+    @Autowired
+    private UserMasterRepository userMasterRepository;
+    
+    @Autowired
+    private HttpSessionService httpSessionService;
 
     /**
      * Get all available doctors in the system
+     * Based on stored procedure: USP_Get_AllDoctors()
+     * 
+     * @param languageId Optional language ID filter (if null, returns all active OPD doctors)
+     * @param clinicId Optional clinic ID filter (if null, returns all active OPD doctors)
+     * @param defaultDoctorId Optional doctor ID to sort first (typically the logged-in user's doctor)
+     * @return List of doctors matching the criteria, with default doctor first if specified
+     */
+    public List<Map<String, Object>> getAllDoctors(Integer languageId, String clinicId, String defaultDoctorId) {
+        try {
+            List<Map<String, Object>> doctors;
+            
+            // If both languageId and clinicId are provided, use filtered query (matches Table[1] from stored procedure)
+            if (languageId != null && clinicId != null && !clinicId.isEmpty()) {
+                List<Object[]> results = doctorMasterRepository.findAllOpdDoctorsByLanguageAndClinic(languageId, clinicId);
+                doctors = results != null ? results.stream()
+                        .map(this::convertQueryResultToMap)
+                        .collect(Collectors.toList()) : List.of();
+            } else {
+                // Fallback: get all active OPD doctors (simplified version)
+                List<Object[]> results = doctorMasterRepository.findAllActiveOpdDoctors();
+                doctors = results != null ? results.stream()
+                        .map(this::convertQueryResultToMap)
+                        .collect(Collectors.toList()) : List.of();
+            }
+            
+            // Always include the default doctor from user_master, even if it doesn't meet filtering criteria
+            if (defaultDoctorId != null && !defaultDoctorId.isEmpty()) {
+                // Check if default doctor is already in the list
+                boolean defaultDoctorExists = doctors.stream()
+                        .anyMatch(d -> {
+                            String id = String.valueOf(d.get("id") != null ? d.get("id") : d.get("doctor_id"));
+                            return defaultDoctorId.equals(id);
+                        });
+                
+                // If default doctor is not in the list, fetch it separately and add it
+                if (!defaultDoctorExists) {
+                    System.out.println("Default doctor " + defaultDoctorId + " not found in filtered list, fetching separately...");
+                    Optional<AuthDoctorMaster> defaultDoctorOpt = doctorMasterRepository.findByDoctorId(defaultDoctorId);
+                    if (defaultDoctorOpt.isPresent()) {
+                        AuthDoctorMaster defaultDoctor = defaultDoctorOpt.get();
+                        // Only add if it's an OPD doctor
+                        if (defaultDoctor.getOpdDr() != null && defaultDoctor.getOpdDr()) {
+                            Map<String, Object> defaultDoctorMap = convertDoctorToMap(defaultDoctor);
+                            doctors.add(0, defaultDoctorMap); // Add at the beginning
+                            System.out.println("Added default doctor " + defaultDoctorId + " to the list");
+                        } else {
+                            System.out.println("Default doctor " + defaultDoctorId + " is not an OPD doctor, skipping");
+                        }
+                    } else {
+                        System.out.println("Default doctor " + defaultDoctorId + " not found in doctor_master table");
+                    }
+                } else {
+                    // Default doctor is already in the list, just sort to put it first
+                    doctors = doctors.stream()
+                            .sorted((d1, d2) -> {
+                                String id1 = String.valueOf(d1.get("id") != null ? d1.get("id") : d1.get("doctor_id"));
+                                String id2 = String.valueOf(d2.get("id") != null ? d2.get("id") : d2.get("doctor_id"));
+                                boolean isDefault1 = defaultDoctorId.equals(id1);
+                                boolean isDefault2 = defaultDoctorId.equals(id2);
+                                if (isDefault1 && !isDefault2) return -1;  // Default doctor comes first
+                                if (!isDefault1 && isDefault2) return 1;   // Non-default comes after
+                                return 0;  // Keep original order for others
+                            })
+                            .collect(Collectors.toList());
+                    System.out.println("Default doctor " + defaultDoctorId + " already in list, sorted to first position");
+                }
+                
+                // Log for debugging
+                System.out.println("Final doctors list size: " + doctors.size());
+                if (!doctors.isEmpty()) {
+                    String firstDoctorId = String.valueOf(doctors.get(0).get("id") != null ? doctors.get(0).get("id") : doctors.get(0).get("doctor_id"));
+                    System.out.println("First doctor in list: " + firstDoctorId + " (matches default: " + defaultDoctorId.equals(firstDoctorId) + ")");
+                }
+            }
+            
+            return doctors;
+        } catch (Exception e) {
+            // Log error but return empty list instead of throwing to prevent frontend from hanging
+            System.err.println("Error fetching doctors: " + e.getMessage());
+            e.printStackTrace();
+            return List.of();
+        }
+    }
+    
+    /**
+     * Get default doctor from user_master table based on the logged-in user's session
+     * 
+     * @param session HTTP session containing user information
+     * @return Default doctor ID from user_master.default_doctor column, or null if not found
+     */
+    public String getDefaultDoctorFromUser(HttpSession session) {
+        try {
+            if (session == null) {
+                System.out.println("Session is null, cannot get default doctor");
+                return null;
+            }
+            
+            // Get loginId from session
+            String loginId = httpSessionService.getLoginId(session);
+            if (loginId == null || loginId.isEmpty()) {
+                System.out.println("LoginId not found in session, cannot get default doctor");
+                return null;
+            }
+            
+            System.out.println("Getting default doctor for loginId: " + loginId);
+            
+            // Find user by loginId
+            Optional<User> userOpt = userMasterRepository.findByLoginIdAndIsActive(loginId, true);
+            if (userOpt.isPresent()) {
+                User user = userOpt.get();
+                String defaultDoctor = user.getDefaultDoctor();
+                System.out.println("Found user. default_doctor value: " + defaultDoctor);
+                return (defaultDoctor != null && !defaultDoctor.isEmpty()) ? defaultDoctor : null;
+            } else {
+                System.out.println("User not found for loginId: " + loginId);
+                return null;
+            }
+        } catch (Exception e) {
+            System.err.println("Error getting default doctor from user_master: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
+    /**
+     * Get all available doctors in the system (backward compatibility - no filters)
      * Based on stored procedure: usp_get_all_doctors()
      */
     public List<Map<String, Object>> getAllDoctors() {
-        try {
-            List<AuthDoctorMaster> doctors = doctorMasterRepository.findAll();
-            
-            return doctors.stream()
-                    .map(this::convertDoctorToMap)
-                    .collect(Collectors.toList());
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to get all doctors: " + e.getMessage(), e);
-        }
+        return getAllDoctors(null, null, null);
+    }
+    
+    /**
+     * Get all available doctors in the system (backward compatibility - with filters but no default)
+     */
+    public List<Map<String, Object>> getAllDoctors(Integer languageId, String clinicId) {
+        return getAllDoctors(languageId, clinicId, null);
     }
 
     /**
@@ -162,35 +298,107 @@ public class DoctorManagementService {
     }
 
     /**
+     * Convert query result array to Map (for native query results)
+     * Query result format: [prefix, first_name, last_name, doctor_id, speciality, name_with_prefix]
+     */
+    private Map<String, Object> convertQueryResultToMap(Object[] result) {
+        Map<String, Object> doctorMap = new HashMap<>();
+        
+        String prefix = result[0] != null ? result[0].toString().trim() : "";
+        String firstName = result[1] != null ? result[1].toString().trim() : "";
+        String lastName = result[2] != null ? result[2].toString().trim() : "";
+        String doctorId = result[3] != null ? result[3].toString().trim() : "";
+        String speciality = result[4] != null ? result[4].toString().trim() : "";
+        String nameWithPrefix = result[5] != null ? result[5].toString().trim() : "";
+        
+        // Uppercase keys for backward compatibility with climasys2.0
+        doctorMap.put("Doctor_ID", doctorId);
+        doctorMap.put("Prefix", prefix);
+        doctorMap.put("First_Name", firstName);
+        doctorMap.put("Speciality", speciality);
+        doctorMap.put("NameWithPrefix", nameWithPrefix);
+        
+        // Lowercase keys for API compatibility
+        doctorMap.put("doctor_id", doctorId);
+        doctorMap.put("doctorId", doctorId);
+        doctorMap.put("id", doctorId);
+        doctorMap.put("prefix", prefix);
+        doctorMap.put("first_name", firstName);
+        doctorMap.put("firstName", firstName);
+        doctorMap.put("last_name", lastName);
+        doctorMap.put("lastName", lastName);
+        doctorMap.put("speciality", speciality);
+        doctorMap.put("specialty", speciality);
+        doctorMap.put("specialization", speciality);
+        doctorMap.put("name_with_prefix", nameWithPrefix);
+        
+        // Frontend expects these fields
+        doctorMap.put("name", nameWithPrefix); // Use NameWithPrefix as the display name
+        doctorMap.put("doctorName", nameWithPrefix);
+        doctorMap.put("doctor_name", nameWithPrefix);
+        
+        // OPD doctor flag (all results are OPD doctors from this query)
+        doctorMap.put("opd_dr", true);
+        doctorMap.put("OPD_DR", true);
+        doctorMap.put("opdDoctor", true);
+        
+        return doctorMap;
+    }
+    
+    /**
      * Helper method to convert AuthDoctorMaster entity to Map
      * Based on stored procedure output format
+     * Returns the same format as convertQueryResultToMap for consistency
      */
     private Map<String, Object> convertDoctorToMap(AuthDoctorMaster doctor) {
         Map<String, Object> doctorMap = new HashMap<>();
-        doctorMap.put("doctor_id", doctor.getDoctorId());
         
-        // Build full name like in stored procedure
-        StringBuilder fullName = new StringBuilder();
-        if (doctor.getFirstName() != null) fullName.append(doctor.getFirstName());
-        if (doctor.getMiddleName() != null) {
-            if (fullName.length() > 0) fullName.append(" ");
-            fullName.append(doctor.getMiddleName());
-        }
-        if (doctor.getLastName() != null) {
-            if (fullName.length() > 0) fullName.append(" ");
-            fullName.append(doctor.getLastName());
-        }
-        doctorMap.put("doctor_name", fullName.toString());
+        String prefix = doctor.getPrefix() != null ? doctor.getPrefix().trim() : "";
+        String firstName = doctor.getFirstName() != null ? doctor.getFirstName().trim() : "";
+        String lastName = doctor.getLastName() != null ? doctor.getLastName().trim() : "";
+        String doctorId = doctor.getDoctorId() != null ? doctor.getDoctorId().trim() : "";
+        String speciality = doctor.getSpeciality() != null ? doctor.getSpeciality().trim() : "";
+        String nameWithPrefix = (prefix + " " + firstName + " - " + speciality).trim();
         
-        doctorMap.put("qualification", doctor.getDoctorQual());
-        doctorMap.put("specialization", doctor.getSpeciality());
-        doctorMap.put("phone", doctor.getMobile1());
-        doctorMap.put("email", doctor.getEmailid());
-        doctorMap.put("is_active", true); // All doctors are considered active in this schema
-        doctorMap.put("address", doctor.getResidentialAdd1()); // Use residential address
+        // Uppercase keys for backward compatibility with climasys2.0
+        doctorMap.put("Doctor_ID", doctorId);
+        doctorMap.put("Prefix", prefix);
+        doctorMap.put("First_Name", firstName);
+        doctorMap.put("Last_Name", lastName);
+        doctorMap.put("Speciality", speciality);
+        doctorMap.put("NameWithPrefix", nameWithPrefix);
+        
+        // Lowercase keys for API compatibility
+        doctorMap.put("doctor_id", doctorId);
+        doctorMap.put("doctorId", doctorId);
+        doctorMap.put("id", doctorId);
+        doctorMap.put("prefix", prefix);
+        doctorMap.put("first_name", firstName);
+        doctorMap.put("firstName", firstName);
+        doctorMap.put("last_name", lastName);
+        doctorMap.put("lastName", lastName);
+        doctorMap.put("speciality", speciality);
+        doctorMap.put("specialty", speciality);
+        doctorMap.put("specialization", speciality);
+        doctorMap.put("name_with_prefix", nameWithPrefix);
+        
+        // Frontend expects these fields
+        doctorMap.put("name", nameWithPrefix); // Use NameWithPrefix as the display name
+        doctorMap.put("doctorName", nameWithPrefix);
+        doctorMap.put("doctor_name", nameWithPrefix);
+        
         // OPD/IPD doctor flags
         doctorMap.put("opd_dr", doctor.getOpdDr() != null ? doctor.getOpdDr() : false);
+        doctorMap.put("OPD_DR", doctor.getOpdDr() != null ? doctor.getOpdDr() : false);
+        doctorMap.put("opdDoctor", doctor.getOpdDr() != null ? doctor.getOpdDr() : false);
         doctorMap.put("ipd_dr", doctor.getIpdDr() != null ? doctor.getIpdDr() : false);
+        
+        // Additional fields
+        doctorMap.put("qualification", doctor.getDoctorQual());
+        doctorMap.put("phone", doctor.getMobile1());
+        doctorMap.put("email", doctor.getEmailid());
+        doctorMap.put("is_active", true);
+        doctorMap.put("address", doctor.getResidentialAdd1());
         
         return doctorMap;
     }
