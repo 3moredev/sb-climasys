@@ -300,7 +300,12 @@ public class PatientController {
                     "pm.pincode, " +
                     "pm.occupation_id, " +
                     "pm.bloodgroup_id, " +
-                    "pm.marital_status_id " +
+                    "pm.marital_status_id, " +
+                    "pm.refer_id, " +
+                    "pm.refer_doctor_details, " +
+                    "pm.doctor_address, " +
+                    "pm.doctor_mobile, " +
+                    "pm.doctor_email " +
                     "FROM patient_master pm " +
                     "WHERE pm.id = ? OR pm.folder_no = ?";
 
@@ -331,7 +336,8 @@ public class PatientController {
                     "registration_status = ?, marital_status_id = ?, occupation_id = ?, " +
                     "address_1 = ?, email_id = ?, doctor_address = ?, doctor_mobile = ?, " +
                     "doctor_email = ?, clinic_id = ?, bloodgroup_id = ?, emergency_name = ?, " +
-                    "emergency_number = ?, modified_on = ?, modifiedby_name = ? " +
+                    "emergency_number = ?, refer_id = ?, refer_doctor_details = ?, " +
+                    "modified_on = ?, modifiedby_name = ? " +
                     "WHERE id = ? OR folder_no = ?";
 
             int rowsAffected = jdbcTemplate.update(sql,
@@ -361,6 +367,8 @@ public class PatientController {
                     req.bloodGroup(),
                     req.emergencyContact(),
                     req.emergencyPhone(),
+                    req.referBy(),
+                    req.referDoctorDetails(),
                     java.time.LocalDateTime.now(), // modified_on
                     req.userId(), // modifiedby_name
                     id, // WHERE id = ?
