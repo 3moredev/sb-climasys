@@ -69,6 +69,12 @@ public class DoctorManagementController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/all-doctors")
+    public ResponseEntity<List<Map<String, Object>>> getAllDoctorsList() {
+        List<Map<String, Object>> result = doctorManagementService.getAllDoctors();
+        return ResponseEntity.ok(result);
+    }
+
     /**
      * Get doctors available for adhoc appointments
      */
