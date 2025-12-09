@@ -42,12 +42,29 @@ public class FeesDetailsService {
             m.put("Patient_Visit_No", r[i++]);
             Object visitDate = r[i++];
             m.put("Visit_Date", visitDate);
-            m.put("Bill", r[i++]);
-            m.put("Collected", r[i++]);
+            // Numeric fields: recompute balance as Collected - (Bill - Discount)
+            Object billObj = r[i++];
+            double bill = billObj != null ? ((Number) billObj).doubleValue() : 0.0;
+
+            Object collectedObj = r[i++];
+            double collected = collectedObj != null ? ((Number) collectedObj).doubleValue() : 0.0;
+
             m.put("Folder_No", r[i++]);
-            m.put("Balance", r[i++]);
-            m.put("Discount", r[i++]);
-            m.put("Dues", r[i++]);
+            // Raw balance from DB (ignored for display, we recompute)
+            i++; // skip raw balance
+            Object discountObj = r[i++];
+            double discount = discountObj != null ? ((Number) discountObj).doubleValue() : 0.0;
+
+            // Dues = Bill - Discount
+            double dues = bill - discount;
+            // Balance = Collected - Dues (negative => pending, positive => outstanding/advance)
+            double balance = collected - dues;
+
+            m.put("Bill", bill);
+            m.put("Collected", collected);
+            m.put("Discount", discount);
+            m.put("Dues", dues);
+            m.put("Balance", balance);
             String visitTimeText = Objects.toString(r[i++], "");
             String shiftInitial = Objects.toString(r[i++], "");
             m.put("Status_Description", r[i++]);
@@ -114,20 +131,30 @@ public class FeesDetailsService {
                     (financialYearObj instanceof Integer ? (Integer) financialYearObj : Integer.valueOf(financialYearObj.toString())) : null;
                 m.put("Financial_Year", financialYear);
                 
+                // Numeric fields with normalized balance logic:
+                // Dues = Billed - Discount
+                // Balance = Collected - Dues (negative => pending, positive => advance/outstanding)
                 Object billedObj = r[i++];
-                m.put("Billed", billedObj != null ? ((Number) billedObj).doubleValue() : 0.0);
+                double billed = billedObj != null ? ((Number) billedObj).doubleValue() : 0.0;
                 
                 Object discountObj = r[i++];
-                m.put("Discount", discountObj != null ? ((Number) discountObj).doubleValue() : 0.0);
+                double discount = discountObj != null ? ((Number) discountObj).doubleValue() : 0.0;
                 
-                Object duesObj = r[i++];
-                m.put("Dues", duesObj != null ? ((Number) duesObj).doubleValue() : 0.0);
-                
+                i++; // raw dues (ignored, we recompute)
+
                 Object collectedObj = r[i++];
-                m.put("Collected", collectedObj != null ? ((Number) collectedObj).doubleValue() : 0.0);
+                double collected = collectedObj != null ? ((Number) collectedObj).doubleValue() : 0.0;
                 
-                Object balanceObj = r[i++];
-                m.put("Balance", balanceObj != null ? ((Number) balanceObj).doubleValue() : 0.0);
+                i++; // raw balance (ignored, we recompute)
+                
+                double dues = billed - discount;
+                double balance = collected - dues;
+
+                m.put("Billed", billed);
+                m.put("Discount", discount);
+                m.put("Dues", dues);
+                m.put("Collected", collected);
+                m.put("Balance", balance);
                 
                 data.add(m);
             }
@@ -193,7 +220,7 @@ public class FeesDetailsService {
                            pv.financial_year AS Financial_Year,
                            pv.fees_to_collect AS Bill,
                            COALESCE(pv.fees_collected, 0) AS Collected,
-                           ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
+                           (COALESCE(pv.fees_collected, 0) - (pv.fees_to_collect - COALESCE(pv.discount, 0))) AS Balance,
                            COALESCE(pv.discount, 0) AS Discount,
                            (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
                       FROM patient_master pm
@@ -218,7 +245,7 @@ public class FeesDetailsService {
                            pv.financial_year AS Financial_Year,
                            pv.fees_to_collect AS Bill,
                            COALESCE(pv.fees_collected, 0) AS Collected,
-                           ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
+                           (COALESCE(pv.fees_collected, 0) - (pv.fees_to_collect - COALESCE(pv.discount, 0))) AS Balance,
                            COALESCE(pv.discount, 0) AS Discount,
                            (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
                       FROM patient_master pm
@@ -243,7 +270,7 @@ public class FeesDetailsService {
                            pv.financial_year AS Financial_Year,
                            0 AS Bill,
                            COALESCE(pv.fees_collected, 0) AS Collected,
-                           (0 - COALESCE(pv.fees_collected, 0)) AS Balance,
+                           COALESCE(pv.fees_collected, 0) AS Balance,
                            0 AS Discount,
                            0 AS Dues
                       FROM patient_payments_adhoc pv
