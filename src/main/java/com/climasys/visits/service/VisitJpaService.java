@@ -1406,22 +1406,69 @@ public class VisitJpaService {
                 .findDetailedPrescriptionsForVisit(patientId, visitDate, patientVisitNo, doctorId, clinicId);
             
             // Format prescription data for better readability
+            // Filter out empty/invalid prescriptions (no medicine name and no dosage)
             List<Map<String, Object>> formattedPrescriptions = new ArrayList<>();
             for (Map<String, Object> prescription : prescriptions) {
+                // Get medicine information
+                String brandName = prescription.get("brand_name") != null ? 
+                    prescription.get("brand_name").toString().trim() : "";
+                String medicineName = prescription.get("medicine_name") != null ? 
+                    prescription.get("medicine_name").toString().trim() : "";
+                
+                // Get dosage information
+                Object morningObj = prescription.get("morning");
+                Object afternoonObj = prescription.get("afternoon");
+                Object nightObj = prescription.get("night");
+                Object noOfDaysObj = prescription.get("no_of_days");
+                
+                // Check if morning, afternoon, or night doses are non-null and non-zero
+                boolean hasDosage = false;
+                if (morningObj != null) {
+                    try {
+                        double morning = Double.parseDouble(morningObj.toString());
+                        if (morning > 0) hasDosage = true;
+                    } catch (NumberFormatException e) {
+                        // Ignore
+                    }
+                }
+                if (!hasDosage && afternoonObj != null) {
+                    try {
+                        double afternoon = Double.parseDouble(afternoonObj.toString());
+                        if (afternoon > 0) hasDosage = true;
+                    } catch (NumberFormatException e) {
+                        // Ignore
+                    }
+                }
+                if (!hasDosage && nightObj != null) {
+                    try {
+                        double night = Double.parseDouble(nightObj.toString());
+                        if (night > 0) hasDosage = true;
+                    } catch (NumberFormatException e) {
+                        // Ignore
+                    }
+                }
+                
+                // Skip empty prescriptions: must have either medicine name/brand name OR valid dosage
+                if ((brandName.isEmpty() && medicineName.isEmpty()) && !hasDosage) {
+                    logger.debug("Skipping empty prescription: brandName='{}', medicineName='{}', hasDosage={}", 
+                        brandName, medicineName, hasDosage);
+                    continue;
+                }
+                
                 Map<String, Object> formattedPrescription = new HashMap<>();
                 
                 // Basic medicine information
-                formattedPrescription.put("medicineName", prescription.get("medicine_name"));
-                formattedPrescription.put("brandName", prescription.get("brand_name"));
+                formattedPrescription.put("medicineName", medicineName.isEmpty() ? null : medicineName);
+                formattedPrescription.put("brandName", brandName.isEmpty() ? null : brandName);
                 formattedPrescription.put("categoryDescription", prescription.get("catsub_description"));
                 formattedPrescription.put("categoryShortName", prescription.get("cat_short_name"));
                 formattedPrescription.put("marketedBy", prescription.get("marketed_by"));
                 
                 // Dosage information
-                formattedPrescription.put("morningDose", prescription.get("morning"));
-                formattedPrescription.put("afternoonDose", prescription.get("afternoon"));
-                formattedPrescription.put("nightDose", prescription.get("night"));
-                formattedPrescription.put("noOfDays", prescription.get("no_of_days"));
+                formattedPrescription.put("morningDose", morningObj);
+                formattedPrescription.put("afternoonDose", afternoonObj);
+                formattedPrescription.put("nightDose", nightObj);
+                formattedPrescription.put("noOfDays", noOfDaysObj);
                 
                 // Instructions
                 formattedPrescription.put("instruction", prescription.get("instruction"));
@@ -1435,20 +1482,20 @@ public class VisitJpaService {
                 
                 // Create a summary string for backward compatibility
                 StringBuilder doseSummary = new StringBuilder();
-                if (prescription.get("morning") != null) {
-                    doseSummary.append("M:").append(prescription.get("morning"));
+                if (morningObj != null) {
+                    doseSummary.append("M:").append(morningObj);
                 }
-                if (prescription.get("afternoon") != null) {
+                if (afternoonObj != null) {
                     if (doseSummary.length() > 0) doseSummary.append(", ");
-                    doseSummary.append("A:").append(prescription.get("afternoon"));
+                    doseSummary.append("A:").append(afternoonObj);
                 }
-                if (prescription.get("night") != null) {
+                if (nightObj != null) {
                     if (doseSummary.length() > 0) doseSummary.append(", ");
-                    doseSummary.append("N:").append(prescription.get("night"));
+                    doseSummary.append("N:").append(nightObj);
                 }
-                if (prescription.get("no_of_days") != null) {
+                if (noOfDaysObj != null) {
                     if (doseSummary.length() > 0) doseSummary.append(" ");
-                    doseSummary.append("for ").append(prescription.get("no_of_days")).append(" days");
+                    doseSummary.append("for ").append(noOfDaysObj).append(" days");
                 }
                 formattedPrescription.put("doseSummary", doseSummary.toString());
                 
@@ -1462,6 +1509,131 @@ public class VisitJpaService {
             
         } catch (Exception e) {
             logger.error("Error fetching detailed prescriptions for visit: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+    
+    /**
+     * Fetch dressing data for a specific visit and return as concatenated string
+     */
+    private String getDressingBodyPartsForVisit(Map<String, Object> visitData) {
+        try {
+            String patientId = (String) visitData.get("patient_id");
+            Object visitDateObj = visitData.get("visit_date");
+            Integer patientVisitNo = (Integer) visitData.get("patient_visit_no");
+            String doctorId = (String) visitData.get("doctor_id");
+            String clinicId = (String) visitData.get("clinic_id");
+            Short shiftId = visitData.get("shift_id") != null ? 
+                ((Number) visitData.get("shift_id")).shortValue() : null;
+            
+            if (patientId == null || visitDateObj == null || patientVisitNo == null || 
+                doctorId == null || clinicId == null || shiftId == null) {
+                logger.warn("Missing required fields for dressing lookup: patientId={}, visitDate={}, visitNo={}, doctorId={}, clinicId={}, shiftId={}", 
+                    patientId, visitDateObj, patientVisitNo, doctorId, clinicId, shiftId);
+                return "";
+            }
+            
+            // Convert visit date to LocalDateTime
+            java.time.LocalDateTime visitDate;
+            if (visitDateObj instanceof java.sql.Timestamp) {
+                visitDate = ((java.sql.Timestamp) visitDateObj).toLocalDateTime();
+            } else if (visitDateObj instanceof java.sql.Date) {
+                visitDate = ((java.sql.Date) visitDateObj).toLocalDate().atStartOfDay();
+            } else {
+                logger.warn("Unsupported visit date type for dressing: {}", visitDateObj.getClass());
+                return "";
+            }
+            
+            // Query dressing data
+            String dressingSql = """
+                SELECT dressing_description AS dressing_description
+                FROM visit_dressing dd
+                WHERE dd.patient_id = ? AND dd.shift_id = ? AND dd.clinic_id = ? AND dd.doctor_id = ?
+                  AND DATE(dd.visit_date) = DATE(?::date) AND dd.patient_visit_no = ? 
+                  AND (dd.delete_flag IS NULL OR dd.delete_flag = false)
+                ORDER BY dd.created_on ASC
+            """;
+            
+            List<Map<String, Object>> dressing = jdbcTemplate.queryForList(
+                dressingSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
+            
+            // Concatenate dressing descriptions
+            if (dressing != null && !dressing.isEmpty()) {
+                StringBuilder dressingBodyParts = new StringBuilder();
+                for (Map<String, Object> dressingRow : dressing) {
+                    Object dressingDesc = dressingRow.get("dressing_description");
+                    if (dressingDesc != null && !dressingDesc.toString().trim().isEmpty()) {
+                        if (dressingBodyParts.length() > 0) {
+                            dressingBodyParts.append("\n"); // Separate multiple dressings with newline
+                        }
+                        dressingBodyParts.append(dressingDesc.toString().trim());
+                    }
+                }
+                logger.debug("Found {} dressing records for visit: patientId={}, visitDate={}, visitNo={}", 
+                    dressing.size(), patientId, visitDate, patientVisitNo);
+                return dressingBodyParts.toString();
+            }
+            
+            return "";
+            
+        } catch (Exception e) {
+            logger.error("Error fetching dressing data for visit: {}", e.getMessage(), e);
+            return "";
+        }
+    }
+    
+    /**
+     * Fetch billing data for a specific visit for breakup tooltip
+     */
+    private List<Map<String, Object>> getBillingDataForVisit(Map<String, Object> visitData) {
+        try {
+            String patientId = (String) visitData.get("patient_id");
+            Integer patientVisitNo = (Integer) visitData.get("patient_visit_no");
+            String doctorId = (String) visitData.get("doctor_id");
+            String clinicId = (String) visitData.get("clinic_id");
+            
+            if (patientId == null || patientVisitNo == null || doctorId == null || clinicId == null) {
+                logger.warn("Missing required fields for billing lookup: patientId={}, visitNo={}, doctorId={}, clinicId={}", 
+                    patientId, patientVisitNo, doctorId, clinicId);
+                return new ArrayList<>();
+            }
+            
+            // Try billing overwrite first, then fallback to regular billing
+            String billingOverwriteSql = """
+                SELECT billing_details, billing_group_name, billing_subgroup_name,
+                       default_fees, collected_fees,
+                       billing_group_name || '*' || billing_subgroup_name || '*' || billing_details AS billing_id
+                FROM patient_visit_billinginfooverwrite pvb
+                WHERE pvb.patient_id = ? AND pvb.clinic_id = ? AND pvb.doctor_id = ?
+                  AND pvb.patient_visit_no = ? 
+                  AND (pvb.delete_flag IS NULL OR pvb.delete_flag = false)
+                ORDER BY pvb.billing_group_name, pvb.billing_subgroup_name, pvb.billing_details
+            """;
+            
+            List<Map<String, Object>> billing = jdbcTemplate.queryForList(
+                billingOverwriteSql, patientId, clinicId, doctorId, patientVisitNo);
+            
+            if (billing.isEmpty()) {
+                String billingSql = """
+                    SELECT billing_details, billing_group_name, billing_subgroup_name,
+                           default_fees, collected_fees,
+                           billing_group_name || '*' || billing_subgroup_name || '*' || billing_details AS billing_id
+                    FROM patient_visit_billinginfo pvb
+                    WHERE pvb.patient_id = ? AND pvb.clinic_id = ? AND pvb.doctor_id = ?
+                      AND pvb.patient_visit_no = ?
+                      AND (pvb.delete_flag IS NULL OR pvb.delete_flag = false)
+                    ORDER BY pvb.billing_group_name, pvb.billing_subgroup_name, pvb.billing_details
+                """;
+                billing = jdbcTemplate.queryForList(
+                    billingSql, patientId, clinicId, doctorId, patientVisitNo);
+            }
+            
+            logger.debug("Found {} billing records for visit: patientId={}, visitNo={}", 
+                billing.size(), patientId, patientVisitNo);
+            return billing;
+            
+        } catch (Exception e) {
+            logger.error("Error fetching billing data for visit: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -1508,6 +1680,32 @@ public class VisitJpaService {
         // Fetch detailed prescription data as nested object
         List<Map<String, Object>> detailedPrescriptions = getDetailedPrescriptionsForVisit(visitData);
         visitMap.put("Prescriptions", detailedPrescriptions);
+        
+        // Fetch dressing data and format as string
+        String dressingBodyParts = getDressingBodyPartsForVisit(visitData);
+        visitMap.put("Dressing", dressingBodyParts);
+        
+        // Fetch billing data for breakup tooltip
+        List<Map<String, Object>> billingData = getBillingDataForVisit(visitData);
+        visitMap.put("Billing", billingData);
+
+        // Receipt information (if available)
+        String receiptNo = visitData.get("receipt_number") != null ? visitData.get("receipt_number").toString() : "";
+        visitMap.put("Receipt_No", receiptNo);
+        if (receiptNo != null && !receiptNo.isEmpty()) {
+            try {
+                Map<String, Object> receipt = jdbcTemplate.queryForMap(
+                    "SELECT receipt_date, receipt_amount FROM patient_receipts WHERE receipt_number = ?",
+                    receiptNo
+                );
+                visitMap.put("Receipt_Date", receipt.get("receipt_date"));
+                visitMap.put("Receipt_Amount", receipt.get("receipt_amount"));
+            } catch (Exception ignore) {
+                // keep optional fields absent if not found
+            }
+        }
+        // Remark/comment field
+        visitMap.put("Remark", visitData.get("comment") != null ? visitData.get("comment").toString() : "");
         visitMap.put("Weight_IN_KGS", visitData.get("weight_in_kgs") != null ? visitData.get("weight_in_kgs") : 0);
         visitMap.put("Visit_Comments", visitData.get("visit_comments") != null ? visitData.get("visit_comments").toString() : "");
         visitMap.put("Observation", visitData.get("observation") != null ? visitData.get("observation").toString() : "");
@@ -1561,10 +1759,11 @@ public class VisitJpaService {
         visitMap.put("Alchohol", visitData.get("alchohol"));
         
         // Additional medical fields
+        visitMap.put("Allergy", visitData.get("allergy_dtls") != null ? visitData.get("allergy_dtls").toString() : "");
         visitMap.put("Current_Complaints", visitData.get("current_complaints"));
         visitMap.put("Current_Medicines", visitData.get("current_medicines"));
         visitMap.put("Important_Findings", visitData.get("important_findings"));
-        visitMap.put("Additional_Comments", visitData.get("additional_comments"));
+        visitMap.put("Additional_Comments", visitData.get("additional_comments") != null ? visitData.get("additional_comments").toString() : "");
         visitMap.put("Systemic", visitData.get("systemic"));
         visitMap.put("Odeama", visitData.get("odeama"));
         visitMap.put("Pallor", visitData.get("pallor"));
