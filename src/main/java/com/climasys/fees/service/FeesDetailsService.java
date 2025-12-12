@@ -49,13 +49,16 @@ public class FeesDetailsService {
             Object collectedObj = r[i++];
             double collected = collectedObj != null ? ((Number) collectedObj).doubleValue() : 0.0;
 
-            m.put("Folder_No", r[i++]);
+            m.put("Folder_No", r[i++]); // Position 6
             // Raw balance from DB (ignored for display, we recompute)
-            i++; // skip raw balance
-            Object discountObj = r[i++];
+            i++; // skip raw balance at position 7
+            Object discountObj = r[i++]; // Position 8
             double discount = discountObj != null ? ((Number) discountObj).doubleValue() : 0.0;
 
-            // Dues = Bill - Discount
+            // SQL also returns dues at position 9, but we calculate it ourselves, so skip it
+            i++; // skip dues at position 9 (we calculate it below)
+
+            // Dues = Bill - Discount (we calculate this, don't use SQL value)
             double dues = bill - discount;
             // Balance = Collected - Dues (negative => pending, positive => outstanding/advance)
             double balance = collected - dues;
@@ -65,25 +68,107 @@ public class FeesDetailsService {
             m.put("Discount", discount);
             m.put("Dues", dues);
             m.put("Balance", balance);
-            String visitTimeText = Objects.toString(r[i++], "");
-            String shiftInitial = Objects.toString(r[i++], "");
-            m.put("Status_Description", r[i++]);
-            m.put("ISadhoc", r[i++]);
-            String receiptNumber = Objects.toString(r[i++], "");
-            String receiptType = Objects.toString(r[i++], "");
-            m.put("DoctorName", r[i++]);
+            
+            // SQL column order (positions 0-16):
+            // 0: patient_id, 1: full_name, 2: patient_visit_no, 3: visit_date
+            // 4: bill, 5: collected, 6: folder_no, 7: balance, 8: discount, 9: dues
+            // 10: visit_time_text, 11: status_description, 12: is_adhoc
+            // 13: receipt_number, 14: receipt_type, 15: doctor_name, 16: doctor_id
+            
+            // At this point, i should be 10 (after reading positions 0-8 and skipping 9)
+            
+            // Read visit_time_text at position 10
+            String visitTimeText = i < r.length ? Objects.toString(r[i++], "") : "";
+            m.put("Visit_Time_Text", visitTimeText);
+            
+            // Read status_description at position 11
+            Object statusDescObj = i < r.length ? r[i++] : null;
+            String statusDescription = statusDescObj != null ? Objects.toString(statusDescObj, "") : "";
+            m.put("Status_Description", statusDescription);
+            
+            // Read is_adhoc at position 12
+            Object isAdhocObj = i < r.length ? r[i++] : null;
+            String isAdhoc = isAdhocObj != null ? Objects.toString(isAdhocObj, "") : "";
+            m.put("ISadhoc", isAdhoc);
+            
+            // Read receipt_number at position 13
+            String receiptNumber = i < r.length ? Objects.toString(r[i++], "") : "";
+            
+            // Read receipt_type at position 14
+            String receiptType = i < r.length ? Objects.toString(r[i++], "") : "";
+            
+            // Read doctor_name at position 15
+            Object doctorNameObj = i < r.length ? r[i++] : null;
+            String doctorName = doctorNameObj != null ? Objects.toString(doctorNameObj, "").trim() : "";
+            
+            // Read doctor_id at position 16 for fallback lookup
+            Object doctorIdObj = i < r.length ? r[i++] : null;
+            String visitDoctorId = doctorIdObj != null ? Objects.toString(doctorIdObj, "").trim() : "";
+            
+            // If doctor name is empty but we have doctor_id, try to fetch it separately
+            if (doctorName.isEmpty() && !visitDoctorId.isEmpty()) {
+                try {
+                    String doctorNameSql = "SELECT COALESCE(TRIM(COALESCE(prefix, '') || ' ' || COALESCE(first_name, '')), '') AS doctor_name " +
+                        "FROM doctor_master WHERE doctor_id = ? LIMIT 1";
+                    List<Map<String, Object>> doctorRows = jdbcTemplate.queryForList(doctorNameSql, visitDoctorId);
+                    
+                    if (!doctorRows.isEmpty()) {
+                        Object fetchedDoctorName = doctorRows.get(0).get("doctor_name");
+                        String fetchedName = fetchedDoctorName != null ? Objects.toString(fetchedDoctorName, "").trim() : "";
+                        if (!fetchedName.isEmpty()) {
+                            doctorName = fetchedName;
+                            System.out.println("DEBUG: Successfully fetched doctor name separately - visitDoctorId: '" + visitDoctorId + "', doctorName: '" + doctorName + "'");
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("ERROR: Failed to fetch doctor name separately for visitDoctorId '" + visitDoctorId + "': " + e.getMessage());
+                }
+            }
+            
+            m.put("DoctorName", doctorName);
+            
+            // Log doctor name for debugging
+            System.out.println("DEBUG: Doctor name from JOIN: '" + doctorName + "', visitDoctorId: '" + visitDoctorId + "'");
+            
+            // If doctor name is empty but we have doctor_id, try to fetch it separately
+            if (doctorName.isEmpty() && !visitDoctorId.isEmpty()) {
+                try {
+                    String doctorNameSql = "SELECT COALESCE(TRIM(COALESCE(prefix, '') || ' ' || COALESCE(first_name, '')), '') AS doctor_name " +
+                        "FROM doctor_master WHERE doctor_id = ? LIMIT 1";
+                    List<Map<String, Object>> doctorRows = jdbcTemplate.queryForList(doctorNameSql, visitDoctorId);
+                    
+                    if (!doctorRows.isEmpty()) {
+                        Object fetchedDoctorName = doctorRows.get(0).get("doctor_name");
+                        String fetchedName = fetchedDoctorName != null ? Objects.toString(fetchedDoctorName, "").trim() : "";
+                        if (!fetchedName.isEmpty()) {
+                            doctorName = fetchedName;
+                            System.out.println("DEBUG: Successfully fetched doctor name separately - visitDoctorId: '" + visitDoctorId + "', doctorName: '" + doctorName + "'");
+                        } else {
+                            System.out.println("WARNING: Doctor record exists but name is empty - visitDoctorId: '" + visitDoctorId + "'");
+                        }
+                    } else {
+                        System.out.println("WARNING: No doctor record found for visitDoctorId: '" + visitDoctorId + "'");
+                    }
+                } catch (Exception e) {
+                    System.out.println("ERROR: Failed to fetch doctor name separately for visitDoctorId '" + visitDoctorId + "': " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+            
+            m.put("DoctorName", doctorName);
 
+            // Format last visit date without shift initial
             String lastVisitDate;
             if (visitDate instanceof java.sql.Timestamp ts) {
                 LocalDate d = ts.toLocalDateTime().toLocalDate();
-                lastVisitDate = dateFmt.format(d) + " - " + visitTimeText + " - " + shiftInitial;
+                lastVisitDate = dateFmt.format(d) + " - " + visitTimeText;
             } else if (visitDate instanceof java.sql.Date d) {
                 LocalDate ld = d.toLocalDate();
-                lastVisitDate = dateFmt.format(ld) + " - " + visitTimeText + " - " + shiftInitial;
+                lastVisitDate = dateFmt.format(ld) + " - " + visitTimeText;
             } else if (visitDate instanceof LocalDateTime ldt) {
-                lastVisitDate = dateFmt.format(ldt.toLocalDate()) + " - " + visitTimeText + " - " + shiftInitial;
+                lastVisitDate = dateFmt.format(ldt.toLocalDate()) + " - " + visitTimeText;
             } else {
-                lastVisitDate = Objects.toString(visitDate, "") + " - " + visitTimeText + " - " + shiftInitial;
+                lastVisitDate = Objects.toString(visitDate, "") + " - " + visitTimeText;
             }
             m.put("LAST_VISIT_DATE", lastVisitDate);
             m.put("Receipt_Number", (receiptType + " " + receiptNumber).trim());
