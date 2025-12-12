@@ -89,6 +89,7 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
     /**
      * Returns consolidated fees aggregated by financial year for a specific patient
      * Equivalent to USP_Get_ConsolidatedFamilyFees
+     * Includes patient_visits, patient_visits_services, and patient_payments_adhoc
      * 
      * Columns returned (in order):
      *  financial_year, billed, discount, dues, collected, balance
@@ -103,7 +104,13 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
             SUM(balance) AS balance
         FROM (
             SELECT 
-                COALESCE(pv.financial_year, CAST(EXTRACT(YEAR FROM pv.visit_date) AS INTEGER)) AS financial_year,
+                COALESCE(pv.financial_year, 
+                    CASE 
+                        WHEN EXTRACT(MONTH FROM pv.visit_date) >= 4 
+                        THEN CAST(EXTRACT(YEAR FROM pv.visit_date) AS INTEGER) + 1 
+                        ELSE CAST(EXTRACT(YEAR FROM pv.visit_date) AS INTEGER) 
+                    END
+                ) AS financial_year,
                 COALESCE(pv.fees_to_collect, 0) AS billed,
                 COALESCE(pv.discount, 0) AS discount,
                 COALESCE(pv.fees_to_collect - pv.discount, 0) AS dues,
@@ -119,7 +126,13 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
               AND pv.status_id = 5
             UNION ALL
             SELECT 
-                COALESCE(pvs.financial_year, CAST(EXTRACT(YEAR FROM pvs.visit_date) AS INTEGER)) AS financial_year,
+                COALESCE(pvs.financial_year, 
+                    CASE 
+                        WHEN EXTRACT(MONTH FROM pvs.visit_date) >= 4 
+                        THEN CAST(EXTRACT(YEAR FROM pvs.visit_date) AS INTEGER) + 1 
+                        ELSE CAST(EXTRACT(YEAR FROM pvs.visit_date) AS INTEGER) 
+                    END
+                ) AS financial_year,
                 COALESCE(pvs.fees_to_collect, 0) AS billed,
                 COALESCE(pvs.discount, 0) AS discount,
                 COALESCE(pvs.fees_to_collect - pvs.discount, 0) AS dues,
@@ -133,6 +146,26 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
               AND pvs.fees_to_collect IS NOT NULL
               AND pvs.fees_collected IS NOT NULL
               AND pvs.status_id = 8
+            UNION ALL
+            SELECT 
+                COALESCE(ppa.financial_year, 
+                    CASE 
+                        WHEN EXTRACT(MONTH FROM ppa.payment_date) >= 4 
+                        THEN CAST(EXTRACT(YEAR FROM ppa.payment_date) AS INTEGER) + 1 
+                        ELSE CAST(EXTRACT(YEAR FROM ppa.payment_date) AS INTEGER) 
+                    END
+                ) AS financial_year,
+                0 AS billed,
+                0 AS discount,
+                0 AS dues,
+                COALESCE(ppa.fees_collected, 0) AS collected,
+                COALESCE(ppa.fees_collected, 0) AS balance
+            FROM patient_payments_adhoc ppa
+            WHERE ppa.patient_id = :patientId
+              AND (:doctorId IS NULL OR ppa.attended_by = :doctorId)
+              AND ppa.clinic_id = :clinicId
+              AND ppa.delete_flag = false
+              AND ppa.fees_collected IS NOT NULL
         ) AS combined
         GROUP BY financial_year
         ORDER BY financial_year DESC
