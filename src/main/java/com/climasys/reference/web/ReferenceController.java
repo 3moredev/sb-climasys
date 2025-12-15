@@ -238,10 +238,19 @@ public class ReferenceController {
     }
 
     @GetMapping("/states")
-    public ResponseEntity<?> getStates(@RequestParam(required = false) String countryId) {
+    public ResponseEntity<?> getStates(
+            @RequestParam(required = false) String countryId,
+            @RequestParam(required = false, defaultValue = "1") Integer languageId) {
         try {
-            List<?> result = referenceDataService.getStates(countryId);
-            return ResponseEntity.ok(result);
+            // If languageId is provided, return states with translations (stateName from state_translations)
+            if (languageId != null && languageId > 0) {
+                List<?> result = referenceDataService.getStatesWithTranslations(countryId, languageId);
+                return ResponseEntity.ok(result);
+            } else {
+                // Otherwise, return states without translations (backward compatibility)
+                List<?> result = referenceDataService.getStates(countryId);
+                return ResponseEntity.ok(result);
+            }
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get states: " + e.getMessage());

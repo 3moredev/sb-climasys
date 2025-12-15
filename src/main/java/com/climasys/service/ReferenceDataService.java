@@ -331,6 +331,39 @@ public class ReferenceDataService {
         return stateRepository.findAllOrdered();
     }
     
+    public List<Map<String, Object>> getStatesWithTranslations(String countryId, Integer languageId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        
+        try {
+            // Get all states
+            List<State> states = getStates(countryId);
+            
+            // For each state, get its translation
+            for (State state : states) {
+                Map<String, Object> stateResult = new HashMap<>();
+                stateResult.put("id", state.getId());
+                
+                // Get state translation
+                StateTranslation stateTranslation = stateTranslationRepository.findByStateIdAndLanguageId(
+                    state.getId().getId(), languageId);
+                
+                if (stateTranslation != null) {
+                    stateResult.put("stateName", stateTranslation.getStateName());
+                } else {
+                    stateResult.put("stateName", null);
+                }
+                
+                result.add(stateResult);
+            }
+        } catch (Exception e) {
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("error", "Error getting states with translations: " + e.getMessage());
+            result.add(errorResult);
+        }
+        
+        return result;
+    }
+    
     public List<Country> getCountries() {
         return countryRepository.findAllOrdered();
     }
