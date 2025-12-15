@@ -1,11 +1,11 @@
 package com.climasys.fees.service;
 
 import com.climasys.repository.FeeDetailsRepository;
+import com.climasys.utils.TimezoneUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -14,10 +14,12 @@ public class FeesDetailsService {
 
     private final FeeDetailsRepository feeDetailsRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final TimezoneUtils timezoneUtils;
 
-    public FeesDetailsService(FeeDetailsRepository feeDetailsRepository, JdbcTemplate jdbcTemplate) {
+    public FeesDetailsService(FeeDetailsRepository feeDetailsRepository, JdbcTemplate jdbcTemplate, TimezoneUtils timezoneUtils) {
         this.feeDetailsRepository = feeDetailsRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.timezoneUtils = timezoneUtils;
     }
 
     /**
@@ -77,9 +79,8 @@ public class FeesDetailsService {
             
             // At this point, i should be 10 (after reading positions 0-8 and skipping 9)
             
-            // Read visit_time_text at position 10
-            String visitTimeText = i < r.length ? Objects.toString(r[i++], "") : "";
-            m.put("Visit_Time_Text", visitTimeText);
+            // Read visit_time_text at position 10 (UTC time from database)
+            String visitTimeTextUtc = i < r.length ? Objects.toString(r[i++], "") : "";
             
             // Read status_description at position 11
             Object statusDescObj = i < r.length ? r[i++] : null;
@@ -157,18 +158,80 @@ public class FeesDetailsService {
             
             m.put("DoctorName", doctorName);
 
-            // Format last visit date without shift initial
-            String lastVisitDate;
+            // Convert visit date and time from UTC to local timezone
+            LocalDateTime localVisitDateTime = null;
+            LocalTime localVisitTime = null;
+            LocalDate localVisitDate = null;
+            
+            // Convert visit_date from UTC to local timezone
             if (visitDate instanceof java.sql.Timestamp ts) {
-                LocalDate d = ts.toLocalDateTime().toLocalDate();
-                lastVisitDate = dateFmt.format(d) + " - " + visitTimeText;
+                // Timestamp is stored in UTC, convert to local timezone
+                Instant instant = ts.toInstant();
+                ZonedDateTime utcZoned = instant.atZone(ZoneId.of("UTC"));
+                ZonedDateTime localZoned = utcZoned.withZoneSameInstant(timezoneUtils.getTargetTimezone());
+                localVisitDateTime = localZoned.toLocalDateTime();
+                localVisitDate = localVisitDateTime.toLocalDate();
+                localVisitTime = localVisitDateTime.toLocalTime();
             } else if (visitDate instanceof java.sql.Date d) {
-                LocalDate ld = d.toLocalDate();
-                lastVisitDate = dateFmt.format(ld) + " - " + visitTimeText;
+                // Treat as UTC date at start of day, convert to local timezone
+                LocalDateTime utcDateTime = d.toLocalDate().atStartOfDay();
+                ZonedDateTime utcZoned = utcDateTime.atZone(ZoneId.of("UTC"));
+                ZonedDateTime localZoned = utcZoned.withZoneSameInstant(timezoneUtils.getTargetTimezone());
+                localVisitDateTime = localZoned.toLocalDateTime();
+                localVisitDate = localVisitDateTime.toLocalDate();
+                localVisitTime = localVisitDateTime.toLocalTime();
             } else if (visitDate instanceof LocalDateTime ldt) {
-                lastVisitDate = dateFmt.format(ldt.toLocalDate()) + " - " + visitTimeText;
+                // Treat as UTC LocalDateTime, convert to local timezone
+                ZonedDateTime utcZoned = ldt.atZone(ZoneId.of("UTC"));
+                ZonedDateTime localZoned = utcZoned.withZoneSameInstant(timezoneUtils.getTargetTimezone());
+                localVisitDateTime = localZoned.toLocalDateTime();
+                localVisitDate = localVisitDateTime.toLocalDate();
+                localVisitTime = localVisitDateTime.toLocalTime();
+            }
+            
+            // Convert visit_time_text from UTC to local timezone
+            String visitTimeText = visitTimeTextUtc;
+            if (localVisitTime != null) {
+                // Format the converted local time
+                DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                visitTimeText = localVisitTime.format(timeFormatter);
+            } else if (!visitTimeTextUtc.isEmpty()) {
+                // Fallback: try to parse UTC time and convert it
+                try {
+                    String[] timeParts = visitTimeTextUtc.split(":");
+                    if (timeParts.length >= 2) {
+                        int hour = Integer.parseInt(timeParts[0]);
+                        int minute = Integer.parseInt(timeParts[1]);
+                        LocalTime utcTime = LocalTime.of(hour, minute);
+                        LocalTime localTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
+                        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                        visitTimeText = localTime.format(timeFormatter);
+                    }
+                } catch (Exception e) {
+                    // If conversion fails, use original UTC time
+                    System.out.println("WARNING: Failed to convert visit time from UTC: " + e.getMessage());
+                }
+            }
+            
+            m.put("Visit_Time_Text", visitTimeText);
+
+            // Format last visit date with local timezone time
+            String lastVisitDate;
+            if (localVisitDate != null) {
+                lastVisitDate = dateFmt.format(localVisitDate) + " - " + visitTimeText;
             } else {
-                lastVisitDate = Objects.toString(visitDate, "") + " - " + visitTimeText;
+                // Fallback to original formatting if conversion failed
+                if (visitDate instanceof java.sql.Timestamp ts) {
+                    LocalDate d = ts.toLocalDateTime().toLocalDate();
+                    lastVisitDate = dateFmt.format(d) + " - " + visitTimeText;
+                } else if (visitDate instanceof java.sql.Date d) {
+                    LocalDate ld = d.toLocalDate();
+                    lastVisitDate = dateFmt.format(ld) + " - " + visitTimeText;
+                } else if (visitDate instanceof LocalDateTime ldt) {
+                    lastVisitDate = dateFmt.format(ldt.toLocalDate()) + " - " + visitTimeText;
+                } else {
+                    lastVisitDate = Objects.toString(visitDate, "") + " - " + visitTimeText;
+                }
             }
             m.put("LAST_VISIT_DATE", lastVisitDate);
             m.put("Receipt_Number", (receiptType + " " + receiptNumber).trim());
