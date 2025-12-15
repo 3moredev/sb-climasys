@@ -2271,7 +2271,8 @@ public class VisitController {
             System.out.println("  futureDate: " + futureDate);
             System.out.println("  languageId: " + languageId);
         
-        String query = "SELECT " +
+            String query = "SELECT * FROM (" +
+                "SELECT DISTINCT ON (PV.patient_id, PV.patient_visit_no) " +
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS Visit_Time, " +
                 "PV.visit_time AS Raw_Visit_Time, " +
                 "PV.visit_date AS Full_DateTime, " +
@@ -2296,25 +2297,31 @@ public class VisitController {
                 "TO_CHAR(PV.visit_time::time, 'HH24:MI') AS From_time, " +
                 "FU.followup_description AS follow_up_type, " +
                 "PV.is_submit_patient_labtest AS isSubmitPatientLabtest, " +
+                "PV.created_on AS created_on, " +
                 "CASE WHEN CURRENT_TIMESTAMP IS NOT NULL THEN " +
                 "TO_CHAR(CURRENT_TIMESTAMP - CURRENT_TIMESTAMP, 'MI:SS') " +
                 "ELSE NULL END AS Duration " +
                 "FROM patient_visits PV " +
                 "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
                 "INNER JOIN doctor_master DM ON PV.doctor_id = DM.doctor_id " +
-                "INNER JOIN gender_translations GT ON PM.gender_id = GT.gender_id " +
+                "INNER JOIN gender_translations GT ON PM.gender_id = GT.gender_id AND GT.language_id = ? " +
                 "LEFT JOIN status_ref SR ON PV.status_id = SR.id AND PV.clinic_id = SR.clinic_id " +
                 "LEFT JOIN follow_up_type FU ON FU.id = PV.follow_up_type " +
                 "WHERE PV.delete_flag = false " +
                 "AND PV.doctor_id = ? " +
-                "AND PV.visit_date::date = ? " +
+                "AND CAST(PV.visit_date AT TIME ZONE 'UTC' AT TIME ZONE ? AS date) = ? " +
                 "AND PV.status_id NOT IN (11, 12) " +
-                "AND GT.language_id = ? " +
-                "ORDER BY PV.status_id ASC, PV.visit_time ASC";
+                "ORDER BY PV.patient_id, PV.patient_visit_no, PV.status_id ASC, PV.created_on ASC, PV.visit_time ASC" +
+                ") AS distinct_appointments " +
+                "ORDER BY Status_ID ASC, created_on ASC, Visit_Time ASC";
         
         System.out.println("DEBUG - Query: " + query);
+        System.out.println("DEBUG - Timezone for date conversion: " + timezoneUtils.getTimezoneDisplayName());
         
-            List<Map<String, Object>> result = jdbcTemplate.queryForList(query, doctorId, futureDate, languageId);
+            // Get timezone ID for PostgreSQL AT TIME ZONE conversion
+            String timezoneId = timezoneUtils.getTimezoneDisplayName();
+            // Parameter order: languageId (JOIN), doctorId, timezoneId, futureDate
+            List<Map<String, Object>> result = jdbcTemplate.queryForList(query, languageId, doctorId, timezoneId, futureDate);
             System.out.println("DEBUG - Result count: " + result.size());
             
             // Debug the time values being returned and convert timezone
