@@ -164,7 +164,7 @@ public class ClinicManagementService {
         clinic.setCreatedbyName("Admin");
         clinic.setModifiedOn(java.time.LocalDateTime.now());
         clinic.setModifiedbyName("Admin");
-        clinic.setIsPrint(false);
+        clinic.setIsPrint(true);
 
         clinicRepository.save(clinic);
 

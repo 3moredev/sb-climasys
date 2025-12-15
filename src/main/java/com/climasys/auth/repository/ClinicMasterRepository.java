@@ -11,14 +11,17 @@ import java.util.Optional;
 
 @Repository
 public interface ClinicMasterRepository extends JpaRepository<Clinic, String> {
-    
+
     Optional<Clinic> findByClinicIdAndIsPrint(String clinicId, Boolean isPrint);
-    
-    // List<Clinic> findByDoctorId(String doctorId);
-    
+
     @Query("SELECT c FROM Clinic c " +
-           "JOIN UserRole ur ON c.clinicId = ur.clinicId " +
-           "JOIN User u ON ur.userId = u.id " +
-           "WHERE u.loginId = :loginId AND c.isPrint = true AND ur.isDefaultClinic = true")
+            "JOIN UserRole ur ON c.clinicId = ur.clinicId " +
+            "WHERE ur.doctorId = :doctorId AND c.isPrint = true AND ur.isDefaultClinic = true")
+    Optional<Clinic> findClinicByDoctorId(@Param("doctorId") String doctorId);
+
+    @Query("SELECT c FROM Clinic c " +
+            "JOIN UserRole ur ON c.clinicId = ur.clinicId " +
+            "JOIN User u ON ur.userId = u.id " +
+            "WHERE u.loginId = :loginId AND c.isPrint = true AND ur.isDefaultClinic = true")
     List<Clinic> findDefaultClinicsByLoginId(@Param("loginId") String loginId);
 }

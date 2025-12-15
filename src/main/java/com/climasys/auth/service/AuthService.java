@@ -30,26 +30,27 @@ public class AuthService {
 
     @Autowired
     private UserMasterRepository userMasterRepository;
-    
+
     @Autowired
     private UserRoleRepository userRoleRepository;
-    
+
     @Autowired
     private AuthDoctorMasterRepository doctorMasterRepository;
-    
+
     @Autowired
     private ClinicMasterRepository clinicMasterRepository;
-    
+
     @Autowired
     private HttpSessionService httpSessionService;
-    
+
     @Value("${climasys.encryption.key:PA1ANDE61INI6}")
     private String encryptionKey;
 
-    public LoginResponse authenticateUser(String loginId, String password, String todaysDay, Integer languageId, HttpSession session) {
+    public LoginResponse authenticateUser(String loginId, String password, String todaysDay, Integer languageId,
+            HttpSession session) {
         logger.info("Starting authentication for user: {}", loginId);
         auditLogger.info("LOGIN_ATTEMPT - User: {}", loginId);
-        
+
         try {
             // Set default language ID if not provided
             if (languageId == null) {
@@ -59,12 +60,12 @@ public class AuthService {
 
             // Find user by login ID only (password will be validated after decryption)
             Optional<User> userOpt = userMasterRepository.findByLoginIdAndIsActive(loginId, true);
-            
+
             LoginResponse response = new LoginResponse();
-            
+
             if (userOpt.isPresent()) {
                 User user = userOpt.get();
-                
+
                 // Decrypt the stored password and compare with input password
                 String decryptedPassword;
                 try {
@@ -77,8 +78,9 @@ public class AuthService {
                     response.setErrorMessage("Authentication error");
                     return response;
                 }
-                
-                // Compare decrypted password with input password (case-sensitive like stored proc)
+
+                // Compare decrypted password with input password (case-sensitive like stored
+                // proc)
                 if (!decryptedPassword.equals(password)) {
                     logger.warn("Authentication failed - password mismatch for user: {}", loginId);
                     auditLogger.warn("LOGIN_FAILED - Invalid password for user: {}", loginId);
@@ -86,56 +88,55 @@ public class AuthService {
                     response.setErrorMessage("Invalid login credentials");
                     return response;
                 }
-                
+
                 logger.info("User found successfully: {}", user.getLoginId());
-                
+
                 // Login successful
                 response.setLoginStatus(1);
                 response.setErrorMessage(null);
-                
+
                 // Get user roles (matching stored procedure logic)
                 List<UserRole> userRoles = userRoleRepository.findDefaultRolesByLoginId(loginId);
                 logger.debug("User roles found: {} roles", userRoles.size());
-                
+
                 if (!userRoles.isEmpty()) {
                     UserRole defaultRole = userRoles.get(0);
-                    
+
                     // Get doctor details using findByDoctorId
                     Optional<AuthDoctorMaster> doctorOpt = doctorMasterRepository.findByDoctorId(user.getDoctorId());
                     logger.debug("Doctor lookup result: {}", doctorOpt.isPresent());
-                    
+
                     // Get clinic details (matching stored procedure logic)
-                    List<Clinic> clinics = clinicMasterRepository.findDefaultClinicsByLoginId(loginId);
-                    logger.debug("Clinics found: {} clinics", clinics.size());
-                    
-                    if (doctorOpt.isPresent() && !clinics.isEmpty()) {
+                    Optional<Clinic> clinicOpt = clinicMasterRepository.findClinicByDoctorId(user.getDoctorId());
+                    // logger.debug("Clinics found: {} clinics", clinic.size());
+
+                    if (doctorOpt.isPresent() && clinicOpt.isPresent()) {
                         AuthDoctorMaster doctor = doctorOpt.get();
-                        Clinic clinic = clinics.get(0);
-                        
+
                         // Build user details (matching stored procedure output)
                         UserDetails userDetails = new UserDetails();
                         userDetails.setId(user.getId());
                         userDetails.setDoctorId(user.getDoctorId());
-                        userDetails.setClinicId(clinic.getClinicId());
+                        userDetails.setClinicId(clinicOpt.get().getClinicId());
                         userDetails.setLoginId(user.getLoginId());
                         userDetails.setFirstName(user.getFirstName());
                         userDetails.setPassword(user.getPassword());
                         userDetails.setRoleName(defaultRole.getRoleMaster().getRoleName());
                         userDetails.setRoleId(defaultRole.getRoleId());
                         userDetails.setDoctorName(buildDoctorName(doctor));
-                        userDetails.setClinicName(clinic.getClinicName());
+                        userDetails.setClinicName(clinicOpt.get().getClinicName());
                         userDetails.setLanguageId(user.getLanguageId());
                         userDetails.setIsActive(user.getIsActive());
                         userDetails.setFinancialYear(getFinancialYear());
                         userDetails.setModelId(1); // Default model ID
                         userDetails.setConfigId(1); // Default config ID
                         userDetails.setIsEnabled(true); // Default enabled
-                        
+
                         response.setUserDetails(userDetails);
                         logger.info("User details built successfully for: {}", user.getLoginId());
-                        
+
                         // Store session data in HTTP session
-                        httpSessionService.storeUserSession(session, user, doctor, clinic);
+                        httpSessionService.storeUserSession(session, user, doctor, clinicOpt.get());
                         logger.info("Session data stored successfully for user: {}", user.getLoginId());
                     } else {
                         logger.warn("Missing doctor or clinic data for user: {}", user.getLoginId());
@@ -143,25 +144,25 @@ public class AuthService {
                 } else {
                     logger.warn("No user roles found for: {}", user.getLoginId());
                 }
-                
+
                 // Build shift times (mock data for now)
                 List<ShiftTime> shiftTimes = buildShiftTimes(todaysDay);
                 response.setShiftTimes(shiftTimes);
-                
+
                 // Build available roles (mock data for now)
                 List<AvailableRole> availableRoles = buildAvailableRoles();
                 response.setAvailableRoles(availableRoles);
-                
+
                 // Build system params (mock data for now)
                 List<SystemParam> systemParams = buildSystemParams(user.getDoctorId());
                 response.setSystemParams(systemParams);
-                
+
                 // Set license key (mock data for now)
                 response.setLicenseKey("TEST_LICENSE_KEY_12345");
-                
-                auditLogger.info("LOGIN_SUCCESS - User: {}, Doctor: {}", 
-                    user.getLoginId(), user.getDoctorId());
-                
+
+                auditLogger.info("LOGIN_SUCCESS - User: {}, Doctor: {}",
+                        user.getLoginId(), user.getDoctorId());
+
             } else {
                 // Login failed - invalid credentials
                 logger.warn("Authentication failed - invalid credentials for user: {}", loginId);
@@ -169,7 +170,7 @@ public class AuthService {
                 response.setLoginStatus(0);
                 response.setErrorMessage("Invalid login credentials");
             }
-            
+
             return response;
         } catch (Exception e) {
             // Handle any exceptions during the authentication process
@@ -181,15 +182,18 @@ public class AuthService {
             return errorResponse;
         }
     }
-    
+
     private String buildDoctorName(AuthDoctorMaster doctor) {
         StringBuilder name = new StringBuilder();
-        if (doctor.getFirstName() != null) name.append(doctor.getFirstName());
-        if (doctor.getMiddleName() != null) name.append(" ").append(doctor.getMiddleName());
-        if (doctor.getLastName() != null) name.append(" ").append(doctor.getLastName());
+        if (doctor.getFirstName() != null)
+            name.append(doctor.getFirstName());
+        if (doctor.getMiddleName() != null)
+            name.append(" ").append(doctor.getMiddleName());
+        if (doctor.getLastName() != null)
+            name.append(" ").append(doctor.getLastName());
         return name.toString().trim();
     }
-    
+
     private Integer getFinancialYear() {
         LocalDate now = LocalDate.now();
         int year = now.getYear();
@@ -198,7 +202,7 @@ public class AuthService {
         }
         return year;
     }
-    
+
     private List<ShiftTime> buildShiftTimes(String todaysDay) {
         List<ShiftTime> shiftTimes = new ArrayList<>();
         ShiftTime shiftTime = new ShiftTime();
@@ -207,7 +211,7 @@ public class AuthService {
         shiftTimes.add(shiftTime);
         return shiftTimes;
     }
-    
+
     private List<AvailableRole> buildAvailableRoles() {
         List<AvailableRole> availableRoles = new ArrayList<>();
         AvailableRole role = new AvailableRole();
@@ -216,7 +220,7 @@ public class AuthService {
         availableRoles.add(role);
         return availableRoles;
     }
-    
+
     private List<SystemParam> buildSystemParams(String doctorId) {
         List<SystemParam> systemParams = new ArrayList<>();
         SystemParam param = new SystemParam();
@@ -226,5 +230,5 @@ public class AuthService {
         systemParams.add(param);
         return systemParams;
     }
-    
+
 }

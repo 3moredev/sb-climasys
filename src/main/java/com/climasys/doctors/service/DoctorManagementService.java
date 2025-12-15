@@ -1,7 +1,9 @@
 package com.climasys.doctors.service;
 
 import com.climasys.auth.entity.AuthDoctorMaster;
+import com.climasys.auth.entity.UserRole;
 import com.climasys.auth.repository.AuthDoctorMasterRepository;
+import com.climasys.auth.repository.UserRoleRepository;
 import com.climasys.auth.service.HttpSessionService;
 import com.climasys.auth.repository.UserMasterRepository;
 import com.climasys.entity.Clinic;
@@ -10,6 +12,8 @@ import com.climasys.entity.User;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
+import com.climasys.common.crypto.LegacyCrypto;
 
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +27,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class DoctorManagementService {
+
+    private final UserRoleRepository userRoleRepository;
 
     @Autowired
     private AuthDoctorMasterRepository doctorMasterRepository;
@@ -38,6 +44,13 @@ public class DoctorManagementService {
 
     @Autowired
     private com.climasys.repository.ClinicDoctorMasterRepository clinicDoctorMasterRepository;
+
+    @Value("${climasys.encryption.key:PA1ANDE61INI6}")
+    private String encryptionKey;
+
+    DoctorManagementService(UserRoleRepository userRoleRepository) {
+        this.userRoleRepository = userRoleRepository;
+    }
 
     /**
      * Get all available doctors in the system
@@ -360,11 +373,58 @@ public class DoctorManagementService {
             doctor.setModifiedOn(java.time.LocalDateTime.now());
             doctor.setModifiedbyName("Admin");
             doctorMasterRepository.save(doctor);
-            try{
+            try {
                 clinicDoctorMasterRepository.save(new ClinicDoctorMaster(doctor.getDoctorId(), doctor.getClinicId()));
-            }catch(Exception e){
+            } catch (Exception e) {
                 throw new RuntimeException("Failed to save clinic doctor: " + e.getMessage(), e);
             }
+            User doctorUser = new User();
+            // doctorUser.setId(doctor.getDoctorId());
+            doctorUser.setDoctorId(doctor.getDoctorId());
+            doctorUser.setIsActive(true);
+            doctorUser.setLoginId(doctor.getEmailid());
+            doctorUser.setFirstName(doctor.getFirstName());
+            doctorUser.setMiddleName(doctor.getMiddleName());
+            doctorUser.setLastName(doctor.getLastName());
+            doctorUser.setResidentialAdd1(doctor.getResidentialAdd1());
+            doctorUser.setResidentialAdd2(doctor.getResidentialAdd2());
+            doctorUser.setCountryId(doctor.getCountryId());
+            doctorUser.setStateId(doctor.getStateId());
+            doctorUser.setCityId(doctor.getCityId());
+            doctorUser.setAreaId(doctor.getAreaId());
+            // doctorUser.setPinCode(doctor.());
+            doctorUser.setPhoneNo(doctor.getMobile1());
+            doctorUser.setMobileNo(doctor.getMobile2());
+            doctorUser.setEmail(doctor.getEmailid());
+            doctorUser.setUserPhoto(null);
+            try {
+                String encryptedPassword = LegacyCrypto.encryptUnicode(encryptionKey, "bmore123");
+                doctorUser.setPassword(encryptedPassword);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to encrypt password for new doctor: " + e.getMessage(), e);
+            }
+            doctorUser.setLanguageId(1);
+            doctorUser.setClinicId(doctor.getClinicId());
+            doctorUser.setBaseLocation(doctor.getBaseLocation());
+            doctorUser.setShowDailyCollection(true);
+            doctorUser.setCreatedOn(java.time.LocalDateTime.now());
+            doctorUser.setCreatedbyName("Admin");
+            doctorUser.setModifiedbyName("Admin");
+            // Manual ID generation removed: User entity uses GenerationType.IDENTITY
+            userMasterRepository.save(doctorUser);
+
+            UserRole userRole = new UserRole();
+            userRole.setUserId(doctorUser.getId());
+            userRole.setDoctorId(doctorUser.getDoctorId());
+            userRole.setClinicId(doctorUser.getClinicId());
+            Integer userRoleId = userRoleRepository.findRoleIdByClinicId(doctorUser.getClinicId());
+            userRole.setRoleId(userRoleId);
+            userRole.setIsDefaultClinic(true);
+            userRole.setCreatedOn(java.time.LocalDateTime.now());
+            userRole.setCreatedbyName("Admin");
+            userRole.setModifiedOn(java.time.LocalDateTime.now());
+            userRole.setModifiedbyName("Admin");
+            userRoleRepository.save(userRole);
             return doctor;
         } catch (Exception e) {
             throw new RuntimeException("Failed to save doctor: " + e.getMessage(), e);
@@ -376,14 +436,17 @@ public class DoctorManagementService {
         if (!doctorId.equals(doctor.getDoctorId())) {
             throw new IllegalArgumentException("Doctor ID in path does not match request body");
         }
-        try{
-            ClinicDoctorMaster clinicDoctorMaster = clinicDoctorMasterRepository.findByDoctorId(doctorId);
-            if (clinicDoctorMaster.getClinicId() != doctor.getClinicId()) {                
-                clinicDoctorMasterRepository.updateClinicIdByDoctorId(doctor.getClinicId(), doctorId);
-            }
-        }catch(Exception e){
-            throw new RuntimeException("Failed to save clinic doctor: " + e.getMessage(), e);
-        }
+        // try{
+        // ClinicDoctorMaster clinicDoctorMaster =
+        // clinicDoctorMasterRepository.findByDoctorId(doctorId);
+        // if (clinicDoctorMaster.getClinicId() != doctor.getClinicId()) {
+        // clinicDoctorMasterRepository.updateClinicIdByDoctorId(doctor.getClinicId(),
+        // doctorId);
+        // }
+        // }catch(Exception e){
+        // throw new RuntimeException("Failed to save clinic doctor: " + e.getMessage(),
+        // e);
+        // }
         // Update modified info
         doctor.setModifiedOn(java.time.LocalDateTime.now());
         doctor.setModifiedbyName("Admin");
