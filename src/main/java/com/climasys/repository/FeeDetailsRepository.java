@@ -19,65 +19,78 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
      *
      * Columns returned (in order):
      *  patient_id, full_name, patient_visit_no, visit_date, bill, collected, folder_no,
-     *  balance, discount, dues, visit_time_text, shift_desc_initial, status_description,
-     *  is_adhoc, receipt_number, receipt_type, doctor_name
+     *  balance, discount, dues, visit_time_text, status_description, is_adhoc,
+     *  receipt_number, receipt_type, doctor_name
      */
     @Query(value = "\n"
-            + "SELECT pv.patient_id, (pm.first_name || ' ' || pm.last_name) AS full_name,\n"
-            + "       pv.patient_visit_no, pv.visit_date, pv.fees_to_collect AS bill, pv.fees_collected AS collected,\n"
-            + "       pm.folder_no, ((pv.fees_to_collect - pv.discount) - pv.fees_collected) AS balance,\n"
-            + "       pv.discount AS discount, (pv.fees_to_collect - pv.discount) AS dues,\n"
-            + "       to_char(pv.visit_time, 'HH24:MI:SS') AS visit_time_text,\n"
-            + "       substr(sm.description, 1, 1) AS shift_desc_initial, sr.status_description,\n"
-            + "       NULL AS is_adhoc, COALESCE(pv.receipt_number, '') AS receipt_number,\n"
-            + "       COALESCE(pv.receipt_type, '') AS receipt_type, (dm.prefix || ' ' || dm.first_name) AS doctor_name\n"
-            + "  FROM patient_master pm\n"
-            + "  JOIN patient_visits pv         ON pm.id = pv.patient_id\n"
-            + "  JOIN shift_master sm            ON pv.shift_id = sm.shift_id\n"
-            + "  JOIN status_ref sr              ON pv.status_id = sr.id\n"
-            + "  JOIN doctor_master dm           ON dm.doctor_id = pv.doctor_id\n"
-            + " WHERE pm.id = :patientId\n"
-            + "   AND (:doctorId IS NULL OR pv.doctor_id = :doctorId)\n"
-            + "   AND pv.clinic_id = :clinicId\n"
-            + "   AND pv.delete_flag = false\n"
-            + "   AND pv.fees_to_collect IS NOT NULL\n"
-            + "   AND pv.fees_collected  IS NOT NULL\n"
-            + "   AND pv.status_id = 5\n"
+            + "SELECT * FROM (\n"
+            + "  SELECT DISTINCT ON (pv.patient_id, pv.patient_visit_no, pv.visit_date) \n"
+            + "         pv.patient_id, (pm.first_name || ' ' || pm.last_name) AS full_name,\n"
+            + "         pv.patient_visit_no, pv.visit_date, pv.fees_to_collect AS bill, pv.fees_collected AS collected,\n"
+            + "         pm.folder_no, ((pv.fees_to_collect - pv.discount) - pv.fees_collected) AS balance,\n"
+            + "         pv.discount AS discount, (pv.fees_to_collect - pv.discount) AS dues,\n"
+            + "         to_char(pv.visit_time, 'HH24:MI:SS') AS visit_time_text,\n"
+            + "         sr.status_description, NULL AS is_adhoc,\n"
+            + "         COALESCE(pv.receipt_number, '') AS receipt_number,\n"
+            + "         COALESCE(pv.receipt_type, '') AS receipt_type, COALESCE(TRIM(COALESCE(dm.prefix, '') || ' ' || COALESCE(dm.first_name, '')), '') AS doctor_name,\n"
+            + "         pv.doctor_id AS doctor_id\n"
+            + "    FROM patient_master pm\n"
+            + "    JOIN patient_visits pv         ON pm.id = pv.patient_id\n"
+            + "    JOIN status_ref sr              ON pv.status_id = sr.id AND pv.clinic_id = sr.clinic_id\n"
+            + "    LEFT JOIN doctor_master dm     ON dm.doctor_id = pv.doctor_id\n"
+            + "   WHERE pm.id = :patientId\n"
+            + "     AND (:doctorId IS NULL OR pv.doctor_id = :doctorId)\n"
+            + "     AND pv.clinic_id = :clinicId\n"
+            + "     AND pv.delete_flag = false\n"
+            + "     AND pv.fees_to_collect IS NOT NULL\n"
+            + "     AND pv.fees_collected  IS NOT NULL\n"
+            + "     AND pv.status_id = 5\n"
+            + "   ORDER BY pv.patient_id, pv.patient_visit_no, pv.visit_date, dm.ctid\n"
+            + ") AS patient_visits_data\n"
             + "UNION ALL\n"
-            + "SELECT pvs.patient_id, (pm.first_name || ' ' || pm.last_name) AS full_name,\n"
-            + "       pvs.patient_visit_no, pvs.visit_date, pvs.fees_to_collect AS bill, pvs.fees_collected AS collected,\n"
-            + "       pm.folder_no, ((pvs.fees_to_collect - pvs.discount) - pvs.fees_collected) AS balance,\n"
-            + "       pvs.discount AS discount, (pvs.fees_to_collect - pvs.discount) AS dues,\n"
-            + "       to_char(pvs.visit_time, 'HH24:MI:SS') AS visit_time_text,\n"
-            + "       substr(sm.description, 1, 1) AS shift_desc_initial, sr.status_description,\n"
-            + "       NULL AS is_adhoc, '' AS receipt_number, '' AS receipt_type, (dm.prefix || ' ' || dm.first_name) AS doctor_name\n"
-            + "  FROM patient_master pm\n"
-            + "  JOIN patient_visits_services pvs ON pm.id = pvs.patient_id\n"
-            + "  JOIN shift_master sm            ON pvs.shift_id = sm.shift_id\n"
-            + "  JOIN status_ref sr              ON pvs.status_id = sr.id\n"
-            + "  JOIN doctor_master dm           ON dm.doctor_id = pvs.doctor_id\n"
-            + " WHERE pm.id = :patientId\n"
-            + "   AND (:doctorId IS NULL OR pvs.doctor_id = :doctorId)\n"
-            + "   AND pvs.clinic_id = :clinicId\n"
-            + "   AND pvs.delete_flag = false\n"
-            + "   AND pvs.fees_to_collect IS NOT NULL\n"
-            + "   AND pvs.fees_collected  IS NOT NULL\n"
-            + "   AND pvs.status_id = 8\n"
+            + "SELECT * FROM (\n"
+            + "  SELECT DISTINCT ON (pvs.patient_id, pvs.patient_visit_no, pvs.visit_date) \n"
+            + "         pvs.patient_id, (pm.first_name || ' ' || pm.last_name) AS full_name,\n"
+            + "         pvs.patient_visit_no, pvs.visit_date, pvs.fees_to_collect AS bill, pvs.fees_collected AS collected,\n"
+            + "         pm.folder_no, ((pvs.fees_to_collect - pvs.discount) - pvs.fees_collected) AS balance,\n"
+            + "         pvs.discount AS discount, (pvs.fees_to_collect - pvs.discount) AS dues,\n"
+            + "         to_char(pvs.visit_time, 'HH24:MI:SS') AS visit_time_text,\n"
+            + "         sr.status_description, NULL AS is_adhoc,\n"
+            + "         '' AS receipt_number, '' AS receipt_type, COALESCE(TRIM(COALESCE(dm.prefix, '') || ' ' || COALESCE(dm.first_name, '')), '') AS doctor_name,\n"
+            + "         pvs.doctor_id AS doctor_id\n"
+            + "    FROM patient_master pm\n"
+            + "    JOIN patient_visits_services pvs ON pm.id = pvs.patient_id\n"
+            + "    JOIN status_ref sr              ON pvs.status_id = sr.id AND pvs.clinic_id = sr.clinic_id\n"
+            + "    LEFT JOIN doctor_master dm      ON dm.doctor_id = pvs.doctor_id\n"
+            + "   WHERE pm.id = :patientId\n"
+            + "     AND (:doctorId IS NULL OR pvs.doctor_id = :doctorId)\n"
+            + "     AND pvs.clinic_id = :clinicId\n"
+            + "     AND pvs.delete_flag = false\n"
+            + "     AND pvs.fees_to_collect IS NOT NULL\n"
+            + "     AND pvs.fees_collected  IS NOT NULL\n"
+            + "     AND pvs.status_id = 8\n"
+            + "   ORDER BY pvs.patient_id, pvs.patient_visit_no, pvs.visit_date, dm.ctid\n"
+            + ") AS patient_visits_services_data\n"
             + "UNION ALL\n"
-            + "SELECT ppa.patient_id, (pm.first_name || ' ' || pm.last_name) AS full_name,\n"
-            + "       0 AS patient_visit_no, ppa.payment_date AS visit_date, 0 AS bill, ppa.fees_collected AS collected,\n"
-            + "       pm.folder_no, (0 - ppa.fees_collected) AS balance, 0 AS discount, 0 AS dues,\n"
-            + "       to_char(ppa.payment_date, 'HH24:MI:SS') AS visit_time_text,\n"
-            + "       substr(sm.description, 1, 1) AS shift_desc_initial, NULL AS status_description,\n"
-            + "       'Y' AS is_adhoc, COALESCE(ppa.receipt_number, '') AS receipt_number,\n"
-            + "       COALESCE(ppa.receipt_type, '') AS receipt_type, ppa.attended_by AS doctor_name\n"
-            + "  FROM patient_payments_adhoc ppa\n"
-            + "  JOIN patient_master pm ON pm.id = ppa.patient_id\n"
-            + "  JOIN shift_master sm  ON ppa.shift_id = sm.shift_id\n"
-            + " WHERE pm.id = :patientId\n"
-            + "   AND (:doctorId IS NULL OR ppa.attended_by = :doctorId)\n"
-            + "   AND ppa.clinic_id = :clinicId\n"
-            + "   AND ppa.delete_flag = false\n"
+            + "SELECT * FROM (\n"
+            + "  SELECT DISTINCT ON (ppa.patient_id, ppa.payment_date) \n"
+            + "         ppa.patient_id, (pm.first_name || ' ' || pm.last_name) AS full_name,\n"
+            + "         0 AS patient_visit_no, ppa.payment_date AS visit_date, 0 AS bill, ppa.fees_collected AS collected,\n"
+            + "         pm.folder_no, (0 - ppa.fees_collected) AS balance, 0 AS discount, 0 AS dues,\n"
+            + "         to_char(ppa.payment_date, 'HH24:MI:SS') AS visit_time_text,\n"
+            + "         NULL AS status_description, 'Y' AS is_adhoc,\n"
+            + "         COALESCE(ppa.receipt_number, '') AS receipt_number,\n"
+            + "         COALESCE(ppa.receipt_type, '') AS receipt_type, COALESCE(TRIM(COALESCE(dm.prefix, '') || ' ' || COALESCE(dm.first_name, '')), ppa.attended_by, '') AS doctor_name,\n"
+            + "         COALESCE(ppa.doctor_id, '') AS doctor_id\n"
+            + "    FROM patient_payments_adhoc ppa\n"
+            + "    JOIN patient_master pm ON pm.id = ppa.patient_id\n"
+            + "    LEFT JOIN doctor_master dm ON dm.doctor_id = ppa.doctor_id\n"
+            + "   WHERE pm.id = :patientId\n"
+            + "     AND (:doctorId IS NULL OR ppa.doctor_id = :doctorId)\n"
+            + "     AND ppa.clinic_id = :clinicId\n"
+            + "     AND ppa.delete_flag = false\n"
+            + "   ORDER BY ppa.patient_id, ppa.payment_date, dm.ctid\n"
+            + ") AS patient_payments_adhoc_data\n"
             + "ORDER BY visit_date DESC\n",
             nativeQuery = true)
     List<Object[]> findFeesDetailsByPatientId(@Param("patientId") String patientId, @Param("doctorId") String doctorId, @Param("clinicId") String clinicId);
@@ -89,6 +102,7 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
     /**
      * Returns consolidated fees aggregated by financial year for a specific patient
      * Equivalent to USP_Get_ConsolidatedFamilyFees
+     * Includes patient_visits, patient_visits_services, and patient_payments_adhoc
      * 
      * Columns returned (in order):
      *  financial_year, billed, discount, dues, collected, balance
@@ -103,7 +117,13 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
             SUM(balance) AS balance
         FROM (
             SELECT 
-                COALESCE(pv.financial_year, CAST(EXTRACT(YEAR FROM pv.visit_date) AS INTEGER)) AS financial_year,
+                COALESCE(pv.financial_year, 
+                    CASE 
+                        WHEN EXTRACT(MONTH FROM pv.visit_date) >= 4 
+                        THEN CAST(EXTRACT(YEAR FROM pv.visit_date) AS INTEGER) + 1 
+                        ELSE CAST(EXTRACT(YEAR FROM pv.visit_date) AS INTEGER) 
+                    END
+                ) AS financial_year,
                 COALESCE(pv.fees_to_collect, 0) AS billed,
                 COALESCE(pv.discount, 0) AS discount,
                 COALESCE(pv.fees_to_collect - pv.discount, 0) AS dues,
@@ -119,7 +139,13 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
               AND pv.status_id = 5
             UNION ALL
             SELECT 
-                COALESCE(pvs.financial_year, CAST(EXTRACT(YEAR FROM pvs.visit_date) AS INTEGER)) AS financial_year,
+                COALESCE(pvs.financial_year, 
+                    CASE 
+                        WHEN EXTRACT(MONTH FROM pvs.visit_date) >= 4 
+                        THEN CAST(EXTRACT(YEAR FROM pvs.visit_date) AS INTEGER) + 1 
+                        ELSE CAST(EXTRACT(YEAR FROM pvs.visit_date) AS INTEGER) 
+                    END
+                ) AS financial_year,
                 COALESCE(pvs.fees_to_collect, 0) AS billed,
                 COALESCE(pvs.discount, 0) AS discount,
                 COALESCE(pvs.fees_to_collect - pvs.discount, 0) AS dues,
@@ -133,6 +159,26 @@ public interface FeeDetailsRepository extends JpaRepository<com.climasys.entity.
               AND pvs.fees_to_collect IS NOT NULL
               AND pvs.fees_collected IS NOT NULL
               AND pvs.status_id = 8
+            UNION ALL
+            SELECT 
+                COALESCE(ppa.financial_year, 
+                    CASE 
+                        WHEN EXTRACT(MONTH FROM ppa.payment_date) >= 4 
+                        THEN CAST(EXTRACT(YEAR FROM ppa.payment_date) AS INTEGER) + 1 
+                        ELSE CAST(EXTRACT(YEAR FROM ppa.payment_date) AS INTEGER) 
+                    END
+                ) AS financial_year,
+                0 AS billed,
+                0 AS discount,
+                0 AS dues,
+                COALESCE(ppa.fees_collected, 0) AS collected,
+                COALESCE(ppa.fees_collected, 0) AS balance
+            FROM patient_payments_adhoc ppa
+            WHERE ppa.patient_id = :patientId
+              AND (:doctorId IS NULL OR ppa.attended_by = :doctorId)
+              AND ppa.clinic_id = :clinicId
+              AND ppa.delete_flag = false
+              AND ppa.fees_collected IS NOT NULL
         ) AS combined
         GROUP BY financial_year
         ORDER BY financial_year DESC

@@ -3,6 +3,7 @@ package com.climasys.trends.service;
 import com.climasys.trends.repository.LabTrendsRepository;
 import com.climasys.trends.dto.LabTrendDTO;
 import com.climasys.trends.dto.LabTrend;
+import com.climasys.utils.TimezoneUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,6 +29,9 @@ public class LabTrendsService {
     
     @Autowired
     private LabTrendsRepository labTrendsRepository;
+    
+    @Autowired
+    private TimezoneUtils timezoneUtils;
     
     /**
      * Get all previous lab test results for a patient (all dates)
@@ -84,11 +91,21 @@ public class LabTrendsService {
     }
     
     /**
-     * Convert LabTrend to DTO
+     * Convert LabTrend to DTO with timezone conversion
      */
     private LabTrendDTO convertToDTO(LabTrend labTrend) {
+        // Convert UTC visitDate to local timezone
+        LocalDate localVisitDate = labTrend.getVisitDate();
+        if (localVisitDate != null) {
+            // Treat the date as UTC at start of day, convert to local timezone
+            LocalDateTime utcDateTime = localVisitDate.atStartOfDay();
+            ZonedDateTime utcZoned = utcDateTime.atZone(ZoneId.of("UTC"));
+            ZonedDateTime localZoned = utcZoned.withZoneSameInstant(timezoneUtils.getTargetTimezone());
+            localVisitDate = localZoned.toLocalDate();
+        }
+        
         return new LabTrendDTO(
-            labTrend.getVisitDate(),
+            localVisitDate,
             labTrend.getPatientVisitNo(),
             labTrend.getLabTestDescription(),
             labTrend.getParameterName(),

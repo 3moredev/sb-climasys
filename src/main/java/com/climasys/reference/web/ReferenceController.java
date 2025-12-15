@@ -239,7 +239,9 @@ public class ReferenceController {
     }
 
     @GetMapping("/states")
-    public ResponseEntity<?> getStates(@RequestParam(required = false) String countryId) {
+    public ResponseEntity<?> getStates(
+            @RequestParam(required = false) String countryId,
+            @RequestParam(required = false, defaultValue = "1") Integer languageId) {
         try {
             List<?> result = referenceDataService.getStates(countryId, 1);
             return ResponseEntity.ok(result);

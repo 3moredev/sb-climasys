@@ -2,6 +2,7 @@ package com.climasys.trends.service;
 
 import com.climasys.trends.repository.PatientTrendsRepository;
 import com.climasys.trends.dto.PatientTrendsDTO;
+import com.climasys.utils.TimezoneUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,7 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +35,9 @@ public class PatientTrendsService {
     
     @Autowired
     private PatientTrendsRepository patientTrendsRepository;
+    
+    @Autowired
+    private TimezoneUtils timezoneUtils;
     
     /**
      * Get patient's last vital signs from previous visits
@@ -71,12 +78,13 @@ public class PatientTrendsService {
     private PatientTrendsDTO mapResultToDTO(Map<String, Object> row) {
         PatientTrendsDTO dto = new PatientTrendsDTO();
         
-        // Basic fields
-        dto.setVisitDate(getLocalDate(row, "visit_date"));
+        // Basic fields - get raw values first
+        LocalDate rawVisitDate = getLocalDate(row, "visit_date");
+        LocalTime rawVisitTime = getLocalTime(row, "visit_time");
+        
         dto.setPatientId(getString(row, "patient_id"));
         dto.setPatientVisitNo(getInteger(row, "patient_visit_no"));
         dto.setStatusId(getShort(row, "status_id"));
-        dto.setVisitTime(getLocalTime(row, "visit_time"));
         dto.setShiftId(getShort(row, "shift_id"));
         dto.setShiftDescription(getString(row, "shift_description"));
         
@@ -97,17 +105,64 @@ public class PatientTrendsService {
         dto.setPallor(getString(row, "pallor"));
         dto.setGc(getString(row, "gc"));
         
-        // Generate formatted display values
-        String dateStr = dto.getVisitDate() != null ? 
-                dto.getVisitDate().format(DATE_FORMATTER) : "";
+        // Convert UTC date/time to local timezone for display
+        // visit_date is a TIMESTAMP stored in UTC, visit_time is a separate TIME column also in UTC
+        LocalDate localDate = null;
+        LocalTime localTime = null;
+        
+        // Try to get full datetime from visit_date timestamp first (most accurate)
+        Object visitDateObj = row.get("visit_date");
+        if (visitDateObj instanceof java.sql.Timestamp) {
+            // java.sql.Timestamp stores milliseconds since epoch (UTC)
+            // Convert directly from UTC instant to avoid timezone interpretation issues
+            java.sql.Timestamp timestamp = (java.sql.Timestamp) visitDateObj;
+            
+            // Get UTC instant from timestamp (this is the correct way - timestamp is always UTC internally)
+            java.time.Instant instant = timestamp.toInstant();
+            
+            // Convert from UTC to target timezone
+            ZoneId targetZone = timezoneUtils.getTargetTimezone();
+            ZonedDateTime utcZoned = instant.atZone(ZoneId.of("UTC"));
+            ZonedDateTime localZoned = utcZoned.withZoneSameInstant(targetZone);
+            localDate = localZoned.toLocalDate();
+            localTime = localZoned.toLocalTime();
+            
+            logger.info("Timezone conversion - Timestamp: {} (UTC epoch: {}), Target: {}, Converted: {} (date: {}, time: {})", 
+                timestamp, instant, targetZone.getId(), localZoned.toLocalDateTime(), localDate, localTime);
+        } else if (rawVisitDate != null) {
+            // Fallback: use date + time separately if timestamp not available
+            if (rawVisitTime != null) {
+                // Combine date and time, treat as UTC, convert to local timezone
+                LocalDateTime utcDateTime = LocalDateTime.of(rawVisitDate, rawVisitTime);
+                ZonedDateTime utcZoned = utcDateTime.atZone(ZoneId.of("UTC"));
+                ZonedDateTime localZoned = utcZoned.withZoneSameInstant(timezoneUtils.getTargetTimezone());
+                localDate = localZoned.toLocalDate();
+                localTime = localZoned.toLocalTime();
+            } else {
+                // If only date is available, convert date at start of day
+                LocalDateTime utcDateTime = rawVisitDate.atStartOfDay();
+                ZonedDateTime utcZoned = utcDateTime.atZone(ZoneId.of("UTC"));
+                ZonedDateTime localZoned = utcZoned.withZoneSameInstant(timezoneUtils.getTargetTimezone());
+                localDate = localZoned.toLocalDate();
+                localTime = localZoned.toLocalTime();
+            }
+        }
+        
+        // Generate formatted display values using converted local date/time
+        String dateStr = localDate != null ? 
+                localDate.format(DATE_FORMATTER) : "";
         String shift = dto.getShiftDescription() != null ? dto.getShiftDescription().trim() : "";
-        String timeStr = dto.getVisitTime() != null ? 
-                dto.getVisitTime().format(TIME_FORMATTER) : "";
+        String timeStr = localTime != null ? 
+                localTime.format(TIME_FORMATTER) : "";
         
         // Format: Date : Shift : Time (if time is available)
         String dateTimeStr = timeStr.isEmpty() ? 
                 (dateStr + " : " + shift) : 
                 (dateStr + " : " + shift + " : " + timeStr);
+        
+        // Update DTO with converted date/time for consistency
+        dto.setVisitDate(localDate);
+        dto.setVisitTime(localTime);
         
         dto.setLastFiveBpValues(formatValue(dateStr, shift, timeStr, dto.getBloodPressure()));
         dto.setLastFiveSugarValues(formatValue(dateStr, shift, timeStr, dto.getSugar()));

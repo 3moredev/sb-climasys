@@ -1,11 +1,11 @@
 package com.climasys.fees.service;
 
 import com.climasys.repository.FeeDetailsRepository;
+import com.climasys.utils.TimezoneUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -14,10 +14,12 @@ public class FeesDetailsService {
 
     private final FeeDetailsRepository feeDetailsRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final TimezoneUtils timezoneUtils;
 
-    public FeesDetailsService(FeeDetailsRepository feeDetailsRepository, JdbcTemplate jdbcTemplate) {
+    public FeesDetailsService(FeeDetailsRepository feeDetailsRepository, JdbcTemplate jdbcTemplate, TimezoneUtils timezoneUtils) {
         this.feeDetailsRepository = feeDetailsRepository;
         this.jdbcTemplate = jdbcTemplate;
+        this.timezoneUtils = timezoneUtils;
     }
 
     /**
@@ -42,31 +44,194 @@ public class FeesDetailsService {
             m.put("Patient_Visit_No", r[i++]);
             Object visitDate = r[i++];
             m.put("Visit_Date", visitDate);
-            m.put("Bill", r[i++]);
-            m.put("Collected", r[i++]);
-            m.put("Folder_No", r[i++]);
-            m.put("Balance", r[i++]);
-            m.put("Discount", r[i++]);
-            m.put("Dues", r[i++]);
-            String visitTimeText = Objects.toString(r[i++], "");
-            String shiftInitial = Objects.toString(r[i++], "");
-            m.put("Status_Description", r[i++]);
-            m.put("ISadhoc", r[i++]);
-            String receiptNumber = Objects.toString(r[i++], "");
-            String receiptType = Objects.toString(r[i++], "");
-            m.put("DoctorName", r[i++]);
+            // Numeric fields: recompute balance as Collected - (Bill - Discount)
+            Object billObj = r[i++];
+            double bill = billObj != null ? ((Number) billObj).doubleValue() : 0.0;
 
-            String lastVisitDate;
+            Object collectedObj = r[i++];
+            double collected = collectedObj != null ? ((Number) collectedObj).doubleValue() : 0.0;
+
+            m.put("Folder_No", r[i++]); // Position 6
+            // Raw balance from DB (ignored for display, we recompute)
+            i++; // skip raw balance at position 7
+            Object discountObj = r[i++]; // Position 8
+            double discount = discountObj != null ? ((Number) discountObj).doubleValue() : 0.0;
+
+            // SQL also returns dues at position 9, but we calculate it ourselves, so skip it
+            i++; // skip dues at position 9 (we calculate it below)
+
+            // Dues = Bill - Discount (we calculate this, don't use SQL value)
+            double dues = bill - discount;
+            // Balance = Collected - Dues (negative => pending, positive => outstanding/advance)
+            double balance = collected - dues;
+
+            m.put("Bill", bill);
+            m.put("Collected", collected);
+            m.put("Discount", discount);
+            m.put("Dues", dues);
+            m.put("Balance", balance);
+            
+            // SQL column order (positions 0-16):
+            // 0: patient_id, 1: full_name, 2: patient_visit_no, 3: visit_date
+            // 4: bill, 5: collected, 6: folder_no, 7: balance, 8: discount, 9: dues
+            // 10: visit_time_text, 11: status_description, 12: is_adhoc
+            // 13: receipt_number, 14: receipt_type, 15: doctor_name, 16: doctor_id
+            
+            // At this point, i should be 10 (after reading positions 0-8 and skipping 9)
+            
+            // Read visit_time_text at position 10 (UTC time from database)
+            String visitTimeTextUtc = i < r.length ? Objects.toString(r[i++], "") : "";
+            
+            // Read status_description at position 11
+            Object statusDescObj = i < r.length ? r[i++] : null;
+            String statusDescription = statusDescObj != null ? Objects.toString(statusDescObj, "") : "";
+            m.put("Status_Description", statusDescription);
+            
+            // Read is_adhoc at position 12
+            Object isAdhocObj = i < r.length ? r[i++] : null;
+            String isAdhoc = isAdhocObj != null ? Objects.toString(isAdhocObj, "") : "";
+            m.put("ISadhoc", isAdhoc);
+            
+            // Read receipt_number at position 13
+            String receiptNumber = i < r.length ? Objects.toString(r[i++], "") : "";
+            
+            // Read receipt_type at position 14
+            String receiptType = i < r.length ? Objects.toString(r[i++], "") : "";
+            
+            // Read doctor_name at position 15
+            Object doctorNameObj = i < r.length ? r[i++] : null;
+            String doctorName = doctorNameObj != null ? Objects.toString(doctorNameObj, "").trim() : "";
+            
+            // Read doctor_id at position 16 for fallback lookup
+            Object doctorIdObj = i < r.length ? r[i++] : null;
+            String visitDoctorId = doctorIdObj != null ? Objects.toString(doctorIdObj, "").trim() : "";
+            
+            // If doctor name is empty but we have doctor_id, try to fetch it separately
+            if (doctorName.isEmpty() && !visitDoctorId.isEmpty()) {
+                try {
+                    String doctorNameSql = "SELECT COALESCE(TRIM(COALESCE(prefix, '') || ' ' || COALESCE(first_name, '')), '') AS doctor_name " +
+                        "FROM doctor_master WHERE doctor_id = ? LIMIT 1";
+                    List<Map<String, Object>> doctorRows = jdbcTemplate.queryForList(doctorNameSql, visitDoctorId);
+                    
+                    if (!doctorRows.isEmpty()) {
+                        Object fetchedDoctorName = doctorRows.get(0).get("doctor_name");
+                        String fetchedName = fetchedDoctorName != null ? Objects.toString(fetchedDoctorName, "").trim() : "";
+                        if (!fetchedName.isEmpty()) {
+                            doctorName = fetchedName;
+                            System.out.println("DEBUG: Successfully fetched doctor name separately - visitDoctorId: '" + visitDoctorId + "', doctorName: '" + doctorName + "'");
+                        }
+                    }
+                } catch (Exception e) {
+                    System.out.println("ERROR: Failed to fetch doctor name separately for visitDoctorId '" + visitDoctorId + "': " + e.getMessage());
+                }
+            }
+            
+            m.put("DoctorName", doctorName);
+            
+            // Log doctor name for debugging
+            System.out.println("DEBUG: Doctor name from JOIN: '" + doctorName + "', visitDoctorId: '" + visitDoctorId + "'");
+            
+            // If doctor name is empty but we have doctor_id, try to fetch it separately
+            if (doctorName.isEmpty() && !visitDoctorId.isEmpty()) {
+                try {
+                    String doctorNameSql = "SELECT COALESCE(TRIM(COALESCE(prefix, '') || ' ' || COALESCE(first_name, '')), '') AS doctor_name " +
+                        "FROM doctor_master WHERE doctor_id = ? LIMIT 1";
+                    List<Map<String, Object>> doctorRows = jdbcTemplate.queryForList(doctorNameSql, visitDoctorId);
+                    
+                    if (!doctorRows.isEmpty()) {
+                        Object fetchedDoctorName = doctorRows.get(0).get("doctor_name");
+                        String fetchedName = fetchedDoctorName != null ? Objects.toString(fetchedDoctorName, "").trim() : "";
+                        if (!fetchedName.isEmpty()) {
+                            doctorName = fetchedName;
+                            System.out.println("DEBUG: Successfully fetched doctor name separately - visitDoctorId: '" + visitDoctorId + "', doctorName: '" + doctorName + "'");
+                        } else {
+                            System.out.println("WARNING: Doctor record exists but name is empty - visitDoctorId: '" + visitDoctorId + "'");
+                        }
+                    } else {
+                        System.out.println("WARNING: No doctor record found for visitDoctorId: '" + visitDoctorId + "'");
+                    }
+                } catch (Exception e) {
+                    System.out.println("ERROR: Failed to fetch doctor name separately for visitDoctorId '" + visitDoctorId + "': " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+            
+            m.put("DoctorName", doctorName);
+
+            // Convert visit date and time from UTC to local timezone
+            LocalDateTime localVisitDateTime = null;
+            LocalTime localVisitTime = null;
+            LocalDate localVisitDate = null;
+            
+            // Convert visit_date from UTC to local timezone
             if (visitDate instanceof java.sql.Timestamp ts) {
-                LocalDate d = ts.toLocalDateTime().toLocalDate();
-                lastVisitDate = dateFmt.format(d) + " - " + visitTimeText + " - " + shiftInitial;
+                // Timestamp is stored in UTC, convert to local timezone
+                Instant instant = ts.toInstant();
+                ZonedDateTime utcZoned = instant.atZone(ZoneId.of("UTC"));
+                ZonedDateTime localZoned = utcZoned.withZoneSameInstant(timezoneUtils.getTargetTimezone());
+                localVisitDateTime = localZoned.toLocalDateTime();
+                localVisitDate = localVisitDateTime.toLocalDate();
+                localVisitTime = localVisitDateTime.toLocalTime();
             } else if (visitDate instanceof java.sql.Date d) {
-                LocalDate ld = d.toLocalDate();
-                lastVisitDate = dateFmt.format(ld) + " - " + visitTimeText + " - " + shiftInitial;
+                // Treat as UTC date at start of day, convert to local timezone
+                LocalDateTime utcDateTime = d.toLocalDate().atStartOfDay();
+                ZonedDateTime utcZoned = utcDateTime.atZone(ZoneId.of("UTC"));
+                ZonedDateTime localZoned = utcZoned.withZoneSameInstant(timezoneUtils.getTargetTimezone());
+                localVisitDateTime = localZoned.toLocalDateTime();
+                localVisitDate = localVisitDateTime.toLocalDate();
+                localVisitTime = localVisitDateTime.toLocalTime();
             } else if (visitDate instanceof LocalDateTime ldt) {
-                lastVisitDate = dateFmt.format(ldt.toLocalDate()) + " - " + visitTimeText + " - " + shiftInitial;
+                // Treat as UTC LocalDateTime, convert to local timezone
+                ZonedDateTime utcZoned = ldt.atZone(ZoneId.of("UTC"));
+                ZonedDateTime localZoned = utcZoned.withZoneSameInstant(timezoneUtils.getTargetTimezone());
+                localVisitDateTime = localZoned.toLocalDateTime();
+                localVisitDate = localVisitDateTime.toLocalDate();
+                localVisitTime = localVisitDateTime.toLocalTime();
+            }
+            
+            // Convert visit_time_text from UTC to local timezone
+            String visitTimeText = visitTimeTextUtc;
+            if (localVisitTime != null) {
+                // Format the converted local time
+                DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                visitTimeText = localVisitTime.format(timeFormatter);
+            } else if (!visitTimeTextUtc.isEmpty()) {
+                // Fallback: try to parse UTC time and convert it
+                try {
+                    String[] timeParts = visitTimeTextUtc.split(":");
+                    if (timeParts.length >= 2) {
+                        int hour = Integer.parseInt(timeParts[0]);
+                        int minute = Integer.parseInt(timeParts[1]);
+                        LocalTime utcTime = LocalTime.of(hour, minute);
+                        LocalTime localTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
+                        DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
+                        visitTimeText = localTime.format(timeFormatter);
+                    }
+                } catch (Exception e) {
+                    // If conversion fails, use original UTC time
+                    System.out.println("WARNING: Failed to convert visit time from UTC: " + e.getMessage());
+                }
+            }
+            
+            m.put("Visit_Time_Text", visitTimeText);
+
+            // Format last visit date with local timezone time
+            String lastVisitDate;
+            if (localVisitDate != null) {
+                lastVisitDate = dateFmt.format(localVisitDate) + " - " + visitTimeText;
             } else {
-                lastVisitDate = Objects.toString(visitDate, "") + " - " + visitTimeText + " - " + shiftInitial;
+                // Fallback to original formatting if conversion failed
+                if (visitDate instanceof java.sql.Timestamp ts) {
+                    LocalDate d = ts.toLocalDateTime().toLocalDate();
+                    lastVisitDate = dateFmt.format(d) + " - " + visitTimeText;
+                } else if (visitDate instanceof java.sql.Date d) {
+                    LocalDate ld = d.toLocalDate();
+                    lastVisitDate = dateFmt.format(ld) + " - " + visitTimeText;
+                } else if (visitDate instanceof LocalDateTime ldt) {
+                    lastVisitDate = dateFmt.format(ldt.toLocalDate()) + " - " + visitTimeText;
+                } else {
+                    lastVisitDate = Objects.toString(visitDate, "") + " - " + visitTimeText;
+                }
             }
             m.put("LAST_VISIT_DATE", lastVisitDate);
             m.put("Receipt_Number", (receiptType + " " + receiptNumber).trim());
@@ -114,20 +279,30 @@ public class FeesDetailsService {
                     (financialYearObj instanceof Integer ? (Integer) financialYearObj : Integer.valueOf(financialYearObj.toString())) : null;
                 m.put("Financial_Year", financialYear);
                 
+                // Numeric fields with normalized balance logic:
+                // Dues = Billed - Discount
+                // Balance = Collected - Dues (negative => pending, positive => advance/outstanding)
                 Object billedObj = r[i++];
-                m.put("Billed", billedObj != null ? ((Number) billedObj).doubleValue() : 0.0);
+                double billed = billedObj != null ? ((Number) billedObj).doubleValue() : 0.0;
                 
                 Object discountObj = r[i++];
-                m.put("Discount", discountObj != null ? ((Number) discountObj).doubleValue() : 0.0);
+                double discount = discountObj != null ? ((Number) discountObj).doubleValue() : 0.0;
                 
-                Object duesObj = r[i++];
-                m.put("Dues", duesObj != null ? ((Number) duesObj).doubleValue() : 0.0);
-                
+                i++; // raw dues (ignored, we recompute)
+
                 Object collectedObj = r[i++];
-                m.put("Collected", collectedObj != null ? ((Number) collectedObj).doubleValue() : 0.0);
+                double collected = collectedObj != null ? ((Number) collectedObj).doubleValue() : 0.0;
                 
-                Object balanceObj = r[i++];
-                m.put("Balance", balanceObj != null ? ((Number) balanceObj).doubleValue() : 0.0);
+                i++; // raw balance (ignored, we recompute)
+                
+                double dues = billed - discount;
+                double balance = collected - dues;
+
+                m.put("Billed", billed);
+                m.put("Discount", discount);
+                m.put("Dues", dues);
+                m.put("Collected", collected);
+                m.put("Balance", balance);
                 
                 data.add(m);
             }
@@ -193,7 +368,7 @@ public class FeesDetailsService {
                            pv.financial_year AS Financial_Year,
                            pv.fees_to_collect AS Bill,
                            COALESCE(pv.fees_collected, 0) AS Collected,
-                           ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
+                           (COALESCE(pv.fees_collected, 0) - (pv.fees_to_collect - COALESCE(pv.discount, 0))) AS Balance,
                            COALESCE(pv.discount, 0) AS Discount,
                            (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
                       FROM patient_master pm
@@ -218,7 +393,7 @@ public class FeesDetailsService {
                            pv.financial_year AS Financial_Year,
                            pv.fees_to_collect AS Bill,
                            COALESCE(pv.fees_collected, 0) AS Collected,
-                           ((pv.fees_to_collect - COALESCE(pv.discount, 0)) - COALESCE(pv.fees_collected, 0)) AS Balance,
+                           (COALESCE(pv.fees_collected, 0) - (pv.fees_to_collect - COALESCE(pv.discount, 0))) AS Balance,
                            COALESCE(pv.discount, 0) AS Discount,
                            (pv.fees_to_collect - COALESCE(pv.discount, 0)) AS Dues
                       FROM patient_master pm
@@ -243,7 +418,7 @@ public class FeesDetailsService {
                            pv.financial_year AS Financial_Year,
                            0 AS Bill,
                            COALESCE(pv.fees_collected, 0) AS Collected,
-                           (0 - COALESCE(pv.fees_collected, 0)) AS Balance,
+                           COALESCE(pv.fees_collected, 0) AS Balance,
                            0 AS Discount,
                            0 AS Dues
                       FROM patient_payments_adhoc pv

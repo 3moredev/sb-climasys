@@ -338,6 +338,43 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
                   AND vpo.clinic_id = pv.clinic_id
                   AND vpo.delete_indicator = false
             ), '') AS medicine_names,
+            -- Medicines from visit_medicine table (short_description) - comma separated
+            COALESCE((
+                SELECT STRING_AGG(vm.short_description, ', ')
+                FROM visit_medicine_overwrite vm
+                WHERE vm.patient_id = pv.patient_id
+                  AND vm.visit_date = pv.visit_date
+                  AND vm.patient_visit_no = pv.patient_visit_no
+                  AND vm.doctor_id = pv.doctor_id
+                  AND vm.clinic_id = pv.clinic_id
+                  AND vm.shift_id = pv.shift_id
+                  AND COALESCE(vm.delete_indicator, false) = false
+                  AND COALESCE(vm.delete_flag, false) = false
+                  AND vm.short_description IS NOT NULL
+                  AND vm.short_description != ''
+            ), COALESCE((
+                SELECT STRING_AGG(vm2.short_description, ', ')
+                FROM visit_medicine vm2
+                WHERE vm2.patient_id = pv.patient_id
+                  AND DATE(vm2.visit_date) = DATE(pv.visit_date)
+                  AND vm2.patient_visit_no = pv.patient_visit_no
+                  AND vm2.doctor_id = pv.doctor_id
+                  AND vm2.clinic_id = pv.clinic_id
+                  AND vm2.shift_id = pv.shift_id
+                  AND COALESCE(vm2.delete_flag, false) = false
+                  AND vm2.short_description IS NOT NULL
+                  AND vm2.short_description != ''
+                  AND NOT EXISTS (
+                      SELECT 1 FROM visit_medicine_overwrite vm3
+                      WHERE vm3.patient_id = vm2.patient_id
+                        AND vm3.visit_date = vm2.visit_date
+                        AND vm3.patient_visit_no = vm2.patient_visit_no
+                        AND vm3.doctor_id = vm2.doctor_id
+                        AND vm3.clinic_id = vm2.clinic_id
+                        AND vm3.shift_id = vm2.shift_id
+                        AND COALESCE(vm3.delete_indicator, false) = false
+                  )
+            ), '')) AS visit_medicines_short_description,
             -- Complaints from complaints table (description only)
             COALESCE((
                 SELECT STRING_AGG(vc.complaint_description, ', ')
@@ -498,6 +535,76 @@ public interface PatientVisitRepository extends JpaRepository<PatientVisit, Pati
         @Param("patientVisitNo") Integer patientVisitNo,
         @Param("doctorId") String doctorId,
         @Param("clinicId") String clinicId
+    );
+    
+    /**
+     * Find medicines for a specific visit from visit_medicine table
+     * Prefers visit_medicine_overwrite if available, otherwise falls back to visit_medicine
+     * Returns short_description which is used for patching medicines field in previous visits
+     */
+    @Query(value = """
+        SELECT 
+            vm.short_description,
+            vm.medicine_description,
+            vm.morning,
+            vm.afternoon,
+            vm.night,
+            vm.no_of_days,
+            vm.instruction,
+            vm.created_on,
+            vm.createdby_name,
+            vm.modified_on,
+            vm.modifiedby_name
+        FROM visit_medicine_overwrite vm
+        WHERE vm.patient_id = :patientId
+          AND vm.visit_date = :visitDate
+          AND vm.patient_visit_no = :patientVisitNo
+          AND vm.doctor_id = :doctorId
+          AND vm.clinic_id = :clinicId
+          AND vm.shift_id = :shiftId
+          AND COALESCE(vm.delete_indicator, false) = false
+          AND COALESCE(vm.delete_flag, false) = false
+        UNION ALL
+        SELECT 
+            vm2.short_description,
+            vm2.medicine_description,
+            vm2.morning,
+            vm2.afternoon,
+            vm2.night,
+            vm2.no_of_days,
+            vm2.instruction,
+            vm2.created_on,
+            vm2.createdby_name,
+            vm2.modified_on,
+            vm2.modifiedby_name
+        FROM visit_medicine vm2
+        WHERE vm2.patient_id = :patientId
+          AND DATE(vm2.visit_date) = DATE(:visitDate)
+          AND vm2.patient_visit_no = :patientVisitNo
+          AND vm2.doctor_id = :doctorId
+          AND vm2.clinic_id = :clinicId
+          AND vm2.shift_id = :shiftId
+          AND COALESCE(vm2.delete_flag, false) = false
+          AND NOT EXISTS (
+              SELECT 1 FROM visit_medicine_overwrite vm3
+              WHERE vm3.patient_id = vm2.patient_id
+                AND vm3.visit_date = vm2.visit_date
+                AND vm3.patient_visit_no = vm2.patient_visit_no
+                AND vm3.doctor_id = vm2.doctor_id
+                AND vm3.clinic_id = vm2.clinic_id
+                AND vm3.shift_id = vm2.shift_id
+                AND vm3.short_description = vm2.short_description
+                AND COALESCE(vm3.delete_indicator, false) = false
+          )
+        ORDER BY short_description ASC
+        """, nativeQuery = true)
+    List<Map<String, Object>> findMedicinesForVisit(
+        @Param("patientId") String patientId,
+        @Param("visitDate") java.time.LocalDateTime visitDate,
+        @Param("patientVisitNo") Integer patientVisitNo,
+        @Param("doctorId") String doctorId,
+        @Param("clinicId") String clinicId,
+        @Param("shiftId") Short shiftId
     );
     
     /**
