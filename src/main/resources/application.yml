@@ -4,9 +4,9 @@ spring:
   profiles:
     active: dev
   datasource:
-    url: jdbc:postgresql://localhost:5432/climasys_dev_new?currentSchema=public
+    url: jdbc:postgresql://localhost:5432/climasys?currentSchema=public
     username: postgres
-    password: root
+    password: admin@123
     driverClassName: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20

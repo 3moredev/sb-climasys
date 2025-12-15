@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.climasys.entity.PatientVisitId;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -15,7 +17,7 @@ import java.util.List;
  * - Part of USP_Get_MasterLists_Services related to previously selected service items
  */
 @Repository
-public interface ServiceVisitRepository extends JpaRepository<com.climasys.entity.PatientVisit, String> {
+public interface ServiceVisitRepository extends JpaRepository<com.climasys.entity.PatientVisit, PatientVisitId> {
 
     /**
      * Previous completed services visits for a patient, sorted newest first.

@@ -12,7 +12,7 @@ import lombok.AllArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@IdClass(ClinicId.class)
+@IdClass(ClinicDoctorMasterId.class)
 public class LicenceKey {
 
     @Id

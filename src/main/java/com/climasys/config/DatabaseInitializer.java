@@ -3,7 +3,6 @@ package com.climasys.config;
 import com.climasys.auth.entity.*;
 import com.climasys.entity.User;
 import com.climasys.entity.Clinic;
-import com.climasys.entity.ClinicId;
 import com.climasys.entity.StatusRef;
 import com.climasys.entity.DoctorClinicShift;
 import com.climasys.entity.DoctorClinicShiftId;

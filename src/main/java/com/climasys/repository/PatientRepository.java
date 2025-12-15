@@ -9,7 +9,7 @@ import org.springframework.stereotype.Repository;
 import java.util.Optional;
 
 @Repository
-public interface PatientRepository extends JpaRepository<Patient, Long> {
+public interface PatientRepository extends JpaRepository<Patient, String> {
     Optional<Patient> findByFolderNo(String folderNo);
     boolean existsByFolderNo(String folderNo);
     boolean existsByEmailId(String emailId);

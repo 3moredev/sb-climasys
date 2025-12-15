@@ -1,7 +1,6 @@
 package com.climasys.auth.repository;
 
 import com.climasys.entity.Clinic;
-import com.climasys.entity.ClinicId;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,11 +10,11 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface ClinicMasterRepository extends JpaRepository<Clinic, ClinicId> {
+public interface ClinicMasterRepository extends JpaRepository<Clinic, String> {
     
     Optional<Clinic> findByClinicIdAndIsPrint(String clinicId, Boolean isPrint);
     
-    List<Clinic> findByDoctorId(String doctorId);
+    // List<Clinic> findByDoctorId(String doctorId);
     
     @Query("SELECT c FROM Clinic c " +
            "JOIN UserRole ur ON c.clinicId = ur.clinicId " +

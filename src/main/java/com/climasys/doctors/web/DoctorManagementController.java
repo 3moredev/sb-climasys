@@ -186,8 +186,7 @@ public class DoctorManagementController {
     public ResponseEntity<com.climasys.auth.entity.AuthDoctorMaster> updateDoctor(
             @PathVariable String doctorId,
             @RequestBody com.climasys.auth.entity.AuthDoctorMaster doctor) {
-        doctor.setDoctorId(doctorId);
-        com.climasys.auth.entity.AuthDoctorMaster updatedDoctor = doctorManagementService.saveDoctor(doctor);
+        com.climasys.auth.entity.AuthDoctorMaster updatedDoctor = doctorManagementService.updateDoctor(doctorId, doctor);
         return ResponseEntity.ok(updatedDoctor);
     }
 }

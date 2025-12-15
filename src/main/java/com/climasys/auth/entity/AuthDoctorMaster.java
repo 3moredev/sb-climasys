@@ -1,10 +1,13 @@
 package com.climasys.auth.entity;
 
 import jakarta.persistence.*;
+import lombok.Data;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "doctor_master")
+@Data
 public class AuthDoctorMaster {
     
     @Id
@@ -97,6 +100,9 @@ public class AuthDoctorMaster {
     
     @Column(name = "opd_dr")
     private Boolean opdDr;
+    
+    @Transient
+    private String clinicId;
     
     // Constructors
     public AuthDoctorMaster() {}

@@ -12,15 +12,10 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@IdClass(ClinicId.class)
 public class Clinic {
 
     @Id
-    @Column(name = "doctor_id", length = 30, nullable = false)
-    private String doctorId;
-
-    @Id
-    @Column(name = "clinic_id", length = 10, nullable = false)
+    @Column(name = "clinic_id", length = 30, nullable = false)
     private String clinicId;
 
     @Column(name = "clinic_name", length = 100)
@@ -70,6 +65,12 @@ public class Clinic {
 
     @Column(name = "is_print")
     private Boolean isPrint;
+
+    @Column(name = "owner_id", length = 60, nullable = false)
+    private String ownerId;
+
+    @Column(name = "owner_name", length = 90, nullable = false)
+    private String ownerName;
 
     @Transient
     private String cityName;

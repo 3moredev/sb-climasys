@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import com.climasys.entity.LicenceKey;
+
 import jakarta.persistence.Column;
 
 import java.time.LocalDateTime;
@@ -100,7 +102,7 @@ public class ClinicManagementService {
      * Get all clinics
      */
     public List<com.climasys.entity.Clinic> getAllClinics() {
-        List<com.climasys.entity.Clinic> clinics = clinicRepository.findUniqueClinics();
+        List<com.climasys.entity.Clinic> clinics = clinicRepository.findAll();
 
         if (clinics != null && !clinics.isEmpty()) {
             List<String> cityIds = clinics.stream()
@@ -155,17 +157,31 @@ public class ClinicManagementService {
      * Save a new clinic
      */
     public com.climasys.entity.Clinic saveClinic(com.climasys.entity.Clinic clinic) {
-        if (clinic.getClinicId() == null || clinic.getClinicId().isEmpty()) {
-            // Generate 10-char unique ID (uppercase alphanumeric)
-            clinic.setClinicId(java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase());
-        }
-
+        clinic.setClinicId(java.util.UUID.randomUUID().toString().replace("-", "").substring(0, 30).toUpperCase());
+        clinic.setOwnerId(java.util.UUID.randomUUID().toString());
+        clinic.setOwnerName(clinic.getClinicName());
         clinic.setCreatedOn(java.time.LocalDateTime.now());
         clinic.setCreatedbyName("Admin");
         clinic.setModifiedOn(java.time.LocalDateTime.now());
         clinic.setModifiedbyName("Admin");
         clinic.setIsPrint(false);
-        return clinicRepository.save(clinic);
+
+        clinicRepository.save(clinic);
+
+        LicenceKey licenceKey = new LicenceKey();
+        licenceKey.setClinicId(clinic.getClinicId());
+        licenceKey.setDoctorId("DR-00010");
+        licenceKey.setValidFrom(java.time.LocalDateTime.now());
+        licenceKey.setValidTo(java.time.LocalDateTime.now().plusYears(1));
+        licenceKey.setVersion("1.0");
+        licenceKey.setInstallationDate(java.time.LocalDateTime.now());
+        licenceKey.setLastRenewalDate(java.time.LocalDateTime.now());
+        licenceKey.setLicenseValidity(365);
+        licenceKey.setLicenseKey(java.util.UUID.randomUUID().toString());
+        licenceKey.setStartVerification(8);
+
+        licenceKeyRepository.save(licenceKey);
+        return clinic;
     }
 
     /**
@@ -181,7 +197,8 @@ public class ClinicManagementService {
         clinic.setModifiedOn(java.time.LocalDateTime.now());
         clinic.setModifiedbyName("Admin");
 
-        return clinicRepository.save(clinic);
+        clinicRepository.save(clinic);
+        return clinic;
     }
 
     /**
