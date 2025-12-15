@@ -1319,6 +1319,7 @@ public class VisitJpaService {
             logger.info("DEBUG: Found {} visits with comprehensive data for patient {}", visitResults.size(), patientId);
             
             if (!visitResults.isEmpty()) {
+                System.out.println("Im here ");
                 List<Map<String, Object>> visitList = new ArrayList<>();
                 
                 // Process each visit result
@@ -1674,7 +1675,8 @@ public class VisitJpaService {
         visitMap.put("Clinic_ID", visitData.get("clinic_id"));
         
         // Medical information with actual data from joins
-        visitMap.put("Medicine_Name", visitData.get("medicine_names") != null ? visitData.get("medicine_names").toString() : "");
+        // visitMap.put("Medicine_Name", visitData.get("medicine_names") != null ? visitData.get("medicine_names").toString() : "");
+        visitMap.put("Medicine_Name", visitData.get("visit_medicines_short_description") != null ? visitData.get("visit_medicines_short_description").toString() : "");
         visitMap.put("Instructions", visitData.get("instructions") != null ? visitData.get("instructions").toString() : "");
         
         // Fetch detailed prescription data as nested object
@@ -1705,7 +1707,8 @@ public class VisitJpaService {
             }
         }
         // Remark/comment field
-        visitMap.put("Remark", visitData.get("comment") != null ? visitData.get("comment").toString() : "");
+        // visitMap.put("Remark", visitData.get("comment") != null ? visitData.get("comment").toString() : "");
+        visitMap.put("Remark", visitData.get("additional_instructions") != null ? visitData.get("additional_instructions").toString() : "");
         visitMap.put("Weight_IN_KGS", visitData.get("weight_in_kgs") != null ? visitData.get("weight_in_kgs") : 0);
         visitMap.put("Visit_Comments", visitData.get("visit_comments") != null ? visitData.get("visit_comments").toString() : "");
         visitMap.put("Observation", visitData.get("observation") != null ? visitData.get("observation").toString() : "");
@@ -1770,9 +1773,8 @@ public class VisitJpaService {
         visitMap.put("GC", visitData.get("gc"));
         
         // Follow-up information
-        visitMap.put("Follow_Up", visitData.get("follow_up"));
+        visitMap.put("Follow_Up", visitData.get("follow_up_comment"));
         visitMap.put("Follow_Up_Flag", visitData.get("is_follow_up"));
-        visitMap.put("Follow_Up_Comment", visitData.get("follow_up_comment"));
         visitMap.put("Follow_Up_Date", visitData.get("follow_up_date"));
         visitMap.put("Follow_Up_Type", visitData.get("follow_up_type"));
         
@@ -2657,7 +2659,10 @@ public class VisitJpaService {
                     visit.setBloodPressure(bloodPressure);
                     visit.setAllergyDtls(allergyDetails);
                     visit.setHabitsComments(habitDetails);
-                    visit.setOfflineReason(reason);
+                    // Patch reason to patient_visit.comments
+                    if (reason != null && !reason.trim().isEmpty()) {
+                        visit.setComment(reason);
+                    }
                     visit.setModifiedOn(now);
                     visit.setModifiedbyName(userId);
                 } else {
@@ -2668,11 +2673,15 @@ public class VisitJpaService {
                     visit.setBloodPressure(bloodPressure);
                     visit.setAllergyDtls(allergyDetails);
                     visit.setHabitsComments(habitDetails);
-                    visit.setComment(comment);
+                    // Patch reason to patient_visit.comments if provided, otherwise use comment
+                    if (reason != null && !reason.trim().isEmpty()) {
+                        visit.setComment(reason);
+                    } else {
+                        visit.setComment(comment);
+                    }
                     // Set paymentById to null if it's 0 (0 doesn't exist in payment_type_master)
                     visit.setPaymentById(paymentById != null && paymentById > 0 ? paymentById : null);
                     visit.setPaymentRemark(paymentRemark);
-                    visit.setOfflineReason(reason);
                     visit.setModifiedOn(now);
                     visit.setModifiedbyName(userId);
                     visit.setDiscount(discount);
