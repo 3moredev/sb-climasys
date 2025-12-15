@@ -995,8 +995,8 @@ public class VisitJpaService {
                        pv.sugar, pv.tpr, pv.odeama, pv.pallor,
                        COALESCE(pv.in_person,false) AS in_person,
                        pv.payment_by_id, pv.payment_remark, pv.fees_collected, pv.receipt_number,
-                       pv.follow_up, pv.follow_up_type, pv.follow_up_date,
-                       pv.thtext, pv.offline_reason, pv.comment
+                       pv.follow_up, pv.follow_up_type, pv.follow_up_date,pv.follow_up_comment,
+                       pv.thtext, pv.offline_reason, pv.comment,pv.impression,pv.symptom_comment,pv.observation,pv.visit_comments,pv.current_medicines,pv.important_findings,pv.additional_comments,pv.surgical_history_past_history
                 FROM patient_visits pv
                 WHERE pv.patient_id = ? AND pv.shift_id = ? AND pv.clinic_id = ?
                   AND pv.doctor_id = ? AND DATE(pv.visit_date) = ? AND pv.patient_visit_no = ?
@@ -1319,7 +1319,6 @@ public class VisitJpaService {
             logger.info("DEBUG: Found {} visits with comprehensive data for patient {}", visitResults.size(), patientId);
             
             if (!visitResults.isEmpty()) {
-                System.out.println("Im here ");
                 List<Map<String, Object>> visitList = new ArrayList<>();
                 
                 // Process each visit result
@@ -1771,6 +1770,7 @@ public class VisitJpaService {
         visitMap.put("Odeama", visitData.get("odeama"));
         visitMap.put("Pallor", visitData.get("pallor"));
         visitMap.put("GC", visitData.get("gc"));
+        visitMap.put("Detailed_History", visitData.get("symptom_comment"));
         
         // Follow-up information
         visitMap.put("Follow_Up", visitData.get("follow_up_comment"));
