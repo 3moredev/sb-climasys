@@ -181,6 +181,45 @@ public class AuthService {
             return errorResponse;
         }
     }
+
+    public boolean changePassword(String loginId, String oldPassword, String newPassword) {
+        logger.info("Attempting to change password for user: {}", loginId);
+        auditLogger.info("PASSWORD_CHANGE_ATTEMPT - User: {}", loginId);
+
+        try {
+            // Find user
+            Optional<User> userOpt = userMasterRepository.findByLoginIdAndIsActive(loginId, true);
+            
+            if (userOpt.isEmpty()) {
+                logger.warn("Password change failed - user not found: {}", loginId);
+                return false;
+            }
+
+            User user = userOpt.get();
+
+            // Verify old password
+            String decryptedStoredPassword = LegacyCrypto.decryptUnicode(encryptionKey, user.getPassword());
+            if (!decryptedStoredPassword.equals(oldPassword)) {
+                logger.warn("Password change failed - old password incorrect for user: {}", loginId);
+                auditLogger.warn("PASSWORD_CHANGE_FAILED - Invalid old password for user: {}", loginId);
+                return false;
+            }
+
+            // Encrypt and save new password
+            String encryptedNewPassword = LegacyCrypto.encryptUnicode(encryptionKey, newPassword);
+            user.setPassword(encryptedNewPassword);
+            userMasterRepository.save(user);
+
+            logger.info("Password changed successfully for user: {}", loginId);
+            auditLogger.info("PASSWORD_CHANGE_SUCCESS - User: {}", loginId);
+            return true;
+
+        } catch (Exception e) {
+            logger.error("Error changing password for user: {} - {}", loginId, e.getMessage(), e);
+            auditLogger.error("PASSWORD_CHANGE_ERROR - User: {}, Error: {}", loginId, e.getMessage());
+            throw new RuntimeException("Failed to change password: " + e.getMessage());
+        }
+    }
     
     private String buildDoctorName(AuthDoctorMaster doctor) {
         StringBuilder name = new StringBuilder();
