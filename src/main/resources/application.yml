@@ -41,7 +41,7 @@ spring:
         batch_size: 25
 
 server:
-  port: 8081
+  port: 8080
   servlet:
     session:
       timeout: 60m
