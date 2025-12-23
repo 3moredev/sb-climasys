@@ -1,75 +1,40 @@
 package com.climasys.billing.service;
 
 import com.climasys.billing.dto.OPDDailyCollectionDTO;
+import com.climasys.billing.repository.OPDDailyCollectionRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Service for OPD Daily Collection operations
- * Returns dummy data instead of database queries
+ * Implements JPA-based queries instead of stored procedures or dummy data
  */
 @Service
 public class OPDDailyCollectionService {
-    
-    // Dummy doctors data
-    private static final List<String[]> DUMMY_DOCTORS = Arrays.asList(
-        new String[]{"DOC-001", "Dr. Tongaonkar"},
-        new String[]{"DOC-002", "Dr. Sharma"},
-        new String[]{"DOC-003", "Dr. Patel"},
-        new String[]{"DOC-004", "Dr. Kumar"},
-        new String[]{"DOC-005", "Dr. Singh"}
-    );
-    
-    // Dummy patients data
-    private static final List<String[]> DUMMY_PATIENTS = Arrays.asList(
-        new String[]{"AMIT SOMRA JAIN", "F-001", "P-001", "Male", "35"},
-        new String[]{"RUPINA J SHAHJI", "F-002", "P-002", "Female", "42"},
-        new String[]{"RAJESH KUMAR", "F-003", "P-003", "Male", "28"},
-        new String[]{"PRIYA SHARMA", "F-004", "P-004", "Female", "31"},
-        new String[]{"VIJAY PATEL", "F-005", "P-005", "Male", "45"},
-        new String[]{"ANITA DESAI", "F-006", "P-006", "Female", "38"},
-        new String[]{"SURESH MEHTA", "F-007", "P-007", "Male", "52"},
-        new String[]{"KAVITA RAO", "F-008", "P-008", "Female", "29"},
-        new String[]{"MOHAN LAL", "F-009", "P-009", "Male", "41"},
-        new String[]{"GEETA VERMA", "F-010", "P-010", "Female", "36"}
-    );
-    
-    // Visit times
-    private static final List<int[]> VISIT_TIMES = Arrays.asList(
-        new int[]{10, 0, 21},
-        new int[]{10, 55, 58},
-        new int[]{11, 30, 15},
-        new int[]{12, 15, 42},
-        new int[]{13, 0, 5},
-        new int[]{14, 20, 33},
-        new int[]{15, 10, 18},
-        new int[]{16, 5, 50},
-        new int[]{16, 45, 12},
-        new int[]{17, 30, 7}
-    );
-    
-    private static final List<String> PAYMENT_METHODS = Arrays.asList("Cash", "Card", "UPI", "Cheque", "");
-    private static final List<String> FOLLOW_UP_TYPES = Arrays.asList("New", "Follow up");
-    private static final List<String> REASONS = Arrays.asList("Regular Checkup", "Follow-up", "Consultation", "Review", "--");
-    private static final List<Integer> ORIGINAL_AMOUNTS = Arrays.asList(500, 600, 750, 400, 800, 550, 650, 700, 450, 900);
-    
+
+    private final OPDDailyCollectionRepository repository;
+
+    public OPDDailyCollectionService(OPDDailyCollectionRepository repository) {
+        this.repository = repository;
+    }
+
     /**
-     * Get OPD Daily Collection data using dummy data
-     * 
-     * @param fromDate Start date for collection period
-     * @param toDate End date for collection period
-     * @param clinicId Clinic ID filter
-     * @param doctorId Doctor ID filter (can be "All" or "0" for all doctors)
-     * @param roleId Role ID filter
+     * Get OPD Daily Collection data using JPA queries
+     *
+     * @param fromDate   Start date for collection period
+     * @param toDate     End date for collection period
+     * @param clinicId   Clinic ID filter
+     * @param doctorId   Doctor ID filter (can be "All" or "0" for all doctors)
+     * @param roleId     Role ID filter
      * @param languageId Language ID for translations
      * @return List of OPDDailyCollectionDTO objects
      */
+    @Transactional(readOnly = true)
     public List<OPDDailyCollectionDTO> getOPDDailyCollection(
             LocalDate fromDate,
             LocalDate toDate,
@@ -78,75 +43,222 @@ public class OPDDailyCollectionService {
             Integer roleId,
             Integer languageId
     ) {
-        // Generate dummy data
+        // Handle "All" or "0" doctor ID (treat as no filter)
+        String actualDoctorId = (doctorId == null || doctorId.equalsIgnoreCase("All") || doctorId.equals("0"))
+                ? null
+                : doctorId;
+
+        // Get visits data
+        List<Object[]> visits = repository.findOPDDailyCollectionVisits(
+                fromDate, toDate, clinicId, actualDoctorId, roleId, languageId
+        );
+
+        // Get adhoc payments data
+        List<Object[]> adhocPayments = repository.findOPDDailyCollectionAdhocPayments(
+                fromDate, toDate, clinicId, actualDoctorId, languageId
+        );
+
+        // Combine results
+        List<Object[]> allResults = new ArrayList<>();
+        allResults.addAll(visits);
+        allResults.addAll(adhocPayments);
+
+        // Map results to DTOs
+        return mapToDTOs(allResults);
+    }
+
+    /**
+     * Map query result set to DTOs
+     *
+     * @param results Raw result set from JPA queries
+     * @return List of OPDDailyCollectionDTO objects
+     */
+    private List<OPDDailyCollectionDTO> mapToDTOs(List<Object[]> results) {
         List<OPDDailyCollectionDTO> dtos = new ArrayList<>();
-        
-        // Filter doctors based on doctorId
-        List<String[]> selectedDoctors = (doctorId == null || doctorId.equals("All") || doctorId.equals("0"))
-                ? DUMMY_DOCTORS
-                : DUMMY_DOCTORS.stream()
-                    .filter(d -> d[0].equals(doctorId))
-                    .collect(Collectors.toList());
-        
-        if (selectedDoctors.isEmpty()) {
-            selectedDoctors = DUMMY_DOCTORS;
-        }
-        
-        // Generate records for each patient
-        for (int i = 0; i < DUMMY_PATIENTS.size(); i++) {
-            String[] patient = DUMMY_PATIENTS.get(i);
-            int[] visitTime = VISIT_TIMES.get(i % VISIT_TIMES.size());
-            String[] doctor = selectedDoctors.get(i % selectedDoctors.size());
-            
-            // Calculate amounts
-            int originalAmount = ORIGINAL_AMOUNTS.get(i % ORIGINAL_AMOUNTS.size());
-            int discount = (i % 3 == 1) ? 50 : ((i % 3 == 2) ? 100 : 0);
-            int originalDiscount = (i % 4 == 1) ? 25 : ((i % 4 == 2) ? 75 : 0);
-            int billed = originalAmount - originalDiscount;
-            int net = billed - discount;
-            double collected = (i % 2 == 0) ? net : ((i % 3 == 1) ? net * 0.5 : ((i % 3 == 2) ? net * 0.8 : 0));
-            double dues = net - collected;
-            int adhoc = (i % 5 == 0) ? ((i % 3 == 1) ? 100 : ((i % 3 == 2) ? 200 : 0)) : 0;
-            int difference = originalAmount - billed;
-            
-            // Format visit time
-            String visitTimeStr = String.format("%02d:%02d:%02d", visitTime[0], visitTime[1], visitTime[2]);
-            
+
+        for (Object[] row : results) {
             OPDDailyCollectionDTO dto = new OPDDailyCollectionDTO();
-            dto.setVisitDate(visitTimeStr);
-            dto.setName(patient[0]);
-            dto.setPatientId(patient[2]);
-            dto.setStatusDescription("Completed");
-            dto.setStatusId((short) 1);
-            dto.setFeesToCollect(BigDecimal.valueOf(billed));
-            dto.setFeesCollected(BigDecimal.valueOf(collected));
-            dto.setAdhocFees(BigDecimal.valueOf(adhoc));
-            dto.setOriginalBilledAmount(BigDecimal.valueOf(originalAmount));
-            dto.setFolderNo(patient[1]);
-            dto.setComment(REASONS.get(i % REASONS.size()));
-            dto.setDifference(BigDecimal.valueOf(difference));
-            dto.setDues(BigDecimal.valueOf(dues));
-            dto.setOriginalDiscount(BigDecimal.valueOf(originalDiscount));
-            dto.setDiscount(BigDecimal.valueOf(discount));
-            dto.setNet(BigDecimal.valueOf(net));
-            dto.setInPerson(true);
-            dto.setAttendedBy(doctor[1]);
-            dto.setPaymentById((i % 2 == 0) ? (short) 1 : null);
-            dto.setPaymentRemark(null);
-            dto.setPaymentDescription(PAYMENT_METHODS.get(i % PAYMENT_METHODS.size()).isEmpty() ? null : PAYMENT_METHODS.get(i % PAYMENT_METHODS.size()));
-            dto.setPartialName(patient[0].split(" ")[0]);
-            dto.setAgeYearsIntRound(Integer.parseInt(patient[4]));
-            dto.setGenderDescription(patient[3]);
-            dto.setPatientVisitNo(i + 1);
-            dto.setDoctorId(doctor[0]);
-            dto.setDoctorName(doctor[1]);
-            dto.setIsFollowUp(FOLLOW_UP_TYPES.get(i % FOLLOW_UP_TYPES.size()));
-            dto.setBaseLocation(null);
-            
+
+            int index = 0;
+
+            // Column order from repository queries:
+            // visitDate, name, patientId, statusDescription, statusId,
+            // feesToCollect, feesCollected, adhocFees, originalBilledAmount, folderNo,
+            // comment, difference, dues, originalDiscount, discount, net,
+            // inPerson, attendedBy, paymentById, paymentRemark, paymentDescription,
+            // partialName, ageYearsIntRound, genderDescription, patientVisitNo,
+            // doctorId, doctorName, isFollowUp, baseLocation
+
+            if (row.length > index && row[index] != null) dto.setVisitDate(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setName(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setPatientId(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setStatusDescription(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setStatusId(convertToShort(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setFeesToCollect(convertToBigDecimal(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setFeesCollected(convertToBigDecimal(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setAdhocFees(convertToBigDecimal(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setOriginalBilledAmount(convertToBigDecimal(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setFolderNo(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setComment(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setDifference(convertToBigDecimal(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setDues(convertToBigDecimal(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setOriginalDiscount(convertToBigDecimal(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setDiscount(convertToBigDecimal(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setNet(convertToBigDecimal(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setInPerson(convertToBoolean(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setAttendedBy(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setPaymentById(convertToShort(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setPaymentRemark(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setPaymentDescription(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setPartialName(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setAgeYearsIntRound(convertToInteger(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setGenderDescription(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) {
+                dto.setPatientVisitNo(convertToInteger(row[index]));
+            }
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setDoctorId(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setDoctorName(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setIsFollowUp(row[index].toString());
+            index++;
+
+            if (row.length > index && row[index] != null) dto.setBaseLocation(row[index].toString());
+
             dtos.add(dto);
         }
-        
+
         return dtos;
+    }
+
+    /**
+     * Helper method to convert Object to BigDecimal
+     */
+    private BigDecimal convertToBigDecimal(Object value) {
+        if (value == null) return null;
+        if (value instanceof BigDecimal) return (BigDecimal) value;
+        if (value instanceof Number) return BigDecimal.valueOf(((Number) value).doubleValue());
+        try {
+            return new BigDecimal(value.toString());
+        } catch (NumberFormatException e) {
+            return BigDecimal.ZERO;
+        }
+    }
+
+    /**
+     * Helper method to convert Object to Short
+     */
+    private Short convertToShort(Object value) {
+        if (value == null) return null;
+        if (value instanceof Short) return (Short) value;
+        if (value instanceof Number) return ((Number) value).shortValue();
+        try {
+            return Short.parseShort(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Helper method to convert Object to Integer
+     */
+    private Integer convertToInteger(Object value) {
+        if (value == null) return null;
+        if (value instanceof Integer) return (Integer) value;
+        if (value instanceof Number) return ((Number) value).intValue();
+        try {
+            return Integer.parseInt(value.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Helper method to convert Object to Boolean
+     */
+    private Boolean convertToBoolean(Object value) {
+        if (value == null) return false;
+        if (value instanceof Boolean) return (Boolean) value;
+        if (value instanceof Number) return ((Number) value).intValue() != 0;
+        return Boolean.parseBoolean(value.toString());
     }
 }
 
