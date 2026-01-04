@@ -38,7 +38,7 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
         SELECT 
             ROW_NUMBER() OVER (ORDER BY ad.admission_date DESC, ad.admission_time DESC) AS serialNumber,
             TRIM(pm.first_name || ' ' || COALESCE(pm.middle_name, '') || ' ' || COALESCE(pm.last_name, '')) AS patientName,
-            ad.ipd_refno AS admissionIpdNo,
+            ad.ipd_refno AS ipdRefNo,
             COALESCE(ad.ipdfileno, '') AS ipdFileNo,
             CASE 
                 WHEN ad.admission_date IS NOT NULL THEN 
@@ -68,7 +68,9 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
                 FROM advance_collection_details acd_sum 
                 WHERE acd_sum.ipd_refno = ad.ipd_refno
             ), 0.00) AS advanceRs,
-            ad.patient_id AS patientId
+            ad.patient_id AS patientId,
+            ad.doctor_id AS doctorId,
+            ad.clinic_id AS clinicId
         FROM admission_data ad
         INNER JOIN patient_master pm ON ad.patient_id = pm.id
         LEFT JOIN discharge_data dd ON ad.ipd_refno = dd.ipd_refno 
@@ -112,7 +114,7 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
         SELECT 
             ROW_NUMBER() OVER (ORDER BY ad.admission_date DESC, ad.admission_time DESC) AS serialNumber,
             TRIM(pm.first_name || ' ' || COALESCE(pm.middle_name, '') || ' ' || COALESCE(pm.last_name, '')) AS patientName,
-            ad.ipd_refno AS admissionIpdNo,
+            ad.ipd_refno AS ipdRefNo,
             COALESCE(ad.ipdfileno, '') AS ipdFileNo,
             CASE 
                 WHEN ad.admission_date IS NOT NULL THEN 
@@ -140,7 +142,9 @@ public interface AdmissionCardRepository extends JpaRepository<AdmissionData, Ad
                 FROM advance_collection_details acd 
                 WHERE acd.ipd_refno = ad.ipd_refno
             ), 0.00) AS advanceRs,
-            ad.patient_id AS patientId
+            ad.patient_id AS patientId,
+            ad.doctor_id AS doctorId,
+            ad.clinic_id AS clinicId
         FROM admission_data ad
         INNER JOIN patient_master pm ON ad.patient_id = pm.id
         LEFT JOIN discharge_data dd ON ad.ipd_refno = dd.ipd_refno 

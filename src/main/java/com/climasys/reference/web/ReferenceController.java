@@ -50,7 +50,8 @@ public class ReferenceController {
     }
 
     @GetMapping("/impressions")
-    public ResponseEntity<?> getImpressions(@RequestParam String doctorId, @RequestParam(required = false) String clinicId) {
+    public ResponseEntity<?> getImpressions(@RequestParam String doctorId,
+            @RequestParam(required = false) String clinicId) {
         try {
             List<?> result = referenceDataService.getImpressions(doctorId, clinicId);
             return ResponseEntity.ok(result);
@@ -188,20 +189,20 @@ public class ReferenceController {
             return ResponseEntity.badRequest().body(error);
         }
     }
-    
+
     @Operation(summary = "Get Marital Statuses with Translations", description = "Retrieve all available marital status options with translations for a specific language")
     @GetMapping("/marital-statuses/translations")
     public ResponseEntity<?> getMaritalStatusesWithTranslations(
             @RequestParam(defaultValue = "1") Integer languageId) {
         try {
             List<Map<String, Object>> result = referenceDataService.getMaritalStatusesWithTranslations(languageId);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("maritalStatuses", result);
             response.put("languageId", languageId);
             response.put("count", result.size());
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -242,7 +243,8 @@ public class ReferenceController {
             @RequestParam(required = false) String countryId,
             @RequestParam(required = false, defaultValue = "1") Integer languageId) {
         try {
-            // If languageId is provided, return states with translations (stateName from state_translations)
+            // If languageId is provided, return states with translations (stateName from
+            // state_translations)
             if (languageId != null && languageId > 0) {
                 List<?> result = referenceDataService.getStatesWithTranslations(countryId, languageId);
                 return ResponseEntity.ok(result);
@@ -269,11 +271,11 @@ public class ReferenceController {
             return ResponseEntity.badRequest().body(error);
         }
     }
-    
+
     // =====================================================
     // NEW ENDPOINTS FOR USP_Get_BloodGroupDetails REPLACEMENT
     // =====================================================
-    
+
     @Operation(summary = "Get Payment Methods", description = "Retrieve all available payment method options")
     @GetMapping("/payment-methods")
     public ResponseEntity<?> getPaymentMethods() {
@@ -286,7 +288,7 @@ public class ReferenceController {
             return ResponseEntity.badRequest().body(error);
         }
     }
-    
+
     @Operation(summary = "Get Titles", description = "Retrieve all available title options")
     @GetMapping("/titles")
     public ResponseEntity<?> getTitles() {
@@ -299,7 +301,7 @@ public class ReferenceController {
             return ResponseEntity.badRequest().body(error);
         }
     }
-    
+
     @Operation(summary = "Get Follow-up Types", description = "Retrieve all available follow-up type options")
     @GetMapping("/follow-up-types")
     public ResponseEntity<?> getFollowUpTypes() {
@@ -312,7 +314,7 @@ public class ReferenceController {
             return ResponseEntity.badRequest().body(error);
         }
     }
-    
+
     @Operation(summary = "Get Follow-up After Options", description = "Retrieve all available follow-up after period options")
     @GetMapping("/followup-after")
     public ResponseEntity<?> getFollowupAfterOptions() {
@@ -325,7 +327,7 @@ public class ReferenceController {
             return ResponseEntity.badRequest().body(error);
         }
     }
-    
+
     @Operation(summary = "Get All Reference Data", description = "Retrieve all reference data in the same format as USP_Get_BloodGroupDetails stored procedure")
     @GetMapping("/all-reference-data")
     public ResponseEntity<?> getAllReferenceData() {
@@ -335,6 +337,19 @@ public class ReferenceController {
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
             error.put("error", "Failed to get all reference data: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @Operation(summary = "Get Keywords", description = "Retrieve all available keywords from ipd_keywords table")
+    @GetMapping("/keywords")
+    public ResponseEntity<?> getKeywords() {
+        try {
+            List<String> result = referenceDataService.getKeywords();
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get keywords: " + e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }

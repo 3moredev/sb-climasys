@@ -1,6 +1,8 @@
 package com.climasys.repository;
 
 import com.climasys.entity.PatientVisit;
+import com.climasys.entity.PatientVisitId;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.Modifying;
@@ -13,7 +15,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface AppointmentRepository extends JpaRepository<PatientVisit, Long> {
+public interface AppointmentRepository extends JpaRepository<PatientVisit, PatientVisitId> {
     
     // Basic queries
     Optional<PatientVisit> findByPatientVisitNo(Integer patientVisitNo);

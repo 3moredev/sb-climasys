@@ -54,5 +54,14 @@ public class AdmissionCardDTO {
     
     @JsonProperty("patientId")
     private String patientId;
+
+    @JsonProperty("doctorId")
+    private String doctorId;
+
+    @JsonProperty("clinicId")
+    private String clinicId;
+
+    @JsonProperty("ipdRefNo")
+    private String ipdRefNo;
 }
 

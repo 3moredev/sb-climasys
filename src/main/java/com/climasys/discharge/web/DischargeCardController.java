@@ -289,24 +289,21 @@ public class DischargeCardController {
             @Parameter(description = "Patient ID", required = true)
             @RequestParam String patientId,
             
-            @Parameter(description = "Shift ID", required = true)
-            @RequestParam Integer shiftId,
+            @Parameter(description = "Doctor ID", required = true)
+            @RequestParam String doctorId,
             
             @Parameter(description = "Clinic ID", required = true)
             @RequestParam String clinicId,
             
-            @Parameter(description = "Doctor ID", required = true)
-            @RequestParam String doctorId,
-            
             @Parameter(description = "IPD Number", required = true)
-            @RequestParam String ipdNo,
+            @RequestParam String ipdRefNo,
             
             @Parameter(description = "Invoice Number (optional)")
             @RequestParam(required = false) String invoiceNo
     ) {
         try {
             DischargeCardDetailResponse response = dischargeCardService.getDischargeCardDetails(
-                    patientId, shiftId, clinicId, doctorId, ipdNo, invoiceNo);
+                    patientId, clinicId, doctorId, ipdRefNo, invoiceNo);
             
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
@@ -377,5 +374,7 @@ public class DischargeCardController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
+    
 }
 

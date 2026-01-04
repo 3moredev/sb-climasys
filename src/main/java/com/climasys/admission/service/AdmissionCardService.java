@@ -443,7 +443,7 @@ public class AdmissionCardService {
         
         dto.setSerialNumber(getIntegerValue(result, "serialnumber"));
         dto.setPatientName(getStringValue(result, "patientname"));
-        dto.setAdmissionIpdNo(getStringValue(result, "admissionipdno"));
+        dto.setAdmissionIpdNo(getStringValue(result, "ipdRefno"));
         dto.setIpdFileNo(getStringValue(result, "ipdfileno"));
         dto.setAdmissionDate(getStringValue(result, "admissiondate"));
         dto.setReasonOfAdmission(getStringValue(result, "reasonofadmission"));
@@ -454,7 +454,9 @@ public class AdmissionCardService {
         dto.setDateOfAdvance(getStringValue(result, "dateofadvance"));
         dto.setReceiptNo(getStringValue(result, "receiptno"));
         dto.setPatientId(getStringValue(result, "patientid"));
-        
+        dto.setDoctorId(getStringValue(result, "doctorid"));
+        dto.setClinicId(getStringValue(result, "clinicid"));
+        dto.setIpdRefNo(getStringValue(result, "ipdRefno"));
         return dto;
     }
     
