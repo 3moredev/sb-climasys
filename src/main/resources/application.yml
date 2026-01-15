@@ -44,12 +44,12 @@ server:
   port: 8080
   servlet:
     session:
-      timeout: 60m
+      timeout: 6h
       cookie:
         name: CLIMASYS_SESSION
         http-only: true
         secure: false
-        max-age: 1800
+        max-age: 21600
 
 management:
   endpoints:
