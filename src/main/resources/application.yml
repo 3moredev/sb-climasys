@@ -21,8 +21,8 @@ spring:
   servlet:
     multipart:
       enabled: true
-      max-file-size: 50MB
-      max-request-size: 100MB
+      max-file-size: 150MB
+      max-request-size: 160MB
       file-size-threshold: 2KB
   jpa:
     hibernate:
@@ -42,6 +42,9 @@ spring:
 
 server:
   port: 8080
+  tomcat:
+    max-swallow-size: 160MB
+    max-http-form-post-size: 160MB
   servlet:
     session:
       timeout: 6h
@@ -118,7 +121,7 @@ climasys:
     upload-keyword-investigations: "./KeywordInvestiations"
     
     # File upload limits
-    max-file-size: "4"
+    max-file-size: "150"
     max-files-per-upload: 5
     
     # File deletion configuration
