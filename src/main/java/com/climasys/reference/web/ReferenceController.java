@@ -113,6 +113,44 @@ public class ReferenceController {
         }
     }
 
+    @GetMapping("/areas/by-id")
+    @Operation(summary = "Get Area Details by ID", description = "Get area name and location by areaId and languageId")
+    public ResponseEntity<?> getAreaDetailsById(
+            @RequestParam Integer areaId,
+            @RequestParam Integer languageId) {
+        try {
+            Map<String, Object> result = referenceDataService.getAreaDetailsById(areaId, languageId);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("error", "Failed to get area details by id: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    @PostMapping("/areas/create")
+    @Operation(summary = "Create New Area", description = "Creates a new area with the given name, city, state, and country")
+    public ResponseEntity<?> createArea(
+            @RequestParam String areaName,
+            @RequestParam String cityId,
+            @RequestParam String stateId,
+            @RequestParam(defaultValue = "IND") String countryId,
+            @RequestParam(defaultValue = "1") Integer languageId) {
+        try {
+            Map<String, Object> result = referenceDataService.createArea(areaName, cityId, stateId, countryId, languageId);
+            if ((Boolean) result.get("success")) {
+                return ResponseEntity.ok(result);
+            } else {
+                return ResponseEntity.badRequest().body(result);
+            }
+        } catch (Exception e) {
+            Map<String, Object> error = new HashMap<>();
+            error.put("success", false);
+            error.put("error", "Failed to create area: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
     @GetMapping("/folders/check")
     public ResponseEntity<?> checkFolderNumber(@RequestParam String folderNo) {
         try {
