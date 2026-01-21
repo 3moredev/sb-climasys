@@ -26,37 +26,20 @@ public class HttpSessionController {
     @Autowired
     private HttpSessionService httpSessionService;
 
-    @Operation(
-        summary = "Get Session Information",
-        description = "Retrieve current session information including clinic and doctor IDs from HTTP session"
-    )
+    @Operation(summary = "Get Session Information", description = "Retrieve current session information including clinic and doctor IDs from HTTP session")
     @ApiResponses(value = {
-        @ApiResponse(
-            responseCode = "200",
-            description = "Session information retrieved successfully",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = Map.class)
-            )
-        ),
-        @ApiResponse(
-            responseCode = "401",
-            description = "No active session",
-            content = @Content(
-                mediaType = "application/json",
-                schema = @Schema(implementation = Map.class)
-            )
-        )
+            @ApiResponse(responseCode = "200", description = "Session information retrieved successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "401", description = "No active session", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class)))
     })
     @GetMapping("/info")
     public ResponseEntity<Map<String, Object>> getSessionInfo(HttpSession session) {
         try {
             Map<String, Object> sessionInfo = httpSessionService.getSessionInfo(session);
-            
+
             if (sessionInfo.containsKey("error")) {
                 return ResponseEntity.status(401).body(sessionInfo);
             }
-            
+
             return ResponseEntity.ok(sessionInfo);
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -65,15 +48,12 @@ public class HttpSessionController {
         }
     }
 
-    @Operation(
-        summary = "Get Doctor ID",
-        description = "Get doctor ID from current session"
-    )
+    @Operation(summary = "Get Doctor ID", description = "Get doctor ID from current session")
     @GetMapping("/doctor-id")
     public ResponseEntity<Map<String, Object>> getDoctorId(HttpSession session) {
         try {
             String doctorId = httpSessionService.getDoctorId(session);
-            
+
             Map<String, Object> response = new HashMap<>();
             if (doctorId != null) {
                 response.put("doctorId", doctorId);
@@ -82,7 +62,7 @@ public class HttpSessionController {
                 response.put("error", "No active session or doctor ID not found");
                 return ResponseEntity.status(401).body(response);
             }
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -91,15 +71,12 @@ public class HttpSessionController {
         }
     }
 
-    @Operation(
-        summary = "Get Clinic ID",
-        description = "Get clinic ID from current session"
-    )
+    @Operation(summary = "Get Clinic ID", description = "Get clinic ID from current session")
     @GetMapping("/clinic-id")
     public ResponseEntity<Map<String, Object>> getClinicId(HttpSession session) {
         try {
             String clinicId = httpSessionService.getClinicId(session);
-            
+
             Map<String, Object> response = new HashMap<>();
             if (clinicId != null) {
                 response.put("clinicId", clinicId);
@@ -108,7 +85,7 @@ public class HttpSessionController {
                 response.put("error", "No active session or clinic ID not found");
                 return ResponseEntity.status(401).body(response);
             }
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -117,15 +94,12 @@ public class HttpSessionController {
         }
     }
 
-    @Operation(
-        summary = "Get Login ID",
-        description = "Get login ID from current session"
-    )
+    @Operation(summary = "Get Login ID", description = "Get login ID from current session")
     @GetMapping("/login-id")
     public ResponseEntity<Map<String, Object>> getLoginId(HttpSession session) {
         try {
             String loginId = httpSessionService.getLoginId(session);
-            
+
             Map<String, Object> response = new HashMap<>();
             if (loginId != null) {
                 response.put("loginId", loginId);
@@ -134,7 +108,7 @@ public class HttpSessionController {
                 response.put("error", "No active session or login ID not found");
                 return ResponseEntity.status(401).body(response);
             }
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -143,15 +117,12 @@ public class HttpSessionController {
         }
     }
 
-    @Operation(
-        summary = "Get User ID",
-        description = "Get user ID from current session"
-    )
+    @Operation(summary = "Get User ID", description = "Get user ID from current session")
     @GetMapping("/user-id")
     public ResponseEntity<Map<String, Object>> getUserId(HttpSession session) {
         try {
             Long userId = httpSessionService.getUserId(session);
-            
+
             Map<String, Object> response = new HashMap<>();
             if (userId != null) {
                 response.put("userId", userId);
@@ -160,7 +131,7 @@ public class HttpSessionController {
                 response.put("error", "No active session or user ID not found");
                 return ResponseEntity.status(401).body(response);
             }
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -169,22 +140,19 @@ public class HttpSessionController {
         }
     }
 
-    @Operation(
-        summary = "Validate Session",
-        description = "Check if the current session is valid"
-    )
+    @Operation(summary = "Validate Session", description = "Check if the current session is valid")
     @GetMapping("/validate")
     public ResponseEntity<Map<String, Object>> validateSession(HttpSession session) {
         try {
             boolean isValid = httpSessionService.isValidSession(session);
             boolean isExpired = httpSessionService.isSessionExpired(session);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("valid", isValid);
             response.put("expired", isExpired);
             response.put("sessionId", session != null ? session.getId() : null);
             response.put("status", isValid ? "success" : "invalid");
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -193,19 +161,16 @@ public class HttpSessionController {
         }
     }
 
-    @Operation(
-        summary = "Logout",
-        description = "Invalidate the current session and logout user"
-    )
+    @Operation(summary = "Logout", description = "Invalidate the current session and logout user")
     @PostMapping("/logout")
     public ResponseEntity<Map<String, Object>> logout(HttpSession session) {
         try {
             httpSessionService.clearSession(session);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Logout successful");
             response.put("status", "success");
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -214,22 +179,19 @@ public class HttpSessionController {
         }
     }
 
-    @Operation(
-        summary = "Update Session Timeout",
-        description = "Update the session timeout duration"
-    )
+    @Operation(summary = "Update Session Timeout", description = "Update the session timeout duration")
     @PostMapping("/timeout")
     public ResponseEntity<Map<String, Object>> updateSessionTimeout(
-            @RequestParam int timeoutInSeconds, 
+            @RequestParam int timeoutInSeconds,
             HttpSession session) {
         try {
             httpSessionService.updateSessionTimeout(session, timeoutInSeconds);
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Session timeout updated successfully");
             response.put("timeoutInSeconds", timeoutInSeconds);
             response.put("status", "success");
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> errorResponse = new HashMap<>();
@@ -238,23 +200,23 @@ public class HttpSessionController {
         }
     }
 
-    @Operation(
-        summary = "Keep Session Alive",
-        description = "Update session last accessed time to prevent timeout due to user activity"
-    )
+    @Operation(summary = "Keep Session Alive", description = "Update session last accessed time to prevent timeout due to user activity")
     @PostMapping("/keepalive")
     public ResponseEntity<Map<String, Object>> keepSessionAlive(HttpSession session) {
         try {
             // Simply accessing the session updates its lastAccessedTime
             // This is enough to reset the session timeout
             if (session != null && httpSessionService.isValidSession(session)) {
+                // Force session update to ensure timeout is reset
+                session.setAttribute("lastKeepAlive", System.currentTimeMillis());
+
                 Map<String, Object> response = new HashMap<>();
                 response.put("message", "Session keepalive successful");
                 response.put("sessionId", session.getId());
                 response.put("lastAccessedTime", session.getLastAccessedTime());
                 response.put("maxInactiveInterval", session.getMaxInactiveInterval());
                 response.put("status", "success");
-                
+
                 return ResponseEntity.ok(response);
             } else {
                 Map<String, Object> errorResponse = new HashMap<>();

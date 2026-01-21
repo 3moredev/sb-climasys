@@ -192,7 +192,7 @@ public class HttpSessionService {
         try {
             // Check if session is still valid
             session.getAttribute(LOGIN_ID);
-            return false;
+            return false;   
         } catch (IllegalStateException e) {
             // Session is invalidated
             return true;

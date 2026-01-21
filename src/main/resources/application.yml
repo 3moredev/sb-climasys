@@ -4,9 +4,9 @@ spring:
   profiles:
     active: dev
   datasource:
-    url: jdbc:postgresql://localhost:5432/climasys?currentSchema=public
+    url: jdbc:postgresql://localhost:5432/climasys_new?currentSchema=public
     username: postgres
-    password: root
+    password: admin@123
     driverClassName: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -44,12 +44,11 @@ server:
   port: 8080
   servlet:
     session:
-      timeout: 60m
+      timeout: 2h
       cookie:
         name: CLIMASYS_SESSION
         http-only: true
         secure: false
-        max-age: 1800
 
 management:
   endpoints:

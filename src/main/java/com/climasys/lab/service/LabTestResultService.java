@@ -28,7 +28,7 @@ public class LabTestResultService {
     private static final Logger logger = LoggerFactory.getLogger(LabTestResultService.class);
     
     @Autowired
-    private PatientVisitLabTestResultRepository repository;
+    private PatientVisitLabTestResultRepository patientVisitLabTestResultRepository;
     
     @Autowired
     private PatientVisitRepository patientVisitRepository;
@@ -103,7 +103,7 @@ public class LabTestResultService {
                     );
                     
                     // Check if record already exists
-                    Optional<PatientVisitLabTestResult> existingResult = repository.findById(id);
+                    Optional<PatientVisitLabTestResult> existingResult = patientVisitLabTestResultRepository.findById(id);
                     
                     if (existingResult.isPresent()) {
                         // Update existing record
@@ -117,7 +117,7 @@ public class LabTestResultService {
                         existing.setComment(request.comment());
                         existing.setDeleteFlag(false);
                         
-                        repository.save(existing);
+                        patientVisitLabTestResultRepository.save(existing);
                         recordsUpdated++;
                         logger.debug("Updated lab test result: {}", id);
                         
@@ -143,7 +143,7 @@ public class LabTestResultService {
                         newResult.setReportDate(request.reportDate());
                         newResult.setComment(request.comment());
                         
-                        repository.save(newResult);
+                        patientVisitLabTestResultRepository.save(newResult);
                         recordsInserted++;
                         logger.debug("Inserted new lab test result: {}", id);
                     }
@@ -201,7 +201,7 @@ public class LabTestResultService {
         
         // First attempt: Try date-only comparison with provided date (matches stored procedure logic)
         // This is the primary method as it matches USP_Get_PreviousLabReports behavior
-        List<PatientVisitLabTestResult> results = repository.findByPatientVisitByDateOnly(
+        List<PatientVisitLabTestResult> results = patientVisitLabTestResultRepository.findByPatientVisitByDateOnly(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, providedVisitDate);
         
         if (!results.isEmpty()) {
@@ -220,7 +220,7 @@ public class LabTestResultService {
                     patientId, patientVisitNo, doctorId, clinicId, shiftId);
             
             // Last attempt: Try without exact date to see if any results exist
-            List<PatientVisitLabTestResult> allResults = repository.findByPatientVisitWithoutExactDate(
+            List<PatientVisitLabTestResult> allResults = patientVisitLabTestResultRepository.findByPatientVisitWithoutExactDate(
                     patientId, patientVisitNo, shiftId, clinicId, doctorId);
             if (!allResults.isEmpty()) {
                 logger.error("Visit not found but {} lab test results exist for this composite key! This indicates data inconsistency.", 
@@ -238,7 +238,7 @@ public class LabTestResultService {
         logger.info("Found visit with exact date: {} (provided date: {})", exactVisitDate, providedVisitDate);
         
         // Third attempt: Try date-only comparison with exact visit date (matches stored procedure)
-        results = repository.findByPatientVisitByDateOnly(
+        results = patientVisitLabTestResultRepository.findByPatientVisitByDateOnly(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate);
         
         if (!results.isEmpty()) {
@@ -248,7 +248,7 @@ public class LabTestResultService {
         
         // Fourth attempt: Try exact timestamp match with exact visit date (for precision)
         logger.debug("No results found with date-only comparison, trying exact timestamp match...");
-        results = repository.findByPatientVisit(
+        results = patientVisitLabTestResultRepository.findByPatientVisit(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate);
         
         if (!results.isEmpty()) {
@@ -262,7 +262,7 @@ public class LabTestResultService {
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate);
         
         // Try to find any results for this composite key without date restriction
-        List<PatientVisitLabTestResult> allResults = repository.findByPatientVisitWithoutExactDate(
+        List<PatientVisitLabTestResult> allResults = patientVisitLabTestResultRepository.findByPatientVisitWithoutExactDate(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId);
         logger.warn("Found {} total lab test results for this composite key (without date restriction): {}", 
                 allResults.size(), allResults.stream()
@@ -276,7 +276,7 @@ public class LabTestResultService {
                     exactVisitDate, firstResultDate, diffMs);
             
             // Last resort: Try date-only comparison with result's date
-            results = repository.findByPatientVisitByDateOnly(
+            results = patientVisitLabTestResultRepository.findByPatientVisitByDateOnly(
                     patientId, patientVisitNo, shiftId, clinicId, doctorId, firstResultDate);
             if (!results.isEmpty()) {
                 logger.info("Found {} results using date-only comparison with result date: {}", results.size(), firstResultDate);
@@ -297,14 +297,14 @@ public class LabTestResultService {
         logger.info("Getting lab test results for patient: {}, visit: {}, date: {}", patientId, patientVisitNo, visitDate);
         
         // First try exact date match
-        List<PatientVisitLabTestResult> results = repository.findByPatientVisit(
+        List<PatientVisitLabTestResult> results = patientVisitLabTestResultRepository.findByPatientVisit(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate);
         
         // If not found with exact date, try without exact date (fallback - not recommended for production)
         if (results.isEmpty()) {
             logger.debug("No results found with exact date match, trying without exact date for patient: {}, visit: {}", 
                     patientId, patientVisitNo);
-            results = repository.findByPatientVisitWithoutExactDate(
+            results = patientVisitLabTestResultRepository.findByPatientVisitWithoutExactDate(
                     patientId, patientVisitNo, shiftId, clinicId, doctorId);
             if (!results.isEmpty()) {
                 logger.info("Found {} lab test results using composite key (without exact date match)", results.size());
@@ -322,7 +322,7 @@ public class LabTestResultService {
         logger.info("Getting lab test results by composite key (without exact date) for patient: {}, visit: {}", 
                 patientId, patientVisitNo);
         
-        return repository.findByPatientVisitWithoutExactDate(
+        return patientVisitLabTestResultRepository.findByPatientVisitWithoutExactDate(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId);
     }
     
@@ -332,7 +332,7 @@ public class LabTestResultService {
     public List<PatientVisitLabTestResult> getPatientLabTestResults(String patientId) {
         logger.info("Getting all lab test results for patient: {}", patientId);
         
-        return repository.findByPatientIdOrderByVisitDateDesc(patientId);
+        return patientVisitLabTestResultRepository.findByPatientIdOrderByVisitDateDesc(patientId);
     }
     
     /**
@@ -344,7 +344,7 @@ public class LabTestResultService {
         logger.info("Deleting lab test results for patient: {}, visit: {}", patientId, patientVisitNo);
         
         try {
-            int deletedCount = repository.softDeleteByPatientVisit(
+            int deletedCount = patientVisitLabTestResultRepository.softDeleteByPatientVisit(
                     patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
                     LocalDateTime.now(), userId);
             
@@ -371,7 +371,7 @@ public class LabTestResultService {
         
         try {
             // Check if the parameter exists before attempting to delete
-            boolean exists = repository.existsByPatientVisitAndParameter(
+            boolean exists = patientVisitLabTestResultRepository.existsByPatientVisitAndParameter(
                     patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
                     labTestDescription, parameterName);
             
@@ -382,7 +382,7 @@ public class LabTestResultService {
             }
             
             // Perform the soft delete
-            int deletedCount = repository.softDeleteByPatientVisitAndParameter(
+            int deletedCount = patientVisitLabTestResultRepository.softDeleteByPatientVisitAndParameter(
                     patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
                     labTestDescription, parameterName, LocalDateTime.now(), userId);
             
@@ -405,7 +405,7 @@ public class LabTestResultService {
         logger.info("Getting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}", 
                 patientId, patientVisitNo, labTestDescription, parameterName);
         
-        return repository.findByPatientVisitAndTestParameter(
+        return patientVisitLabTestResultRepository.findByPatientVisitAndTestParameter(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
                 labTestDescription, parameterName);
     }

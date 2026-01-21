@@ -49,21 +49,6 @@ public class LabController {
         }
     }
 
-    @PostMapping("/visits/{visitId}/results")
-    public ResponseEntity<?> saveResults(@PathVariable String visitId, @RequestBody Map<String, Object> payload) {
-        try {
-            // Note: This endpoint is deprecated in favor of /api/lab/results/submit
-            // which provides proper JPA implementation equivalent to USP_Insert_LabTestAllData
-            return ResponseEntity.badRequest().body(Map.of(
-                "error", "This endpoint is deprecated. Please use /api/lab/results/submit instead.",
-                "message", "Use the new LabTestResultController for lab test result submission",
-                "newEndpoint", "/api/lab/results/submit"
-            ));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
-    }
-
     @GetMapping("/visits/{visitId}/results/previous")
     public ResponseEntity<?> getPreviousTestResults(@PathVariable String visitId) {
         try {
