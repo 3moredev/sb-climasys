@@ -47,8 +47,8 @@ public class PatientController {
             String doctorAddress,
             String doctorMobile,
             String doctorEmail,
-            String clinicId
-    ) {}
+            String clinicId) {
+    }
 
     @PostMapping
     @Transactional
@@ -59,33 +59,36 @@ public class PatientController {
             if (maritalStatus != null && maritalStatus.trim().isEmpty()) {
                 maritalStatus = null;
             }
-            
+
             Integer occupation = req.occupation();
             if (occupation != null && occupation == 0) {
                 occupation = null;
             }
 
-            // Validate area_id, city_id, state_id, country_id combination exists in area_master (using id column)
+            // Validate area_id, city_id, state_id, country_id combination exists in
+            // area_master (using id column)
             Integer areaId = req.areaId();
             String cityId = req.cityId();
             String stateId = req.stateId();
             String countryId = req.countryId();
-            
+
             // Area ID is mandatory - check if provided
             if (areaId == null) {
                 throw new AreaValidationException("Area ID is required and cannot be null");
             }
-            
+
             // Validate area combination exists in area_master table
             if (cityId != null && stateId != null && countryId != null) {
                 String areaValidationSql = "SELECT COUNT(*) FROM area_master WHERE id = ? AND city_id = ? AND state_id = ? AND country_id = ?";
-                Integer count = jdbcTemplate.queryForObject(areaValidationSql, Integer.class, areaId, cityId, stateId, countryId);
-                
+                Integer count = jdbcTemplate.queryForObject(areaValidationSql, Integer.class, areaId, cityId, stateId,
+                        countryId);
+
                 if (count == null || count == 0) {
                     throw new AreaValidationException(areaId, cityId, stateId, countryId);
                 }
             } else {
-                throw new AreaValidationException("City ID, State ID, and Country ID are required when Area ID is provided");
+                throw new AreaValidationException(
+                        "City ID, State ID, and Country ID are required when Area ID is provided");
             }
 
             // Validate gender_id exists in gender_master table
@@ -93,10 +96,10 @@ public class PatientController {
             if (genderId == null || genderId.trim().isEmpty()) {
                 throw new GenderValidationException("Gender is required and cannot be null or empty", true);
             }
-            
+
             String genderValidationSql = "SELECT COUNT(*) FROM gender_master WHERE id = ?";
             Integer genderCount = jdbcTemplate.queryForObject(genderValidationSql, Integer.class, genderId);
-            
+
             if (genderCount == null || genderCount == 0) {
                 throw new GenderValidationException(genderId);
             }
@@ -104,10 +107,10 @@ public class PatientController {
             // Check for duplicate patient (matching stored procedure logic)
             String duplicateCheckSql = "SELECT ID FROM patient_master " +
                     "WHERE last_name = ? AND first_name = ? AND gender_id = ? AND clinic_id = ?";
-            
+
             List<Map<String, Object>> existingPatients = jdbcTemplate.queryForList(duplicateCheckSql,
                     req.lastName(), req.firstName(), genderId, req.clinicId());
-            
+
             if (!existingPatients.isEmpty()) {
                 Map<String, Object> result = new HashMap<>();
                 result.put("SAVE_STATUS", 0);
@@ -166,15 +169,14 @@ public class PatientController {
                     req.userId(), // modifiedby_name
                     0, // patient_last_visit_no
                     req.referBy(),
-                    req.referDoctorDetails()
-            );
+                    req.referDoctorDetails());
 
             // Return response matching stored procedure format
             Map<String, Object> result = new HashMap<>();
             result.put("SAVE_STATUS", 1);
             result.put("ID", patientId);
             result.put("message", "Patient registered successfully");
-            
+
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -189,44 +191,45 @@ public class PatientController {
             // Get sequence number for PAT entity type
             String sequenceSql = "SELECT last_sequenceno, prefix_char, total_length " +
                     "FROM sequence_nos WHERE clinic_id = ? AND entity_type = 'PAT'";
-            
+
             List<Map<String, Object>> sequenceResult = jdbcTemplate.queryForList(sequenceSql, clinicId);
-            
+
             if (sequenceResult.isEmpty()) {
                 // Create default sequence entry if not exists
                 String insertSequenceSql = "INSERT INTO sequence_nos " +
-                        "(doctor_id, entity_type, entity_name, prefix_char, total_length, last_sequenceno, clinic_id) " +
+                        "(doctor_id, entity_type, entity_name, prefix_char, total_length, last_sequenceno, clinic_id) "
+                        +
                         "VALUES (?, 'PAT', 'PATIENT', '', 5, 0, ?)";
                 jdbcTemplate.update(insertSequenceSql, "DEFAULT", clinicId);
-                
+
                 // Retry getting sequence
                 sequenceResult = jdbcTemplate.queryForList(sequenceSql, clinicId);
                 if (sequenceResult.isEmpty()) {
                     return null;
                 }
             }
-            
+
             Map<String, Object> sequenceData = sequenceResult.get(0);
             Long lastSequenceNo = ((Number) sequenceData.get("last_sequenceno")).longValue();
             Integer totalLength = ((Number) sequenceData.get("total_length")).intValue();
-            
+
             // Increment sequence number
             lastSequenceNo = lastSequenceNo + 1;
-            
+
             // Generate patient ID in format: DD-MM-YYYY-XXXXX
             java.time.LocalDate today = java.time.LocalDate.now();
-            String dateStr = String.format("%02d-%02d-%04d", 
+            String dateStr = String.format("%02d-%02d-%04d",
                     today.getDayOfMonth(), today.getMonthValue(), today.getYear());
-            
+
             // Pad sequence number with zeros
             String paddedSequence = String.format("%0" + totalLength + "d", lastSequenceNo);
             String patientId = dateStr + "-" + paddedSequence;
-            
+
             // Update sequence number
             String updateSequenceSql = "UPDATE sequence_nos SET last_sequenceno = ? " +
                     "WHERE clinic_id = ? AND entity_type = 'PAT'";
             jdbcTemplate.update(updateSequenceSql, lastSequenceNo, clinicId);
-            
+
             return patientId;
         } catch (Exception e) {
             return null;
@@ -265,8 +268,8 @@ public class PatientController {
             String emergencyPhone,
             String allergies,
             String medicalHistory,
-            String familyHistory
-    ) {}
+            String familyHistory) {
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<?> getPatient(@PathVariable String id) {
@@ -296,7 +299,11 @@ public class PatientController {
                     "pm.country_id, " +
                     "pm.state_id, " +
                     "pm.city_id, " +
+                    "(SELECT ct.city_name FROM city_translations ct WHERE ct.city_id = pm.city_id AND ct.language_id = 1 LIMIT 1) AS city_name, "
+                    +
                     "pm.area_id, " +
+                    "(SELECT at.area_name FROM area_translations at WHERE at.area_id = pm.area_id AND at.city_id = pm.city_id AND at.state_id = pm.state_id AND at.country_id = pm.country_id AND at.language_id = 1) AS area_name, "
+                    +
                     "pm.pincode, " +
                     "pm.occupation_id, " +
                     "pm.bloodgroup_id, " +
@@ -310,13 +317,13 @@ public class PatientController {
                     "WHERE pm.id = ? OR pm.folder_no = ?";
 
             List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id, id);
-            
+
             if (result.isEmpty()) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("error", "Patient not found with ID: " + id);
                 return ResponseEntity.notFound().build();
             }
-            
+
             return ResponseEntity.ok(result.get(0));
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -328,7 +335,8 @@ public class PatientController {
     @PutMapping("/{id}")
     public ResponseEntity<?> updatePatient(@PathVariable String id, @RequestBody FullRegistrationRequest req) {
         try {
-            // Use direct SQL UPDATE instead of stored procedure for PostgreSQL compatibility
+            // Use direct SQL UPDATE instead of stored procedure for PostgreSQL
+            // compatibility
             String sql = "UPDATE patient_master SET " +
                     "doctor_id = ?, folder_no = ?, first_name = ?, middle_name = ?, last_name = ?, " +
                     "mobile_1 = ?, area_id = ?, city_id = ?, state_id = ?, country_id = ?, " +
@@ -372,15 +380,16 @@ public class PatientController {
                     java.time.LocalDateTime.now(), // modified_on
                     req.userId(), // modifiedby_name
                     id, // WHERE id = ?
-                    id  // OR folder_no = ?
+                    id // OR folder_no = ?
             );
 
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("patientId", id);
             result.put("rowsAffected", rowsAffected);
-            result.put("message", rowsAffected > 0 ? "Patient updated successfully" : "No patient found with ID: " + id);
-            
+            result.put("message",
+                    rowsAffected > 0 ? "Patient updated successfully" : "No patient found with ID: " + id);
+
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -406,17 +415,18 @@ public class PatientController {
                     "pm.relationship_to_main_patient, " +
                     "pm.family_folder_no " +
                     "FROM patient_master pm " +
-                    "WHERE pm.family_folder_no = (SELECT family_folder_no FROM patient_master WHERE id = ? OR folder_no = ?) " +
+                    "WHERE pm.family_folder_no = (SELECT family_folder_no FROM patient_master WHERE id = ? OR folder_no = ?) "
+                    +
                     "OR pm.id = ? OR pm.folder_no = ?";
 
             List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id, id, id, id);
-            
+
             if (result.isEmpty()) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("error", "No family details found for patient ID: " + id);
                 return ResponseEntity.notFound().build();
             }
-            
+
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -436,7 +446,7 @@ public class PatientController {
                     "WHERE pv.patient_id = (SELECT id FROM patient_master WHERE id = ? OR folder_no = ?)";
 
             List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id, id);
-            
+
             if (result.isEmpty()) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("max_visit_number", 0);
@@ -444,7 +454,7 @@ public class PatientController {
                 response.put("patient_id", id);
                 return ResponseEntity.ok(response);
             }
-            
+
             return ResponseEntity.ok(result.get(0));
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -491,15 +501,15 @@ public class PatientController {
 
             String searchPattern = "%" + query + "%";
             List<Map<String, Object>> result;
-            
+
             if (!"all".equals(status)) {
-                result = jdbcTemplate.queryForList(baseSql, 
-                    searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, 
-                    status, size, page * size);
+                result = jdbcTemplate.queryForList(baseSql,
+                        searchPattern, searchPattern, searchPattern, searchPattern, searchPattern,
+                        status, size, page * size);
             } else {
-                result = jdbcTemplate.queryForList(baseSql, 
-                    searchPattern, searchPattern, searchPattern, searchPattern, searchPattern, 
-                    size, page * size);
+                result = jdbcTemplate.queryForList(baseSql,
+                        searchPattern, searchPattern, searchPattern, searchPattern, searchPattern,
+                        size, page * size);
             }
 
             Map<String, Object> response = new HashMap<>();
@@ -509,7 +519,7 @@ public class PatientController {
             response.put("size", size);
             response.put("query", query);
             response.put("status", status);
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -523,17 +533,21 @@ public class PatientController {
             @PathVariable String id,
             @RequestParam(required = false) String doctorId,
             @RequestParam(required = false) String clinicId) {
-        // This endpoint is specifically for the "Last Visit" column in the appointment screen
-        // It should only return completed visits (not waiting, in-progress, cancelled, etc.)
-        // It includes today's completed visits if the patient has completed a visit today
+        // This endpoint is specifically for the "Last Visit" column in the appointment
+        // screen
+        // It should only return completed visits (not waiting, in-progress, cancelled,
+        // etc.)
+        // It includes today's completed visits if the patient has completed a visit
+        // today
         try {
-            System.out.println("DEBUG - getPreviousVisitDates called with patient ID: " + id + 
-                ", doctorId: " + doctorId + ", clinicId: " + clinicId);
-            
-            // First, dynamically determine the correct status IDs based on doctor and clinic
+            System.out.println("DEBUG - getPreviousVisitDates called with patient ID: " + id +
+                    ", doctorId: " + doctorId + ", clinicId: " + clinicId);
+
+            // First, dynamically determine the correct status IDs based on doctor and
+            // clinic
             String completedStatusId = null;
             String excludedStatusIds = "4, 5, 11, 12"; // Default exclusions
-            
+
             if (doctorId != null && clinicId != null) {
                 // Try to find the "Completed" status for this doctor and clinic
                 String statusQuery = "SELECT id FROM status_ref WHERE " +
@@ -543,36 +557,41 @@ public class PatientController {
                         "ORDER BY CASE WHEN doctor_id = ? THEN 1 ELSE 2 END, " +
                         "CASE WHEN clinic_id = ? THEN 1 ELSE 2 END " +
                         "LIMIT 1";
-                
+
                 try {
-                    List<Map<String, Object>> statusResult = jdbcTemplate.queryForList(statusQuery, doctorId, clinicId, doctorId, clinicId);
+                    List<Map<String, Object>> statusResult = jdbcTemplate.queryForList(statusQuery, doctorId, clinicId,
+                            doctorId, clinicId);
                     if (!statusResult.isEmpty()) {
                         completedStatusId = statusResult.get(0).get("id").toString();
-                        System.out.println("DEBUG - Found completed status ID: " + completedStatusId + " for doctor: " + doctorId + ", clinic: " + clinicId);
+                        System.out.println("DEBUG - Found completed status ID: " + completedStatusId + " for doctor: "
+                                + doctorId + ", clinic: " + clinicId);
                     }
                 } catch (Exception e) {
-                    System.out.println("DEBUG - Could not find completed status, using default filtering: " + e.getMessage());
+                    System.out.println(
+                            "DEBUG - Could not find completed status, using default filtering: " + e.getMessage());
                 }
-                
+
                 // Also get excluded status IDs (cancelled, no-show, etc.)
                 String excludedStatusQuery = "SELECT id FROM status_ref WHERE " +
-                        "(status_description ILIKE '%cancel%' OR status_description ILIKE '%no%show%' OR status_description ILIKE '%invalid%') " +
+                        "(status_description ILIKE '%cancel%' OR status_description ILIKE '%no%show%' OR status_description ILIKE '%invalid%') "
+                        +
                         "AND (doctor_id = ? OR doctor_id IS NULL) " +
                         "AND (clinic_id = ? OR clinic_id IS NULL)";
-                
+
                 try {
-                    List<Map<String, Object>> excludedResult = jdbcTemplate.queryForList(excludedStatusQuery, doctorId, clinicId);
+                    List<Map<String, Object>> excludedResult = jdbcTemplate.queryForList(excludedStatusQuery, doctorId,
+                            clinicId);
                     if (!excludedResult.isEmpty()) {
                         excludedStatusIds = excludedResult.stream()
-                            .map(row -> row.get("id").toString())
-                            .collect(java.util.stream.Collectors.joining(","));
+                                .map(row -> row.get("id").toString())
+                                .collect(java.util.stream.Collectors.joining(","));
                         System.out.println("DEBUG - Found excluded status IDs: " + excludedStatusIds);
                     }
                 } catch (Exception e) {
                     System.out.println("DEBUG - Could not find excluded statuses, using default: " + e.getMessage());
                 }
             }
-            
+
             // Build the query with dynamic status filtering
             // For "Last Visit" column, we ALWAYS want to show only completed visits
             String statusFilter;
@@ -583,12 +602,13 @@ public class PatientController {
             } else {
                 // If no completed status found, try to find it with broader search
                 System.out.println("DEBUG - No completed status found, trying broader search...");
-                
+
                 // Try broader search for completed status
                 String broaderStatusQuery = "SELECT id FROM status_ref WHERE " +
-                        "(status_description ILIKE '%complete%' OR status_description ILIKE '%finish%' OR status_description ILIKE '%done%') " +
+                        "(status_description ILIKE '%complete%' OR status_description ILIKE '%finish%' OR status_description ILIKE '%done%') "
+                        +
                         "ORDER BY id LIMIT 1";
-                
+
                 try {
                     List<Map<String, Object>> broaderResult = jdbcTemplate.queryForList(broaderStatusQuery);
                     if (!broaderResult.isEmpty()) {
@@ -598,14 +618,15 @@ public class PatientController {
                     } else {
                         // Last resort: exclude only clearly non-completed statuses
                         statusFilter = "AND pv.status_id NOT IN (" + excludedStatusIds + ")";
-                        System.out.println("DEBUG - No completed status found, using exclusion filter: " + excludedStatusIds);
+                        System.out.println(
+                                "DEBUG - No completed status found, using exclusion filter: " + excludedStatusIds);
                     }
                 } catch (Exception e) {
                     System.out.println("DEBUG - Broader search failed, using exclusion filter: " + e.getMessage());
                     statusFilter = "AND pv.status_id NOT IN (" + excludedStatusIds + ")";
                 }
             }
-            
+
             String sql = "SELECT " +
                     "pv.visit_date, " +
                     "pv.visit_time, " +
@@ -619,34 +640,36 @@ public class PatientController {
                     "WHERE pv.patient_id = (SELECT id FROM patient_master WHERE id = ? OR folder_no = ?) " +
                     "AND pv.delete_flag = false " +
                     statusFilter + " " +
-                    "ORDER BY pv.visit_date DESC, pv.visit_time DESC " + // Sort newest first so first item is the latest completed visit
+                    "ORDER BY pv.visit_date DESC, pv.visit_time DESC " + // Sort newest first so first item is the
+                                                                         // latest completed visit
                     "LIMIT 10"; // Get last 10 valid previous visits
 
             System.out.println("DEBUG - Simplified Query: " + sql);
             System.out.println("DEBUG - Parameters: patient_id=" + id + ", folder_no=" + id);
 
             List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id, id);
-            
-            System.out.println("DEBUG - Found " + result.size() + " completed visits for patient " + id + " (including today's if completed)");
-            
+
+            System.out.println("DEBUG - Found " + result.size() + " completed visits for patient " + id
+                    + " (including today's if completed)");
+
             // Debug: Print the actual results
             for (int i = 0; i < Math.min(result.size(), 5); i++) {
                 Map<String, Object> row = result.get(i);
-                System.out.println("DEBUG - Visit " + i + ": " + 
-                    "Date=" + row.get("visit_date") + 
-                    ", Time=" + row.get("visit_time") + 
-                    ", VisitNo=" + row.get("patient_visit_no") + 
-                    ", Status=" + row.get("status_id") + 
-                    ", Doctor=" + row.get("doctor_id") +
-                    ", PatientId=" + id);
+                System.out.println("DEBUG - Visit " + i + ": " +
+                        "Date=" + row.get("visit_date") +
+                        ", Time=" + row.get("visit_time") +
+                        ", VisitNo=" + row.get("patient_visit_no") +
+                        ", Status=" + row.get("status_id") +
+                        ", Doctor=" + row.get("doctor_id") +
+                        ", PatientId=" + id);
             }
-            
+
             // Additional debug: Check if all patients are getting the same date
             if (!result.isEmpty()) {
                 Map<String, Object> firstVisit = result.get(0);
                 System.out.println("DEBUG - First visit date for patient " + id + ": " + firstVisit.get("visit_date"));
             }
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("visits", result);
             response.put("total_visits", result.size());
@@ -656,7 +679,7 @@ public class PatientController {
             response.put("status_filter_used", statusFilter);
             response.put("doctor_id", doctorId);
             response.put("clinic_id", clinicId);
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             System.out.println("ERROR - getPreviousVisitDates failed: " + e.getMessage());
@@ -671,8 +694,9 @@ public class PatientController {
     public ResponseEntity<?> debugPatientVisits(@PathVariable String id) {
         try {
             System.out.println("DEBUG - debugPatientVisits called with patient ID: " + id);
-            
-            // Get all visits for this patient (no filtering) to see what's actually in the DB
+
+            // Get all visits for this patient (no filtering) to see what's actually in the
+            // DB
             String sql = "SELECT " +
                     "pv.visit_date, " +
                     "pv.visit_time, " +
@@ -689,22 +713,22 @@ public class PatientController {
                     "LIMIT 20";
 
             List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, id, id);
-            
+
             System.out.println("DEBUG - Found " + result.size() + " total visits for patient " + id);
-            
+
             // Debug: Print all visits
             for (int i = 0; i < result.size(); i++) {
                 Map<String, Object> row = result.get(i);
-                System.out.println("DEBUG - Visit " + i + ": " + 
-                    "Date=" + row.get("visit_date") + 
-                    ", Time=" + row.get("visit_time") + 
-                    ", VisitNo=" + row.get("patient_visit_no") + 
-                    ", Status=" + row.get("status_id") + 
-                    ", Doctor=" + row.get("doctor_id") +
-                    ", DeleteFlag=" + row.get("delete_flag") +
-                    ", LastVisitNo=" + row.get("patient_last_visit_no"));
+                System.out.println("DEBUG - Visit " + i + ": " +
+                        "Date=" + row.get("visit_date") +
+                        ", Time=" + row.get("visit_time") +
+                        ", VisitNo=" + row.get("patient_visit_no") +
+                        ", Status=" + row.get("status_id") +
+                        ", Doctor=" + row.get("doctor_id") +
+                        ", DeleteFlag=" + row.get("delete_flag") +
+                        ", LastVisitNo=" + row.get("patient_last_visit_no"));
             }
-            
+
             // Also get status breakdown
             String statusSql = "SELECT " +
                     "pv.status_id, " +
@@ -714,33 +738,35 @@ public class PatientController {
                     "AND pv.delete_flag = false " +
                     "GROUP BY pv.status_id " +
                     "ORDER BY pv.status_id";
-            
+
             List<Map<String, Object>> statusResult = jdbcTemplate.queryForList(statusSql, id, id);
             System.out.println("DEBUG - Status breakdown for patient " + id + ":");
             for (Map<String, Object> statusRow : statusResult) {
-                System.out.println("DEBUG - Status " + statusRow.get("status_id") + ": " + statusRow.get("count") + " visits");
+                System.out.println(
+                        "DEBUG - Status " + statusRow.get("status_id") + ": " + statusRow.get("count") + " visits");
             }
-            
+
             // Also get status descriptions for the status IDs found
             if (!statusResult.isEmpty()) {
                 String statusIds = statusResult.stream()
-                    .map(row -> row.get("status_id").toString())
-                    .collect(java.util.stream.Collectors.joining(","));
-                
+                        .map(row -> row.get("status_id").toString())
+                        .collect(java.util.stream.Collectors.joining(","));
+
                 String statusDescSql = "SELECT id, status_description FROM status_ref WHERE id IN (" + statusIds + ")";
                 List<Map<String, Object>> statusDescResult = jdbcTemplate.queryForList(statusDescSql);
                 System.out.println("DEBUG - Status descriptions for patient " + id + ":");
                 for (Map<String, Object> descRow : statusDescResult) {
-                    System.out.println("DEBUG - Status ID " + descRow.get("id") + ": " + descRow.get("status_description"));
+                    System.out.println(
+                            "DEBUG - Status ID " + descRow.get("id") + ": " + descRow.get("status_description"));
                 }
             }
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("all_visits", result);
             response.put("status_breakdown", statusResult);
             response.put("total_visits", result.size());
             response.put("patient_id", id);
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             System.out.println("ERROR - debugPatientVisits failed: " + e.getMessage());
@@ -755,36 +781,36 @@ public class PatientController {
     public ResponseEntity<?> getStatusRefData() {
         try {
             System.out.println("DEBUG - Getting status_ref table data");
-            
+
             // Get all status references to see what's actually in the database
             String sql = "SELECT id, status_description, clinic_id, doctor_id FROM status_ref ORDER BY id";
-            
+
             List<Map<String, Object>> result = jdbcTemplate.queryForList(sql);
-            
+
             System.out.println("DEBUG - Found " + result.size() + " status references");
-            
+
             // Debug: Print all status references
             for (Map<String, Object> row : result) {
-                System.out.println("DEBUG - Status ID " + row.get("id") + ": " + 
-                    row.get("status_description") + 
-                    " (Clinic: " + row.get("clinic_id") + 
-                    ", Doctor: " + row.get("doctor_id") + ")");
+                System.out.println("DEBUG - Status ID " + row.get("id") + ": " +
+                        row.get("status_description") +
+                        " (Clinic: " + row.get("clinic_id") +
+                        ", Doctor: " + row.get("doctor_id") + ")");
             }
-            
+
             // Also get what status IDs are actually used in patient_visits
             String visitsStatusSql = "SELECT status_id, COUNT(*) as count FROM patient_visits WHERE delete_flag = false GROUP BY status_id ORDER BY status_id";
             List<Map<String, Object>> visitsStatusResult = jdbcTemplate.queryForList(visitsStatusSql);
-            
+
             System.out.println("DEBUG - Status IDs actually used in patient_visits:");
             for (Map<String, Object> row : visitsStatusResult) {
                 System.out.println("DEBUG - Status ID " + row.get("status_id") + ": " + row.get("count") + " visits");
             }
-            
+
             Map<String, Object> response = new HashMap<>();
             response.put("status_ref", result);
             response.put("visits_status_usage", visitsStatusResult);
             response.put("total_statuses", result.size());
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             System.out.println("ERROR - getStatusRefData failed: " + e.getMessage());
@@ -816,19 +842,19 @@ public class PatientController {
                     "AND pv.shift_id = ? " +
                     "WHERE pm.id = ? OR pm.folder_no = ?";
 
-            List<Map<String, Object>> result = jdbcTemplate.queryForList(sql, 
-                java.sql.Date.valueOf(date), 
-                Integer.valueOf(shiftId), 
-                patientId, 
-                patientId);
-            
+            List<Map<String, Object>> result = jdbcTemplate.queryForList(sql,
+                    java.sql.Date.valueOf(date),
+                    Integer.valueOf(shiftId),
+                    patientId,
+                    patientId);
+
             if (result.isEmpty()) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("patient_exists", false);
                 response.put("message", "Patient not found with ID: " + patientId);
                 return ResponseEntity.ok(response);
             }
-            
+
             Map<String, Object> patientData = result.get(0);
             Map<String, Object> response = new HashMap<>();
             response.put("patient_exists", true);
@@ -836,7 +862,7 @@ public class PatientController {
             response.put("has_visit_on_date", patientData.get("has_visit_on_date"));
             response.put("visit_date", date);
             response.put("shift_id", shiftId);
-            
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -845,5 +871,3 @@ public class PatientController {
         }
     }
 }
-
-
