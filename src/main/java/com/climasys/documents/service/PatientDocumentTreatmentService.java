@@ -35,7 +35,7 @@ public class PatientDocumentTreatmentService {
 
     @Value("${climasys.file-upload.max-file-size:4}")
     private long maxFileSizeMB;
-    
+
     @Value("${climasys.file-upload.delete.require-physical-deletion:true}")
     private boolean requirePhysicalDeletion;
 
@@ -43,13 +43,13 @@ public class PatientDocumentTreatmentService {
      * Insert a new patient document treatment record
      * Equivalent to USP_INSERT_PatientDocuments_Treatment
      *
-     * @param patientId Patient ID
-     * @param doctorId Doctor ID
-     * @param clinicId Clinic ID
-     * @param documentName Document name/path
-     * @param createdByName User who created the document
+     * @param patientId      Patient ID
+     * @param doctorId       Doctor ID
+     * @param clinicId       Clinic ID
+     * @param documentName   Document name/path
+     * @param createdByName  User who created the document
      * @param patientVisitNo Patient visit number
-     * @param visitDate Visit date
+     * @param visitDate      Visit date
      * @return Map containing success status and document details
      */
     @Transactional
@@ -62,8 +62,8 @@ public class PatientDocumentTreatmentService {
             Integer patientVisitNo,
             LocalDateTime visitDate) {
 
-        logger.info("Inserting patient document treatment - PatientId: {}, DocumentName: {}, VisitNo: {}", 
-                    patientId, documentName, patientVisitNo);
+        logger.info("Inserting patient document treatment - PatientId: {}, DocumentName: {}, VisitNo: {}",
+                patientId, documentName, patientVisitNo);
 
         Map<String, Object> response = new HashMap<>();
 
@@ -115,7 +115,7 @@ public class PatientDocumentTreatmentService {
 
         try {
             List<PatientDocumentTreatment> documents = repository.findByPatientIdAndVisitNo(patientId, visitNo);
-            
+
             response.put("success", true);
             response.put("documents", documents);
             response.put("count", documents.size());
@@ -139,7 +139,7 @@ public class PatientDocumentTreatmentService {
 
         try {
             List<PatientDocumentTreatment> documents = repository.findByPatientId(patientId);
-            
+
             response.put("success", true);
             response.put("documents", documents);
             response.put("count", documents.size());
@@ -164,17 +164,17 @@ public class PatientDocumentTreatmentService {
 
         try {
             Optional<PatientDocumentTreatment> documentOpt = repository.findById(documentId);
-            
+
             if (documentOpt.isPresent()) {
                 PatientDocumentTreatment document = documentOpt.get();
                 document.setDeleteFlag(true);
                 document.setModifiedOn(LocalDateTime.now());
                 document.setModifiedName(userId);
-                
+
                 repository.save(document);
-                
+
                 logger.info("Successfully deleted document ID: {} by user: {}", documentId, userId);
-                
+
                 response.put("success", true);
                 response.put("message", "Document deleted successfully");
                 response.put("documentId", documentId);
@@ -194,7 +194,8 @@ public class PatientDocumentTreatmentService {
 
     /**
      * Delete document with physical file deletion as part of a transaction
-     * This method ensures both file system and database operations succeed or fail together
+     * This method ensures both file system and database operations succeed or fail
+     * together
      */
     @Transactional
     public Map<String, Object> deleteDocumentWithPhysicalFile(Integer documentId, String userId) {
@@ -202,48 +203,51 @@ public class PatientDocumentTreatmentService {
 
         try {
             Optional<PatientDocumentTreatment> documentOpt = repository.findById(documentId);
-            
+
             if (documentOpt.isPresent()) {
                 PatientDocumentTreatment document = documentOpt.get();
                 String filePath = document.getDocumentName(); // document_name stores the file path
-                
+
                 // Step 1: Delete physical file first - MUST succeed before database update
                 boolean fileDeleted = false;
                 String fileStatus = "unknown";
-                
+
                 if (filePath != null && !filePath.trim().isEmpty()) {
                     logger.info("Attempting to delete file: {} for document ID: {}", filePath, documentId);
-                    
+
                     // Try different path formats to handle various storage scenarios
                     fileDeleted = fileStorageService.deleteFile(filePath);
-                    
+
                     if (!fileDeleted) {
                         logger.warn("Failed to delete physical file: {} for document ID: {}", filePath, documentId);
-                        
+
                         // Try alternative path resolution
                         String alternativePath = filePath.startsWith("/") ? filePath.substring(1) : filePath;
                         if (!alternativePath.equals(filePath)) {
                             logger.info("Trying alternative path: {}", alternativePath);
                             fileDeleted = fileStorageService.deleteFile(alternativePath);
                         }
-                        
+
                         if (!fileDeleted) {
                             // Check if file exists at all
-                            boolean fileExists = fileStorageService.fileExists(filePath) || 
-                                               fileStorageService.fileExists(alternativePath);
-                            
+                            boolean fileExists = fileStorageService.fileExists(filePath) ||
+                                    fileStorageService.fileExists(alternativePath);
+
                             if (!fileExists) {
                                 fileStatus = "not_found";
-                                logger.info("Physical file not found for document ID: {} - treating as already deleted", documentId);
+                                logger.info("Physical file not found for document ID: {} - treating as already deleted",
+                                        documentId);
                                 fileDeleted = true; // Consider it successful if file doesn't exist
                             } else {
                                 fileStatus = "deletion_failed";
-                                logger.error("All attempts to delete physical file failed for document ID: {}", documentId);
-                                
+                                logger.error("All attempts to delete physical file failed for document ID: {}",
+                                        documentId);
+
                                 if (requirePhysicalDeletion) {
                                     // CRITICAL: Do not proceed with database update if file deletion failed
                                     response.put("success", false);
-                                    response.put("error", "Failed to delete physical file. Database record not updated.");
+                                    response.put("error",
+                                            "Failed to delete physical file. Database record not updated.");
                                     response.put("documentId", documentId);
                                     response.put("fileDeleted", false);
                                     response.put("fileStatus", fileStatus);
@@ -251,12 +255,14 @@ public class PatientDocumentTreatmentService {
                                     return response; // Exit early - no database update
                                 } else {
                                     // Legacy behavior: continue with soft delete even if file deletion fails
-                                    logger.warn("Continuing with database update despite failed file deletion (requirePhysicalDeletion=false)");
+                                    logger.warn(
+                                            "Continuing with database update despite failed file deletion (requirePhysicalDeletion=false)");
                                 }
                             }
                         } else {
                             fileStatus = "deleted_alternative_path";
-                            logger.info("Successfully deleted physical file using alternative path: {}", alternativePath);
+                            logger.info("Successfully deleted physical file using alternative path: {}",
+                                    alternativePath);
                         }
                     } else {
                         fileStatus = "deleted";
@@ -264,20 +270,23 @@ public class PatientDocumentTreatmentService {
                     }
                 } else {
                     fileStatus = "no_path";
-                    logger.info("No file path found for document ID: {} - proceeding with database update only", documentId);
+                    logger.info("No file path found for document ID: {} - proceeding with database update only",
+                            documentId);
                     fileDeleted = true; // Consider it successful if no file path
                 }
-                
-                // Step 2: Soft delete in database ONLY if file deletion was successful (or if requirePhysicalDeletion is false)
+
+                // Step 2: Soft delete in database ONLY if file deletion was successful (or if
+                // requirePhysicalDeletion is false)
                 if (fileDeleted || (!requirePhysicalDeletion && "deletion_failed".equals(fileStatus))) {
                     document.setDeleteFlag(true);
                     document.setModifiedOn(LocalDateTime.now());
                     document.setModifiedName(userId);
-                    
+
                     repository.save(document);
                     logger.info("Database record updated successfully for document ID: {}", documentId);
                 } else {
-                    logger.error("Skipping database update due to failed file deletion for document ID: {}", documentId);
+                    logger.error("Skipping database update due to failed file deletion for document ID: {}",
+                            documentId);
                     response.put("success", false);
                     response.put("error", "File deletion failed. Database record not updated.");
                     response.put("documentId", documentId);
@@ -286,17 +295,17 @@ public class PatientDocumentTreatmentService {
                     response.put("filePath", filePath);
                     return response; // Exit early - no database update
                 }
-                
-                logger.info("Successfully deleted document ID: {} by user: {} (file status: {})", 
-                    documentId, userId, fileStatus);
-                
+
+                logger.info("Successfully deleted document ID: {} by user: {} (file status: {})",
+                        documentId, userId, fileStatus);
+
                 response.put("success", true);
                 response.put("message", "Document deleted successfully");
                 response.put("documentId", documentId);
                 response.put("fileDeleted", fileDeleted);
                 response.put("fileStatus", fileStatus);
                 response.put("filePath", filePath);
-                
+
                 // Add specific message based on file status
                 if ("not_found".equals(fileStatus)) {
                     response.put("message", "Document deleted successfully (file was already missing)");
@@ -307,7 +316,7 @@ public class PatientDocumentTreatmentService {
                 } else if ("no_path".equals(fileStatus)) {
                     response.put("message", "Document deleted successfully (no file path)");
                 }
-                
+
             } else {
                 response.put("success", false);
                 response.put("error", "Document not found with ID: " + documentId);
@@ -317,7 +326,7 @@ public class PatientDocumentTreatmentService {
             logger.error("Error deleting document with physical file: {}", e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to delete document: " + e.getMessage());
-            
+
             // Transaction will be rolled back automatically due to @Transactional
             // This ensures database consistency even if file operations fail
         }
@@ -334,17 +343,17 @@ public class PatientDocumentTreatmentService {
 
         try {
             Optional<PatientDocumentTreatment> documentOpt = repository.findById(documentId);
-            
+
             if (documentOpt.isPresent()) {
                 PatientDocumentTreatment document = documentOpt.get();
                 document.setDocumentName(documentName);
                 document.setModifiedOn(LocalDateTime.now());
                 document.setModifiedName(userId);
-                
+
                 PatientDocumentTreatment updatedDocument = repository.save(document);
-                
+
                 logger.info("Successfully updated document ID: {} by user: {}", documentId, userId);
-                
+
                 response.put("success", true);
                 response.put("message", "Document updated successfully");
                 response.put("document", updatedDocument);
@@ -366,13 +375,13 @@ public class PatientDocumentTreatmentService {
      * Upload and save a single file for patient treatment
      * Equivalent to .NET: UploadFileSubmit() method
      * 
-     * @param file MultipartFile to upload
-     * @param patientId Patient ID
-     * @param doctorId Doctor ID
-     * @param clinicId Clinic ID
-     * @param createdByName User who uploaded
+     * @param file           MultipartFile to upload
+     * @param patientId      Patient ID
+     * @param doctorId       Doctor ID
+     * @param clinicId       Clinic ID
+     * @param createdByName  User who uploaded
      * @param patientVisitNo Visit number
-     * @param visitDate Visit date
+     * @param visitDate      Visit date
      * @return Map containing success status and document details
      */
     @Transactional
@@ -395,28 +404,37 @@ public class PatientDocumentTreatmentService {
                 return response;
             }
 
-            // Validate file size - Equivalent to: long filesize = ((FU_AttachDocument.PostedFile.ContentLength) / 1024) / 1024;
+            // Validate file size - Equivalent to: long filesize =
+            // ((FU_AttachDocument.PostedFile.ContentLength) / 1024) / 1024;
             if (!fileStorageService.validateFileSize(file, maxFileSizeMB)) {
                 response.put("success", false);
                 response.put("error", "File size exceeds maximum allowed size of " + maxFileSizeMB + " MB");
                 return response;
             }
 
-            // Save file to file system - Equivalent to: hpf.SaveAs(Server.MapPath(Savepath));
+            // Validate file extension
+            String[] allowedExtensions = { "jpg", "jpeg", "png", "gif", "pdf", "xls", "xlsx", "doc", "docx" };
+            if (!fileStorageService.validateFileExtension(file.getOriginalFilename(), allowedExtensions)) {
+                response.put("success", false);
+                response.put("error", "Invalid file format. Allowed: Image, PDF, Excel, DOC.");
+                return response;
+            }
+
+            // Save file to file system - Equivalent to:
+            // hpf.SaveAs(Server.MapPath(Savepath));
             String savedFilePath = fileStorageService.saveFile(file, patientId, "patient-documents");
-            
+
             logger.info("File saved to: {} for patient: {}", savedFilePath, patientId);
 
             // Save document record to database
             Map<String, Object> dbResult = insertPatientDocumentTreatment(
-                patientId,
-                doctorId,
-                clinicId,
-                savedFilePath,
-                createdByName,
-                patientVisitNo,
-                visitDate
-            );
+                    patientId,
+                    doctorId,
+                    clinicId,
+                    savedFilePath,
+                    createdByName,
+                    patientVisitNo,
+                    visitDate);
 
             return dbResult;
 
@@ -437,13 +455,13 @@ public class PatientDocumentTreatmentService {
      * Upload and save multiple files for patient treatment
      * Equivalent to .NET: UploadFileSubmit() with HttpFileCollection
      * 
-     * @param files Array of MultipartFiles
-     * @param patientId Patient ID
-     * @param doctorId Doctor ID
-     * @param clinicId Clinic ID
-     * @param createdByName User who uploaded
+     * @param files          Array of MultipartFiles
+     * @param patientId      Patient ID
+     * @param doctorId       Doctor ID
+     * @param clinicId       Clinic ID
+     * @param createdByName  User who uploaded
      * @param patientVisitNo Visit number
-     * @param visitDate Visit date
+     * @param visitDate      Visit date
      * @return Map containing success status and list of uploaded documents
      */
     @Transactional
@@ -475,23 +493,34 @@ public class PatientDocumentTreatmentService {
                 return response;
             }
 
-            // Save files to file system - Equivalent to: for (int i = 0; i < hfc.Count - 1; i++)
+            // Validate file extensions for all files
+            String[] allowedExtensions = { "jpg", "jpeg", "png", "gif", "pdf", "xls", "xlsx", "doc", "docx" };
+            for (MultipartFile file : files) {
+                if (!file.isEmpty()
+                        && !fileStorageService.validateFileExtension(file.getOriginalFilename(), allowedExtensions)) {
+                    response.put("success", false);
+                    response.put("error", "Invalid format in one or more files. Allowed: Image, PDF, Excel, DOC.");
+                    return response;
+                }
+            }
+
+            // Save files to file system - Equivalent to: for (int i = 0; i < hfc.Count - 1;
+            // i++)
             List<String> savedFilePaths = fileStorageService.saveMultipleFiles(files, patientId, "patient-documents");
-            
+
             logger.info("Saved {} files for patient: {}", savedFilePaths.size(), patientId);
 
             // Save each document record to database
             for (String filePath : savedFilePaths) {
                 try {
                     Map<String, Object> dbResult = insertPatientDocumentTreatment(
-                        patientId,
-                        doctorId,
-                        clinicId,
-                        filePath,
-                        createdByName,
-                        patientVisitNo,
-                        visitDate
-                    );
+                            patientId,
+                            doctorId,
+                            clinicId,
+                            filePath,
+                            createdByName,
+                            patientVisitNo,
+                            visitDate);
 
                     if ((Boolean) dbResult.get("success")) {
                         uploadedDocuments.add(dbResult);
@@ -510,7 +539,7 @@ public class PatientDocumentTreatmentService {
             response.put("uploadedCount", uploadedDocuments.size());
             response.put("totalFiles", files.length);
             response.put("documents", uploadedDocuments);
-            
+
             if (!errors.isEmpty()) {
                 response.put("errors", errors);
             }
@@ -542,17 +571,17 @@ public class PatientDocumentTreatmentService {
 
         try {
             Optional<PatientDocumentTreatment> documentOpt = repository.findById(documentId);
-            
+
             if (documentOpt.isPresent()) {
                 PatientDocumentTreatment document = documentOpt.get();
                 String filePath = document.getDocumentName();
-                
+
                 // Get file bytes
                 byte[] fileBytes = fileStorageService.getFileBytes(filePath);
-                
+
                 // Extract filename from path
                 String filename = filePath.substring(filePath.lastIndexOf('/') + 1);
-                
+
                 response.put("success", true);
                 response.put("fileBytes", fileBytes);
                 response.put("filename", filename);
@@ -581,7 +610,7 @@ public class PatientDocumentTreatmentService {
      */
     private String determineContentType(String filename) {
         String extension = fileStorageService.getFileExtension(filename);
-        
+
         return switch (extension.toLowerCase()) {
             case "pdf" -> "application/pdf";
             case "jpg", "jpeg" -> "image/jpeg";
@@ -596,4 +625,3 @@ public class PatientDocumentTreatmentService {
         };
     }
 }
-

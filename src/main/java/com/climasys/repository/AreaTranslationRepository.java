@@ -25,7 +25,7 @@ public interface AreaTranslationRepository extends JpaRepository<AreaTranslation
 
         @Query("SELECT at FROM AreaTranslation at INNER JOIN Area a ON at.id.areaId = a.id " +
                         "AND at.id.cityId = a.cityId AND at.id.countryId = a.countryId " +
-                        "WHERE at.id.languageId = :languageId AND at.areaName LIKE %:searchStr% AND a.isActivate = true")
+                        "WHERE at.id.languageId = :languageId AND LOWER(at.areaName) LIKE LOWER(CONCAT('%', :searchStr, '%')) AND a.isActivate = true")
         List<AreaTranslation> searchAreasByLanguageAndName(@Param("searchStr") String searchStr,
                         @Param("languageId") Integer languageId);
 }
