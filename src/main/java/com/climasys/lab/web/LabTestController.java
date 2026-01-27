@@ -1,5 +1,7 @@
 package com.climasys.lab.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.lab.service.LabTestService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +15,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/lab/tests")
+@RefreshSession
 public class LabTestController {
 
     @Autowired

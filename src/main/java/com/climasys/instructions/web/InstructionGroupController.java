@@ -1,5 +1,7 @@
 package com.climasys.instructions.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.instructions.dto.*;
 import com.climasys.instructions.service.InstructionGroupService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -26,6 +28,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/instruction-groups")
 @Tag(name = "Instruction Groups", description = "APIs for managing instruction groups and visit instructions")
+@RefreshSession
 public class InstructionGroupController {
     
     private static final Logger logger = LoggerFactory.getLogger(InstructionGroupController.class);
@@ -416,4 +419,3 @@ public class InstructionGroupController {
         }
     }
 }
-

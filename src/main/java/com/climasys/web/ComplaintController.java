@@ -1,5 +1,7 @@
 package com.climasys.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.service.ComplaintMasterService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,6 +19,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/complain")
+@RefreshSession
 public class ComplaintController {
 
     private static final Logger logger = LoggerFactory.getLogger(ComplaintController.class);

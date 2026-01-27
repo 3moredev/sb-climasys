@@ -1,5 +1,7 @@
 package com.climasys.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.entity.ProcedureFindings;
 import com.climasys.entity.ProcedureMaster;
 import com.climasys.service.ProcedureMasterService;
@@ -21,6 +23,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/procedure-master")
+@RefreshSession
 public class ProcedureMasterController {
 
     private static final Logger logger = LoggerFactory.getLogger(ProcedureMasterController.class);
@@ -309,4 +312,3 @@ public class ProcedureMasterController {
         }
     }
 }
-

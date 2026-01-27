@@ -1,5 +1,7 @@
 package com.climasys.appointments.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.appointments.service.AppointmentSchedulingService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -15,6 +17,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/appointments")
+@RefreshSession
 public class AppointmentSchedulingController {
 
     @Autowired

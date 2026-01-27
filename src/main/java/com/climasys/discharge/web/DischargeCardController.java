@@ -1,5 +1,7 @@
 package com.climasys.discharge.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.discharge.dto.DischargeCardDTO;
 import com.climasys.discharge.dto.DischargeCardDetailResponse;
 import com.climasys.discharge.dto.UpdateDischargeCardRequest;
@@ -27,6 +29,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/discharge")
 @Tag(name = "Discharge Cards", description = "APIs for managing patient discharge cards")
+@RefreshSession
 public class DischargeCardController {
     
     @Autowired
@@ -378,4 +381,3 @@ public class DischargeCardController {
         }
     }
 }
-

@@ -1,5 +1,7 @@
 package com.climasys.visits.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import jakarta.validation.constraints.NotBlank;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +31,7 @@ import java.util.HashSet;
 
 @RestController
 @RequestMapping("/api/visits")
+@RefreshSession
 public class VisitController {
 
     private static final Logger logger = LoggerFactory.getLogger(VisitController.class);

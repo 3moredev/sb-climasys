@@ -1,5 +1,7 @@
 package com.climasys.lab.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
@@ -10,6 +12,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/lab")
+@RefreshSession
 public class LabController {
 
     private final JdbcTemplate jdbcTemplate;
@@ -65,5 +68,4 @@ public class LabController {
         }
     }
 }
-
 

@@ -1,5 +1,7 @@
 package com.climasys.reference.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.service.ReferenceDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,6 +16,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/reference")
 @Tag(name = "Reference Data", description = "Reference data endpoints for genders, blood groups, and other lookup values")
+@RefreshSession
 public class ReferenceController {
 
     private final ReferenceDataService referenceDataService;

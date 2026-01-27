@@ -1,5 +1,7 @@
 package com.climasys.appointments.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.appointments.service.PatientExaminationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +15,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/examinations")
+@RefreshSession
 public class PatientExaminationController {
 
     @Autowired

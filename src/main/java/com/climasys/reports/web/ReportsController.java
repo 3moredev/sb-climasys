@@ -1,5 +1,7 @@
 package com.climasys.reports.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.reports.service.DashboardService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reports")
+@RefreshSession
 public class ReportsController {
 
     private final JdbcTemplate jdbcTemplate;

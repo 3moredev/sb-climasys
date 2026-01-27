@@ -1,5 +1,7 @@
 package com.climasys.lab.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.entity.LabTestMaster;
 import com.climasys.lab.service.LabTestMasterService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/lab/master")
 @Tag(name = "Lab Test Master", description = "Lab Test Master management APIs")
+@RefreshSession
 public class LabTestMasterController {
     
     @Autowired

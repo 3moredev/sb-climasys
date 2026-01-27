@@ -1,5 +1,7 @@
 package com.climasys.doctors.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.doctors.service.DoctorManagementService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +16,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/doctors")
+@RefreshSession
 public class DoctorManagementController {
 
     @Autowired

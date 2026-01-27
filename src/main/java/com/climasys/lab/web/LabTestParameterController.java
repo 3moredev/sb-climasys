@@ -1,5 +1,7 @@
 package com.climasys.lab.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.dto.LabTestAndParameterRequest;
 import com.climasys.entity.LabTestParameter;
 import com.climasys.lab.service.LabTestParameterService;
@@ -22,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/lab/master/parameters")
 @Tag(name = "Lab Test Parameters", description = "Operations for lab test parameters")
+@RefreshSession
 public class LabTestParameterController {
     
     @Autowired

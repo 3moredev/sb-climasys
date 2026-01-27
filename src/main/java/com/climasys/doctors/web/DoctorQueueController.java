@@ -1,5 +1,7 @@
 package com.climasys.doctors.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.doctors.service.DoctorQueueService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +15,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/doctors/queue")
+@RefreshSession
 public class DoctorQueueController {
 
     @Autowired

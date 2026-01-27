@@ -1,5 +1,7 @@
 package com.climasys.refdata.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.refdata.service.PatientProfileRefDataService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/refdata")
+@RefreshSession
 public class PatientProfileRefDataController {
 
     private final PatientProfileRefDataService refDataService;
@@ -49,5 +52,4 @@ public class PatientProfileRefDataController {
         return ResponseEntity.ok(refDataService.searchPrescriptionForPatientProfile(prefixText, doctorId, clinicId));
     }
 }
-
 

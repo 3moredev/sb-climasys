@@ -1,5 +1,7 @@
 package com.climasys.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.entity.DiagnosisMaster;
 import com.climasys.service.DiagnosisMasterService;
 import org.slf4j.Logger;
@@ -19,6 +21,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/diagnosis-master")
+@RefreshSession
 public class DiagnosisMasterController {
 
     private static final Logger logger = LoggerFactory.getLogger(DiagnosisMasterController.class);
@@ -349,4 +352,3 @@ public class DiagnosisMasterController {
         }
     }
 }
-

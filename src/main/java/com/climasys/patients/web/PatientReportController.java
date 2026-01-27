@@ -1,5 +1,7 @@
 package com.climasys.patients.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.patients.service.PatientReportService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -15,6 +17,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/patients/reports")
+@RefreshSession
 public class PatientReportController {
 
     @Autowired

@@ -1,5 +1,7 @@
 package com.climasys.documents.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.documents.service.PatientDocumentTreatmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -34,6 +36,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/patient-documents/treatment")
 @Tag(name = "Patient Document Treatment", description = "Manage patient treatment-related documents")
+@RefreshSession
 public class PatientDocumentTreatmentController {
 
     @Autowired
@@ -459,4 +462,3 @@ public class PatientDocumentTreatmentController {
         }
     }
 }
-

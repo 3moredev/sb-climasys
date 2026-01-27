@@ -1,5 +1,7 @@
 package com.climasys.visits.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.visits.service.ServiceVisitService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,6 +20,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/services")
+@RefreshSession
 public class ServiceVisitController {
 
     private static final Logger logger = LoggerFactory.getLogger(ServiceVisitController.class);
@@ -120,5 +123,4 @@ public class ServiceVisitController {
         }
     }
 }
-
 

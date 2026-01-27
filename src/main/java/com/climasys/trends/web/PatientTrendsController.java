@@ -1,5 +1,7 @@
 package com.climasys.trends.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.trends.dto.PatientTrendsDTO;
 import com.climasys.trends.service.PatientTrendsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/trends")
 @Tag(name = "Patient Trends", description = "APIs for retrieving patient vital signs history and clinical measurement trends")
+@RefreshSession
 public class PatientTrendsController {
     
     private static final Logger logger = LoggerFactory.getLogger(PatientTrendsController.class);
@@ -137,4 +140,3 @@ public class PatientTrendsController {
         }
     }
 }
-

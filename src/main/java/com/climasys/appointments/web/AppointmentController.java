@@ -1,5 +1,7 @@
 package com.climasys.appointments.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.appointments.service.AppointmentSchedulingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api")
 @Tag(name = "Appointments", description = "Appointment management endpoints for booking, updating, and deleting appointments")
+@RefreshSession
 public class AppointmentController {
 
     @Autowired
@@ -316,5 +319,4 @@ public class AppointmentController {
         }
     }
 }
-
 

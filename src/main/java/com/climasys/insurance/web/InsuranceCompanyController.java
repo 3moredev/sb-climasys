@@ -1,5 +1,7 @@
 package com.climasys.insurance.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.insurance.service.InsuranceCompanyService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -22,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/insurance/companies")
 @Tag(name = "Insurance Company", description = "APIs for managing insurance company data")
+@RefreshSession
 public class InsuranceCompanyController {
 
     @Autowired

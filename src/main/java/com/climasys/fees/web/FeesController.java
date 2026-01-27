@@ -1,5 +1,7 @@
 package com.climasys.fees.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.fees.service.FeesDetailsService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/fees")
+@RefreshSession
 public class FeesController {
 
     private final FeesDetailsService feesDetailsService;
@@ -80,5 +83,4 @@ public class FeesController {
         return ResponseEntity.ok(result);
     }
 }
-
 

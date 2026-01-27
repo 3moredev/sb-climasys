@@ -1,5 +1,7 @@
 package com.climasys.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +15,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/complaint-mock")
+@RefreshSession
 public class ComplaintSimpleController {
 
     /**

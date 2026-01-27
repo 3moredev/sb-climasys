@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.servlet.http.HttpSession;
 import java.util.HashMap;
 import java.util.Map;
+import com.climasys.auth.annotation.RefreshSession;
 
 /**
  * Controller for HTTP session management endpoints
@@ -32,6 +33,7 @@ public class HttpSessionController {
             @ApiResponse(responseCode = "401", description = "No active session", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class)))
     })
     @GetMapping("/info")
+    @RefreshSession
     public ResponseEntity<Map<String, Object>> getSessionInfo(HttpSession session) {
         try {
             Map<String, Object> sessionInfo = httpSessionService.getSessionInfo(session);
@@ -50,6 +52,7 @@ public class HttpSessionController {
 
     @Operation(summary = "Get Doctor ID", description = "Get doctor ID from current session")
     @GetMapping("/doctor-id")
+    @RefreshSession
     public ResponseEntity<Map<String, Object>> getDoctorId(HttpSession session) {
         try {
             String doctorId = httpSessionService.getDoctorId(session);
@@ -73,6 +76,7 @@ public class HttpSessionController {
 
     @Operation(summary = "Get Clinic ID", description = "Get clinic ID from current session")
     @GetMapping("/clinic-id")
+    @RefreshSession
     public ResponseEntity<Map<String, Object>> getClinicId(HttpSession session) {
         try {
             String clinicId = httpSessionService.getClinicId(session);
@@ -96,6 +100,7 @@ public class HttpSessionController {
 
     @Operation(summary = "Get Login ID", description = "Get login ID from current session")
     @GetMapping("/login-id")
+    @RefreshSession
     public ResponseEntity<Map<String, Object>> getLoginId(HttpSession session) {
         try {
             String loginId = httpSessionService.getLoginId(session);
@@ -119,6 +124,7 @@ public class HttpSessionController {
 
     @Operation(summary = "Get User ID", description = "Get user ID from current session")
     @GetMapping("/user-id")
+    @RefreshSession
     public ResponseEntity<Map<String, Object>> getUserId(HttpSession session) {
         try {
             Long userId = httpSessionService.getUserId(session);
@@ -142,6 +148,7 @@ public class HttpSessionController {
 
     @Operation(summary = "Validate Session", description = "Check if the current session is valid")
     @GetMapping("/validate")
+    @RefreshSession
     public ResponseEntity<Map<String, Object>> validateSession(HttpSession session) {
         try {
             boolean isValid = httpSessionService.isValidSession(session);

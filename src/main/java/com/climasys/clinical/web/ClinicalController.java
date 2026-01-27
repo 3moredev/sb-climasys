@@ -1,5 +1,7 @@
 package com.climasys.clinical.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -11,6 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/clinical")
+@RefreshSession
 public class ClinicalController {
 
     private final JdbcTemplate jdbcTemplate;

@@ -1,5 +1,7 @@
 package com.climasys.admin.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
@@ -14,6 +16,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admin")
 @Tag(name = "Administration", description = "Administrative functions for user, medicine, and clinic management")
+@RefreshSession
 public class AdminController {
 
     private final JdbcTemplate jdbcTemplate;

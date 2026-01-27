@@ -119,7 +119,7 @@ public class AuthService {
                         userDetails.setClinicId(clinic.getClinicId());
                         userDetails.setLoginId(user.getLoginId());
                         userDetails.setFirstName(user.getFirstName());
-                        userDetails.setPassword(user.getPassword());
+                        userDetails.setPassword("");
                         userDetails.setRoleName(defaultRole.getRoleMaster().getRoleName());
                         userDetails.setRoleId(defaultRole.getRoleId());
                         userDetails.setDoctorName(buildDoctorName(doctor));

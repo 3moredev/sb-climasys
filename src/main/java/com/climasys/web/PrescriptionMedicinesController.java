@@ -1,5 +1,7 @@
 package com.climasys.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.entity.PrescriptionMedicines;
 import com.climasys.service.PrescriptionMedicinesService;
 import org.slf4j.Logger;
@@ -20,6 +22,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/prescription-medicines")
+@RefreshSession
 public class PrescriptionMedicinesController {
 
     private static final Logger logger = LoggerFactory.getLogger(PrescriptionMedicinesController.class);
@@ -228,4 +231,3 @@ public class PrescriptionMedicinesController {
         }
     }
 }
-

@@ -1,5 +1,7 @@
 package com.climasys.billing.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.billing.service.BillingBreakupService;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
@@ -16,6 +18,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/billing")
+@RefreshSession
 public class BillingController {
 
     private final JdbcTemplate jdbcTemplate;

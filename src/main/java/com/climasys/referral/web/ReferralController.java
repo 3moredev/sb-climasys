@@ -1,5 +1,7 @@
 package com.climasys.referral.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.entity.ReferBy;
 import com.climasys.entity.ReferByTranslation;
 import com.climasys.entity.ReferralDoctor;
@@ -17,6 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/referrals")
 @Tag(name = "Referral Management", description = "APIs for managing referral doctors and referral data")
+@RefreshSession
 public class ReferralController {
 
     private final ReferralService referralService;

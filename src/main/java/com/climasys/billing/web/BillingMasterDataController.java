@@ -1,5 +1,7 @@
 package com.climasys.billing.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.billing.service.BillingMasterDataService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +15,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/billing/master-data")
+@RefreshSession
 public class BillingMasterDataController {
 
     @Autowired

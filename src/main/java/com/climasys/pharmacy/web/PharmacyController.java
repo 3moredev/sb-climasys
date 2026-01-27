@@ -1,5 +1,7 @@
 package com.climasys.pharmacy.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
@@ -10,6 +12,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/pharmacy")
+@RefreshSession
 public class PharmacyController {
 
     private final JdbcTemplate jdbcTemplate;
@@ -86,5 +89,4 @@ public class PharmacyController {
         }
     }
 }
-
 

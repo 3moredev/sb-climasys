@@ -1,5 +1,7 @@
 package com.climasys.department.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.department.service.DepartmentMasterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/departments")
 @Tag(name = "Department Master", description = "APIs for managing department master data")
+@RefreshSession
 public class DepartmentMasterController {
     
     @Autowired
@@ -222,4 +225,3 @@ public class DepartmentMasterController {
         public List<Map<String, Object>> data;
     }
 }
-

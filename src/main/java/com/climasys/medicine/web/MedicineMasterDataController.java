@@ -1,5 +1,7 @@
 package com.climasys.medicine.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.medicine.service.MedicineMasterDataService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -14,6 +16,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/medicine/master-data")
+@RefreshSession
 public class MedicineMasterDataController {
 
     @Autowired

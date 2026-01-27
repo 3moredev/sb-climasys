@@ -1,5 +1,7 @@
 package com.climasys.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.entity.PrescriptionCategory;
 import com.climasys.service.PrescriptionCategoryService;
 import org.slf4j.Logger;
@@ -20,6 +22,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/prescription-category")
+@RefreshSession
 public class PrescriptionCategoryController {
 
     private static final Logger logger = LoggerFactory.getLogger(PrescriptionCategoryController.class);
@@ -155,4 +158,3 @@ public class PrescriptionCategoryController {
         }
     }
 }
-

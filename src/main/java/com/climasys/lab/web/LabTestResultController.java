@@ -1,5 +1,7 @@
 package com.climasys.lab.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.dto.LabTestResultRequest;
 import com.climasys.dto.LabTestResultResponse;
 import com.climasys.entity.PatientVisitLabTestResult;
@@ -33,6 +35,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/lab/results")
 @Tag(name = "Lab Test Results", description = "Lab Test Result management APIs - equivalent to USP_Insert_LabTestAllData")
+@RefreshSession
 public class LabTestResultController {
 
     @Autowired

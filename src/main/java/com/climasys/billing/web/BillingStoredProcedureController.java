@@ -1,5 +1,7 @@
 package com.climasys.billing.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/billing/stored-procs")
+@RefreshSession
 public class BillingStoredProcedureController {
 
     private static final Logger logger = LoggerFactory.getLogger(BillingStoredProcedureController.class);
@@ -311,4 +314,3 @@ public class BillingStoredProcedureController {
         }
     }
 }
-

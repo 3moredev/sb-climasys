@@ -1,5 +1,7 @@
 package com.climasys.trends.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.trends.dto.LabTrendDTO;
 import com.climasys.trends.service.LabTrendsService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/trends/lab")
 @Tag(name = "Lab Trends", description = "APIs for retrieving patient lab test results and trends")
+@RefreshSession
 public class LabTrendsController {
     
     private static final Logger logger = LoggerFactory.getLogger(LabTrendsController.class);
@@ -133,4 +136,3 @@ public class LabTrendsController {
         }
     }
 }
-

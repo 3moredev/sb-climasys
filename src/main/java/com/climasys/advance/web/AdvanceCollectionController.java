@@ -1,5 +1,7 @@
 package com.climasys.advance.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.advance.dto.*;
 import com.climasys.advance.service.AdvanceCollectionService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,6 +26,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/advance-collection")
 @Tag(name = "Advance Collection", description = "APIs for managing advance collections and payments")
+@RefreshSession
 public class AdvanceCollectionController {
     
     @Autowired
@@ -267,4 +270,3 @@ public class AdvanceCollectionController {
         }
     }
 }
-

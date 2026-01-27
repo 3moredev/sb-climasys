@@ -1,5 +1,7 @@
 package com.climasys.patients.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.patients.exception.AreaValidationException;
 import com.climasys.patients.exception.GenderValidationException;
 import jakarta.validation.constraints.NotBlank;
@@ -14,6 +16,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/patients")
+@RefreshSession
 public class PatientController {
 
     private final JdbcTemplate jdbcTemplate;

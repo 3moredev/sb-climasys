@@ -1,5 +1,7 @@
 package com.climasys.reports.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.config.DatabaseTableConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -12,6 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reports")
+@RefreshSession
 public class PatientStatusController {
 
     @Autowired

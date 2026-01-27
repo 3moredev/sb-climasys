@@ -1,5 +1,7 @@
 package com.climasys.billing.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.billing.dto.*;
 import com.climasys.billing.service.ReceiptService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -23,6 +25,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/receipts")
 @Tag(name = "Receipt", description = "APIs for managing patient receipts")
+@RefreshSession
 public class ReceiptController {
     
     private static final Logger logger = LoggerFactory.getLogger(ReceiptController.class);
@@ -149,4 +152,3 @@ public class ReceiptController {
         }
     }
 }
-

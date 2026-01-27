@@ -1,5 +1,7 @@
 package com.climasys.refdata.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.refdata.service.SymptomDataService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/refdata")
+@RefreshSession
 public class SymptomDataController {
 
     private final SymptomDataService symptomDataService;
@@ -29,5 +32,4 @@ public class SymptomDataController {
         return ResponseEntity.ok(symptomDataService.getSymptomData(doctorId, clinicId));
     }
 }
-
 

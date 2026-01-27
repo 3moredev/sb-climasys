@@ -1,5 +1,7 @@
 package com.climasys.billing.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.billing.dto.OPDDailyCollectionDTO;
 import com.climasys.billing.service.OPDDailyCollectionService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -17,6 +19,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/billing/opd-daily-collection")
+@RefreshSession
 public class OPDDailyCollectionController {
     
     private final OPDDailyCollectionService opdDailyCollectionService;
@@ -95,4 +98,3 @@ public class OPDDailyCollectionController {
         return getOPDDailyCollection(today, today, clinicId, doctorId, roleId, languageId);
     }
 }
-

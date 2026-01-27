@@ -1,5 +1,7 @@
 package com.climasys.patients.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.patients.service.PatientSearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -22,6 +24,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/patients")
 @Tag(name = "Patient Search", description = "Patient search APIs matching stored procedure USP_Search_Patient_With_OPD")
+@RefreshSession
 public class PatientSearchController {
 
     @Autowired
@@ -73,4 +76,3 @@ public class PatientSearchController {
         }
     }
 }
-

@@ -1,5 +1,7 @@
 package com.climasys.admission.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.admission.dto.AdmissionCardDTO;
 import com.climasys.admission.dto.AdmissionCardRequest;
 import com.climasys.admission.service.AdmissionCardService;
@@ -26,6 +28,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/admission")
 @Tag(name = "Admission Cards", description = "APIs for managing patient admission cards")
+@RefreshSession
 public class AdmissionCardController {
     
     @Autowired
@@ -278,4 +281,3 @@ public class AdmissionCardController {
         public String clinicId;
     }
 }
-

@@ -1,5 +1,7 @@
 package com.climasys.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.entity.MedicineMaster;
 import com.climasys.service.MedicineMasterService;
 import org.slf4j.Logger;
@@ -20,6 +22,7 @@ import java.util.Optional;
  */
 @RestController
 @RequestMapping("/api/medicine-master")
+@RefreshSession
 public class MedicineMasterController {
 
     private static final Logger logger = LoggerFactory.getLogger(MedicineMasterController.class);
@@ -198,4 +201,3 @@ public class MedicineMasterController {
         }
     }
 }
-

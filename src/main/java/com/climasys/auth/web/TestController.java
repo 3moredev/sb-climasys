@@ -1,5 +1,7 @@
 package com.climasys.auth.web;
 
+import com.climasys.auth.annotation.RefreshSession;
+
 import com.climasys.common.crypto.LegacyCrypto;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,6 +13,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/test")
+@RefreshSession
 public class TestController {
 
     @Autowired
