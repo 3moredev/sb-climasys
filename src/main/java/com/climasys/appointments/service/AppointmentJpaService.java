@@ -28,36 +28,42 @@ public class AppointmentJpaService {
 
     @Autowired
     private AppointmentRepository appointmentRepository;
-    
+
     @Autowired
     private TimezoneUtils timezoneUtils;
-    
+
     @Autowired
     private DoctorMasterRepository doctorMasterRepository;
-    
+
     @Autowired
     private StatusRefRepository statusRefRepository;
-    
+
     @Autowired
     private GenderTranslationsRepository genderTranslationsRepository;
-    
+
     @Autowired
     private FollowUpTypeRepository followUpTypeRepository;
+
+    @Autowired
+    private PatientRepository patientRepository;
 
     /**
      * USP_Get_FutureAppointments_All_New equivalent
      * Get all future appointments for a clinic
      */
-    public List<Map<String, Object>> getFutureAppointmentsAllNew(String clinicId, LocalDate futureDate, Integer languageId) {
+    public List<Map<String, Object>> getFutureAppointmentsAllNew(String clinicId, LocalDate futureDate,
+            Integer languageId) {
         logger.info("Getting future appointments for clinic: {} from date: {}", clinicId, futureDate);
-        
+
         try {
             LocalDateTime futureDateTime = futureDate.atStartOfDay();
-            List<PatientVisit> appointments = appointmentRepository.getFutureAppointmentsAllNew(clinicId, futureDateTime, languageId);
+            List<PatientVisit> appointments = appointmentRepository.getFutureAppointmentsAllNew(clinicId,
+                    futureDateTime, languageId);
             return convertAppointmentsToMapList(appointments, languageId);
         } catch (Exception e) {
             logger.error("Error getting future appointments: {}", e.getMessage(), e);
-            auditLogger.error("APPOINTMENT_QUERY_ERROR - Clinic: {}, Date: {}, Error: {}", clinicId, futureDate, e.getMessage());
+            auditLogger.error("APPOINTMENT_QUERY_ERROR - Clinic: {}, Date: {}, Error: {}", clinicId, futureDate,
+                    e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -66,16 +72,19 @@ public class AppointmentJpaService {
      * USP_Get_FutureAppointments_ForGivenDate equivalent
      * Get future appointments for a specific doctor and date
      */
-    public List<Map<String, Object>> getFutureAppointmentsForGivenDate(String doctorId, String clinicId, LocalDate futureDate, Integer languageId) {
+    public List<Map<String, Object>> getFutureAppointmentsForGivenDate(String doctorId, String clinicId,
+            LocalDate futureDate, Integer languageId) {
         logger.info("Getting future appointments for doctor: {} on date: {}", doctorId, futureDate);
-        
+
         try {
             LocalDateTime futureDateDateTime = futureDate.atStartOfDay();
-            List<PatientVisit> appointments = appointmentRepository.getFutureAppointmentsForGivenDate(doctorId, clinicId, futureDateDateTime, languageId);
+            List<PatientVisit> appointments = appointmentRepository.getFutureAppointmentsForGivenDate(doctorId,
+                    clinicId, futureDateDateTime, languageId);
             return convertAppointmentsToMapList(appointments, languageId);
         } catch (Exception e) {
             logger.error("Error getting future appointments for date: {}", e.getMessage(), e);
-            auditLogger.error("APPOINTMENT_QUERY_ERROR - Doctor: {}, Date: {}, Error: {}", doctorId, futureDate, e.getMessage());
+            auditLogger.error("APPOINTMENT_QUERY_ERROR - Doctor: {}, Date: {}, Error: {}", doctorId, futureDate,
+                    e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -84,15 +93,18 @@ public class AppointmentJpaService {
      * USP_Get_TodaysAppointments_ForGivenDate equivalent
      * Get today's appointments for a specific doctor and date
      */
-    public List<Map<String, Object>> getTodaysAppointmentsForGivenDate(String doctorId, String clinicId, LocalDateTime visitDate, Integer languageId) {
+    public List<Map<String, Object>> getTodaysAppointmentsForGivenDate(String doctorId, String clinicId,
+            LocalDateTime visitDate, Integer languageId) {
         logger.info("Getting today's appointments for doctor: {} on date: {}", doctorId, visitDate);
-        
+
         try {
-            List<PatientVisit> appointments = appointmentRepository.getTodaysAppointmentsForGivenDate(doctorId, clinicId, visitDate, languageId);
+            List<PatientVisit> appointments = appointmentRepository.getTodaysAppointmentsForGivenDate(doctorId,
+                    clinicId, visitDate, languageId);
             return convertAppointmentsToMapList(appointments, languageId);
         } catch (Exception e) {
             logger.error("Error getting today's appointments: {}", e.getMessage(), e);
-            auditLogger.error("APPOINTMENT_QUERY_ERROR - Doctor: {}, Date: {}, Error: {}", doctorId, visitDate, e.getMessage());
+            auditLogger.error("APPOINTMENT_QUERY_ERROR - Doctor: {}, Date: {}, Error: {}", doctorId, visitDate,
+                    e.getMessage());
             return new ArrayList<>();
         }
     }
@@ -114,19 +126,19 @@ public class AppointmentJpaService {
             Boolean inPerson,
             String scheduleDay,
             LocalTime visitTimeTo) {
-        
+
         logger.info("Booking appointment for patient: {} with doctor: {} on {}", patientId, doctorId, visitDate);
-        
+
         try {
             // Check for conflicts - same patient, same doctor, same date, specific statuses
             Long conflictCount = appointmentRepository.countConflictingAppointments(doctorId, visitDate, patientId);
             if (conflictCount > 0) {
                 throw new RuntimeException("Patient already has an appointment with this doctor on this date");
             }
-            
+
             // Get next patient visit number
             Integer nextVisitNo = appointmentRepository.getNextPatientVisitNo(patientId);
-            
+
             // Create new appointment
             PatientVisit appointment = new PatientVisit();
             appointment.setDoctorId(doctorId);
@@ -144,23 +156,60 @@ public class AppointmentJpaService {
             appointment.setDeleteFlag(false);
             appointment.setDiscount(BigDecimal.ZERO); // Set default discount to 0
             appointment.setOriginalDiscount(BigDecimal.ZERO); // Set default original discount to 0
-            
+
             // Set additional required fields for validation
             appointment.setFeesToCollect(BigDecimal.ZERO); // Set default fees to 0
             appointment.setIsSubmitPatientVisitDetails(false); // Set default submit flag
             appointment.setModifiedOn(LocalDateTime.now());
             appointment.setModifiedbyName(userId);
-            
+
+            // Fetch patient referral data from patient_master and copy to appointment
+            // This ensures referral info entered during registration is auto-populated in
+            // Visit Details
+            try {
+                Optional<Patient> patientOptional = patientRepository.findByIdString(patientId);
+                if (patientOptional.isPresent()) {
+                    Patient patient = patientOptional.get();
+
+                    // Copy referral fields from patient_master to patient_visits
+                    if (patient.getReferId() != null) {
+                        appointment.setReferId(patient.getReferId());
+                    }
+                    if (patient.getReferDoctorDetails() != null) {
+                        appointment.setReferDoctorDetails(patient.getReferDoctorDetails());
+                    }
+                    if (patient.getDoctorAddress() != null) {
+                        appointment.setDoctorAddress(patient.getDoctorAddress());
+                    }
+                    if (patient.getDoctorMobile() != null) {
+                        appointment.setDoctorMobile(patient.getDoctorMobile());
+                    }
+                    if (patient.getDoctorEmail() != null) {
+                        appointment.setDoctorEmail(patient.getDoctorEmail());
+                    }
+
+                    logger.info("Copied referral data from patient_master to appointment: referId={}, referralName={}",
+                            patient.getReferId(), patient.getReferDoctorDetails());
+                } else {
+                    logger.warn("Patient not found in patient_master: {}, referral data will not be copied", patientId);
+                }
+            } catch (Exception e) {
+                logger.warn(
+                        "Failed to fetch patient referral data from patient_master: {}, continuing with appointment creation",
+                        e.getMessage());
+                // Don't fail the appointment creation if we can't fetch referral data
+            }
+
             // Save appointment (bypass validation for now)
             PatientVisit savedAppointment = appointmentRepository.save(appointment);
-            
+
             Map<String, Object> result = new HashMap<>();
             result.put("success", true);
             result.put("appointmentId", savedAppointment.getPatientVisitNo());
             result.put("patientId", patientId);
             result.put("doctorId", doctorId);
             result.put("visitDate", savedAppointment.getVisitDate()); // Use actual stored visitDate
-            
+
             // Convert stored UTC time back to target timezone for response
             java.sql.Time storedTime = savedAppointment.getVisitTime();
             if (storedTime != null) {
@@ -168,22 +217,23 @@ public class AppointmentJpaService {
                 // Convert UTC to target timezone for display
                 LocalTime targetTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
                 result.put("visitTime", targetTime);
-                logger.info("Response time conversion: UTC {} -> {} {}", utcTime, timezoneUtils.getTimezoneDisplayName(), targetTime);
+                logger.info("Response time conversion: UTC {} -> {} {}", utcTime,
+                        timezoneUtils.getTimezoneDisplayName(), targetTime);
             } else {
                 result.put("visitTime", null);
             }
             result.put("status", "Waiting");
-            
-            auditLogger.info("APPOINTMENT_CREATED - Patient: {}, Doctor: {}, Date: {}, Time: {}", 
-                           patientId, doctorId, visitDate, visitTime);
-            
+
+            auditLogger.info("APPOINTMENT_CREATED - Patient: {}, Doctor: {}, Date: {}, Time: {}",
+                    patientId, doctorId, visitDate, visitTime);
+
             return result;
-            
+
         } catch (Exception e) {
             logger.error("Error booking appointment: {}", e.getMessage(), e);
-            auditLogger.error("APPOINTMENT_CREATE_ERROR - Patient: {}, Doctor: {}, Error: {}", 
-                            patientId, doctorId, e.getMessage());
-            
+            auditLogger.error("APPOINTMENT_CREATE_ERROR - Patient: {}, Doctor: {}, Error: {}",
+                    patientId, doctorId, e.getMessage());
+
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", e.getMessage());
@@ -196,63 +246,68 @@ public class AppointmentJpaService {
      * Soft delete an appointment
      */
     @Transactional
-    public Map<String, Object> deletePatientAppointment(String patientId, LocalDateTime visitDate, String doctorId, String clinicId, String userId) {
-        logger.info("Deleting today's appointment for patient: {} at time {} with doctor: {}", patientId, visitDate.toLocalTime(), doctorId);
-        
+    public Map<String, Object> deletePatientAppointment(String patientId, LocalDateTime visitDate, String doctorId,
+            String clinicId, String userId) {
+        logger.info("Deleting today's appointment for patient: {} at time {} with doctor: {}", patientId,
+                visitDate.toLocalTime(), doctorId);
+
         try {
             logger.info("Looking for appointment with exact datetime: {} (UTC)", visitDate);
-            
-            // First, let's check what appointments exist for this patient and doctor with this exact datetime
-            List<PatientVisit> existingAppointments = appointmentRepository.findAppointmentsByPatientDoctorAndExactDateTime(
-                patientId, doctorId, visitDate);
-            
-            logger.info("Found {} existing appointments for patient {} with doctor {} at exact datetime {} (UTC)", 
-                       existingAppointments.size(), patientId, doctorId, visitDate);
-            
+
+            // First, let's check what appointments exist for this patient and doctor with
+            // this exact datetime
+            List<PatientVisit> existingAppointments = appointmentRepository
+                    .findAppointmentsByPatientDoctorAndExactDateTime(
+                            patientId, doctorId, visitDate);
+
+            logger.info("Found {} existing appointments for patient {} with doctor {} at exact datetime {} (UTC)",
+                    existingAppointments.size(), patientId, doctorId, visitDate);
+
             for (PatientVisit appointment : existingAppointments) {
-                logger.info("Existing appointment: ID={}, VisitDate={}, VisitTime={}, Status={}, DeleteFlag={}", 
-                           appointment.getPatientVisitNo(), appointment.getVisitDate(), 
-                           appointment.getVisitTime(), appointment.getStatusId(), appointment.getDeleteFlag());
+                logger.info("Existing appointment: ID={}, VisitDate={}, VisitTime={}, Status={}, DeleteFlag={}",
+                        appointment.getPatientVisitNo(), appointment.getVisitDate(),
+                        appointment.getVisitTime(), appointment.getStatusId(), appointment.getDeleteFlag());
             }
-            
+
             // Try exact datetime match (since DB stores both date and time in UTC)
             int deletedCount = appointmentRepository.softDeleteAppointment(
-                patientId, visitDate, doctorId, clinicId, LocalDateTime.now(), userId);
-            
+                    patientId, visitDate, doctorId, clinicId, LocalDateTime.now(), userId);
+
             logger.info("Exact datetime match deleted {} records", deletedCount);
-            
+
             // If no exact match, try date-only match as fallback
             if (deletedCount == 0) {
                 logger.info("No exact datetime match found, trying date-only match as fallback");
                 List<PatientVisit> dateOnlyAppointments = appointmentRepository.findAppointmentsByPatientDoctorAndDate(
-                    patientId, doctorId, visitDate);
+                        patientId, doctorId, visitDate);
                 logger.info("Found {} appointments for date-only search", dateOnlyAppointments.size());
-                
+
                 if (!dateOnlyAppointments.isEmpty()) {
                     deletedCount = appointmentRepository.softDeleteAppointmentByDate(
-                        patientId, visitDate, doctorId, clinicId, LocalDateTime.now(), userId);
+                            patientId, visitDate, doctorId, clinicId, LocalDateTime.now(), userId);
                     logger.info("Date-only match deleted {} records", deletedCount);
                 }
             }
-            
+
             Map<String, Object> result = new HashMap<>();
             if (deletedCount > 0) {
                 result.put("success", true);
                 result.put("message", "Appointment deleted successfully");
-                auditLogger.info("APPOINTMENT_DELETED - Patient: {}, Doctor: {}, Date: {}", 
-                               patientId, doctorId, visitDate);
+                auditLogger.info("APPOINTMENT_DELETED - Patient: {}, Doctor: {}, Date: {}",
+                        patientId, doctorId, visitDate);
             } else {
                 result.put("success", false);
-                result.put("message", "No appointment found to delete. Found " + existingAppointments.size() + " appointments but none matched the criteria.");
+                result.put("message", "No appointment found to delete. Found " + existingAppointments.size()
+                        + " appointments but none matched the criteria.");
             }
-            
+
             return result;
-            
+
         } catch (Exception e) {
             logger.error("Error deleting appointment: {}", e.getMessage(), e);
-            auditLogger.error("APPOINTMENT_DELETE_ERROR - Patient: {}, Doctor: {}, Error: {}", 
-                            patientId, doctorId, e.getMessage());
-            
+            auditLogger.error("APPOINTMENT_DELETE_ERROR - Patient: {}, Doctor: {}, Error: {}",
+                    patientId, doctorId, e.getMessage());
+
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", e.getMessage());
@@ -264,31 +319,32 @@ public class AppointmentJpaService {
      * Update appointment status
      */
     @Transactional
-    public Map<String, Object> updateAppointmentStatus(String patientId, LocalDateTime visitDate, String doctorId, Short statusId, String userId) {
+    public Map<String, Object> updateAppointmentStatus(String patientId, LocalDateTime visitDate, String doctorId,
+            Short statusId, String userId) {
         logger.info("Updating appointment status for patient: {} to status: {}", patientId, statusId);
-        
+
         try {
             int updatedCount = appointmentRepository.updateAppointmentStatus(
-                patientId, visitDate, doctorId, statusId, LocalDateTime.now(), userId);
-            
+                    patientId, visitDate, doctorId, statusId, LocalDateTime.now(), userId);
+
             Map<String, Object> result = new HashMap<>();
             if (updatedCount > 0) {
                 result.put("success", true);
                 result.put("message", "Appointment status updated successfully");
-                auditLogger.info("APPOINTMENT_STATUS_UPDATED - Patient: {}, Doctor: {}, Status: {}", 
-                               patientId, doctorId, statusId);
+                auditLogger.info("APPOINTMENT_STATUS_UPDATED - Patient: {}, Doctor: {}, Status: {}",
+                        patientId, doctorId, statusId);
             } else {
                 result.put("success", false);
                 result.put("message", "No appointment found to update");
             }
-            
+
             return result;
-            
+
         } catch (Exception e) {
             logger.error("Error updating appointment status: {}", e.getMessage(), e);
-            auditLogger.error("APPOINTMENT_STATUS_UPDATE_ERROR - Patient: {}, Doctor: {}, Error: {}", 
-                            patientId, doctorId, e.getMessage());
-            
+            auditLogger.error("APPOINTMENT_STATUS_UPDATE_ERROR - Patient: {}, Doctor: {}, Error: {}",
+                    patientId, doctorId, e.getMessage());
+
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", e.getMessage());
@@ -297,7 +353,8 @@ public class AppointmentJpaService {
     }
 
     /**
-     * Update appointment online time, doctor, and status (equivalent to USP_Update_TodaysVisitOnlineTimeDetails with status)
+     * Update appointment online time, doctor, and status (equivalent to
+     * USP_Update_TodaysVisitOnlineTimeDetails with status)
      */
     @Transactional
     public Map<String, Object> updateAppointmentOnlineTimeAndDoctor(
@@ -309,10 +366,11 @@ public class AppointmentJpaService {
             String doctorId,
             Short statusId,
             String userId) {
-        
-        logger.info("Updating appointment online time and doctor for patient: {} visit: {} to doctor: {} with status: {}", 
-                   patientId, patientVisitNo, doctorId, statusId);
-        
+
+        logger.info(
+                "Updating appointment online time and doctor for patient: {} visit: {} to doctor: {} with status: {}",
+                patientId, patientVisitNo, doctorId, statusId);
+
         try {
             // Get existing refer_id logic (same as stored procedure)
             String referId = "S"; // Default value
@@ -324,7 +382,7 @@ public class AppointmentJpaService {
             } catch (Exception e) {
                 logger.warn("Could not retrieve existing refer_id, using default: {}", e.getMessage());
             }
-            
+
             // Convert online appointment time
             java.sql.Time onlineTime = null;
             if (onlineAppointmentTime != null && !onlineAppointmentTime.trim().isEmpty()) {
@@ -337,39 +395,40 @@ public class AppointmentJpaService {
             } else {
                 logger.info("Online appointment time is null or empty: '{}'", onlineAppointmentTime);
             }
-            
+
             // Log the exact parameters being used in the WHERE clause
-            logger.info("UPDATE WHERE clause parameters: patientId={}, visitNo={}, shiftId={}, clinicId={}", 
-                       patientId, patientVisitNo, shiftId, clinicId);
-            logger.info("UPDATE SET values: onlineTime={}, doctorId={}, statusId={}, referId={}", 
-                       onlineTime, doctorId, statusId, referId);
-            
+            logger.info("UPDATE WHERE clause parameters: patientId={}, visitNo={}, shiftId={}, clinicId={}",
+                    patientId, patientVisitNo, shiftId, clinicId);
+            logger.info("UPDATE SET values: onlineTime={}, doctorId={}, statusId={}, referId={}",
+                    onlineTime, doctorId, statusId, referId);
+
             // Update appointment
             int updatedCount = appointmentRepository.updateAppointmentOnlineTimeAndDoctor(
-                patientId, patientVisitNo, shiftId, clinicId, onlineTime, doctorId, 
-                statusId, LocalDateTime.now(), userId, referId);
-            
+                    patientId, patientVisitNo, shiftId, clinicId, onlineTime, doctorId,
+                    statusId, LocalDateTime.now(), userId, referId);
+
             logger.info("UPDATE result: {} row(s) affected", updatedCount);
-            
+
             Map<String, Object> result = new HashMap<>();
             if (updatedCount > 0) {
                 result.put("success", true);
                 result.put("message", "Appointment online time, doctor, and status updated successfully");
                 result.put("updatedCount", updatedCount);
-                auditLogger.info("APPOINTMENT_ONLINE_TIME_DOCTOR_STATUS_UPDATED - Patient: {}, Visit: {}, Doctor: {}, Status: {}, OnlineTime: {}", 
-                               patientId, patientVisitNo, doctorId, statusId, onlineAppointmentTime);
+                auditLogger.info(
+                        "APPOINTMENT_ONLINE_TIME_DOCTOR_STATUS_UPDATED - Patient: {}, Visit: {}, Doctor: {}, Status: {}, OnlineTime: {}",
+                        patientId, patientVisitNo, doctorId, statusId, onlineAppointmentTime);
             } else {
                 result.put("success", false);
                 result.put("message", "No appointment found to update");
             }
-            
+
             return result;
-            
+
         } catch (Exception e) {
             logger.error("Error updating appointment online time and doctor: {}", e.getMessage(), e);
-            auditLogger.error("APPOINTMENT_ONLINE_TIME_DOCTOR_STATUS_UPDATE_ERROR - Patient: {}, Visit: {}, Error: {}", 
-                            patientId, patientVisitNo, e.getMessage());
-            
+            auditLogger.error("APPOINTMENT_ONLINE_TIME_DOCTOR_STATUS_UPDATE_ERROR - Patient: {}, Visit: {}, Error: {}",
+                    patientId, patientVisitNo, e.getMessage());
+
             Map<String, Object> error = new HashMap<>();
             error.put("success", false);
             error.put("error", e.getMessage());
@@ -382,7 +441,7 @@ public class AppointmentJpaService {
      */
     public List<Map<String, Object>> getPatientAppointmentDetails(String patientId) {
         logger.info("Getting appointment details for patient: {}", patientId);
-        
+
         try {
             List<PatientVisit> appointments = appointmentRepository.findByPatientIdAndActive(patientId);
             return convertAppointmentsToMapList(appointments, 1); // Default language ID
@@ -402,7 +461,8 @@ public class AppointmentJpaService {
                 Map<String, Object> statusMap = new HashMap<>();
                 statusMap.put("id", status.getId());
                 statusMap.put("description", status.getStatusDescription());
-                statusMap.put("code", status.getStatusDescription()); // Use description as code since there's no statusCode field
+                statusMap.put("code", status.getStatusDescription()); // Use description as code since there's no
+                                                                      // statusCode field
                 return statusMap;
             }).collect(Collectors.toList());
         } catch (Exception e) {
@@ -440,7 +500,8 @@ public class AppointmentJpaService {
                 Map<String, Object> followUpMap = new HashMap<>();
                 followUpMap.put("id", followUp.getId());
                 followUpMap.put("description", followUp.getFollowUpDescription());
-                followUpMap.put("code", followUp.getFollowUpDescription()); // Use description as code since code field doesn't exist
+                followUpMap.put("code", followUp.getFollowUpDescription()); // Use description as code since code field
+                                                                            // doesn't exist
                 return followUpMap;
             }).collect(Collectors.toList());
         } catch (Exception e) {
@@ -452,10 +513,11 @@ public class AppointmentJpaService {
     /**
      * Convert PatientVisit entities to Map format for API compatibility
      */
-    private List<Map<String, Object>> convertAppointmentsToMapList(List<PatientVisit> appointments, Integer languageId) {
+    private List<Map<String, Object>> convertAppointmentsToMapList(List<PatientVisit> appointments,
+            Integer languageId) {
         return appointments.stream().map(appointment -> {
             Map<String, Object> appointmentMap = new HashMap<>();
-            
+
             // Basic appointment info
             appointmentMap.put("patientVisitNo", appointment.getPatientVisitNo());
             appointmentMap.put("patientId", appointment.getPatientId());
@@ -468,35 +530,38 @@ public class AppointmentJpaService {
             appointmentMap.put("instructions", appointment.getInstructions());
             appointmentMap.put("inPerson", appointment.getInPerson());
             appointmentMap.put("reportsReceived", appointment.getReportsReceived());
-            
+
             // Convert stored UTC times to target timezone for display
             if (appointment.getVisitTime() != null) {
                 LocalTime utcTime = appointment.getVisitTime().toLocalTime();
                 LocalTime targetTime = timezoneUtils.convertUtcToTargetTimezone(utcTime);
                 appointmentMap.put("visitTime", targetTime);
                 appointmentMap.put("visitTimeFormatted", targetTime.toString());
-                logger.debug("Converted visit time: UTC {} -> {} {}", utcTime, timezoneUtils.getTimezoneDisplayName(), targetTime);
+                logger.debug("Converted visit time: UTC {} -> {} {}", utcTime, timezoneUtils.getTimezoneDisplayName(),
+                        targetTime);
             } else {
                 appointmentMap.put("visitTime", null);
                 appointmentMap.put("visitTimeFormatted", null);
             }
-            
+
             if (appointment.getOnlineAppointmentTime() != null) {
                 LocalTime utcOnlineTime = appointment.getOnlineAppointmentTime().toLocalTime();
                 LocalTime targetOnlineTime = timezoneUtils.convertUtcToTargetTimezone(utcOnlineTime);
                 appointmentMap.put("onlineAppointmentTime", targetOnlineTime);
-                logger.debug("Converted online appointment time: UTC {} -> {} {}", utcOnlineTime, timezoneUtils.getTimezoneDisplayName(), targetOnlineTime);
+                logger.debug("Converted online appointment time: UTC {} -> {} {}", utcOnlineTime,
+                        timezoneUtils.getTimezoneDisplayName(), targetOnlineTime);
             } else {
                 appointmentMap.put("onlineAppointmentTime", null);
             }
-            
+
             // Format visit date for display
             if (appointment.getVisitDate() != null) {
-                appointmentMap.put("visitDateFormatted", appointment.getVisitDate().toLocalDate().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")));
+                appointmentMap.put("visitDateFormatted",
+                        appointment.getVisitDate().toLocalDate().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy")));
             } else {
                 appointmentMap.put("visitDateFormatted", null);
             }
-            
+
             return appointmentMap;
         }).collect(Collectors.toList());
     }
