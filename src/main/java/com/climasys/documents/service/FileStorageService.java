@@ -42,14 +42,14 @@ public class FileStorageService {
 
     @Value("${climasys.file-upload.upload-keyword-investigations}")
     private String uploadKeywordInvestigations;
-    
+
     // File deletion configuration
     @Value("${climasys.file-upload.delete.strict-mode:false}")
     private boolean strictMode;
-    
+
     @Value("${climasys.file-upload.delete.detailed-logging:true}")
     private boolean detailedLogging;
-    
+
     @Value("${climasys.file-upload.delete.retry-attempts:2}")
     private int retryAttempts;
 
@@ -60,8 +60,8 @@ public class FileStorageService {
      * Save a single file for a patient
      * Equivalent to .NET: Server.MapPath + SaveAs
      *
-     * @param file MultipartFile to save
-     * @param patientId Patient ID for directory structure
+     * @param file       MultipartFile to save
+     * @param patientId  Patient ID for directory structure
      * @param uploadType Type of upload (patient, mr-profile, treatment, etc.)
      * @return Relative path to saved file
      */
@@ -72,14 +72,28 @@ public class FileStorageService {
 
         // Get the base path based on upload type
         String basePath = getBasePathForType(uploadType);
-        
+
         // Create directory structure: basePath/patientId/
         Path directoryPath = Paths.get(basePath, patientId);
-        
-        // Equivalent to: if (!Directory.Exists(folder)) { Directory.CreateDirectory(folder); }
+        Path absoluteDirPath = directoryPath.toAbsolutePath();
+
+        // Equivalent to: if (!Directory.Exists(folder)) {
+        // Directory.CreateDirectory(folder); }
         if (!Files.exists(directoryPath)) {
-            Files.createDirectories(directoryPath);
-            logger.info("Created directory: {}", directoryPath.toAbsolutePath());
+            try {
+                Files.createDirectories(directoryPath);
+                logger.info("Created directory: {}", absoluteDirPath);
+            } catch (IOException e) {
+                logger.error("Failed to create directory: {}. Reason: {}", absoluteDirPath, e.getMessage());
+                throw new IOException(
+                        "Could not create upload directory: " + absoluteDirPath + ". Check server permissions.", e);
+            }
+        }
+
+        // Verify write permissions
+        if (!Files.isWritable(directoryPath)) {
+            logger.error("No write permission for directory: {}", absoluteDirPath);
+            throw new IOException("Application lacks write permission to: " + absoluteDirPath);
         }
 
         // Get original filename
@@ -90,14 +104,20 @@ public class FileStorageService {
 
         // Clean filename to prevent path traversal attacks
         String cleanFilename = cleanFilename(originalFilename);
-        
+
         // Full path for saving
         Path filePath = directoryPath.resolve(cleanFilename);
-        
-        // Save the file - Equivalent to: hpf.SaveAs(Server.MapPath(Savepath));
-        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-        
-        logger.info("File saved successfully: {}", filePath.toAbsolutePath());
+        Path absoluteFilePath = filePath.toAbsolutePath();
+
+        try {
+            // Save the file - Equivalent to: hpf.SaveAs(Server.MapPath(Savepath));
+            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            logger.info("File saved successfully to absolute path: {}", absoluteFilePath);
+        } catch (IOException e) {
+            logger.error("Failed to save file to: {}. Reason: {}", absoluteFilePath, e.getMessage());
+            throw new IOException("Failed to save file to " + absoluteFilePath + ". Check disk space and permissions.",
+                    e);
+        }
 
         // Return relative path for database storage
         // Format: /PatientUploads/patientId/filename
@@ -109,12 +129,13 @@ public class FileStorageService {
      * Save multiple files for a patient
      * Equivalent to .NET: Handling HttpFileCollection in a loop
      *
-     * @param files Array of MultipartFiles
-     * @param patientId Patient ID
+     * @param files      Array of MultipartFiles
+     * @param patientId  Patient ID
      * @param uploadType Type of upload
      * @return List of relative paths to saved files
      */
-    public List<String> saveMultipleFiles(MultipartFile[] files, String patientId, String uploadType) throws IOException {
+    public List<String> saveMultipleFiles(MultipartFile[] files, String patientId, String uploadType)
+            throws IOException {
         if (files == null || files.length == 0) {
             throw new IllegalArgumentException("No files provided");
         }
@@ -148,27 +169,28 @@ public class FileStorageService {
         if (detailedLogging) {
             logger.info("Attempting to delete file with path: {}", relativePath);
         }
-        
+
         // Try multiple attempts with retry logic
         for (int attempt = 1; attempt <= retryAttempts; attempt++) {
             try {
                 if (detailedLogging && attempt > 1) {
                     logger.info("Retry attempt {} for file deletion: {}", attempt, relativePath);
                 }
-                
+
                 // Use the same path resolution logic as getFileBytes and fileExists
                 Path resolvedPath = resolveFilePath(relativePath);
-                
+
                 if (resolvedPath != null && Files.exists(resolvedPath)) {
                     Files.delete(resolvedPath);
                     logger.info("File deleted successfully: {}", resolvedPath.toAbsolutePath());
                     return true;
                 }
-                
+
                 if (attempt == retryAttempts) {
-                    logger.warn("File not found for deletion after {} attempts. Original path: {}", retryAttempts, relativePath);
+                    logger.warn("File not found for deletion after {} attempts. Original path: {}", retryAttempts,
+                            relativePath);
                 }
-                
+
             } catch (IOException e) {
                 logger.error("Error deleting file (attempt {}): {}", attempt, relativePath, e);
                 if (attempt == retryAttempts) {
@@ -183,7 +205,7 @@ public class FileStorageService {
                 }
             }
         }
-        
+
         return false;
     }
 
@@ -212,7 +234,7 @@ public class FileStorageService {
      */
     public byte[] getFileBytes(String relativePath) throws IOException {
         Path resolvedPath = resolveFilePath(relativePath);
-        
+
         if (resolvedPath == null || !Files.exists(resolvedPath)) {
             String resolvedStr = resolvedPath != null ? resolvedPath.toAbsolutePath().toString() : "null";
             throw new IOException("File not found: " + relativePath + " (resolved to: " + resolvedStr + ")");
@@ -224,7 +246,8 @@ public class FileStorageService {
 
     /**
      * Resolve a relative path stored in the database to the actual file system path
-     * Maps database paths like /patient-documents/ to actual folder structure like PatientUploads/
+     * Maps database paths like /patient-documents/ to actual folder structure like
+     * PatientUploads/
      *
      * @param relativePath Relative path from database
      * @return Resolved Path object, or null if not found
@@ -233,34 +256,41 @@ public class FileStorageService {
         if (relativePath == null || relativePath.isEmpty()) {
             return null;
         }
-        
+
         // Try multiple path resolution strategies (same as deleteFile)
         Path[] possiblePaths = {
-            // Strategy 1: Direct path
-            Paths.get(relativePath),
-            // Strategy 2: Relative to current working directory
-            Paths.get(System.getProperty("user.dir"), relativePath),
-            // Strategy 3: Relative to parent directory (for sb-climasys subdirectory structure)
-            Paths.get(System.getProperty("user.dir"), "..", relativePath),
-            // Strategy 4: Relative to upload folder path if configured
-            uploadFolderPath != null ? Paths.get(uploadFolderPath, relativePath) : null,
-            // Strategy 5: Remove leading slash if present
-            relativePath.startsWith("/") ? Paths.get(relativePath.substring(1)) : null,
-            // Strategy 6: Try with uploads prefix
-            Paths.get("uploads", relativePath),
-            // Strategy 7: Try with uploads prefix and remove leading slash
-            relativePath.startsWith("/") ? Paths.get("uploads", relativePath.substring(1)) : null,
-            // Strategy 8: Map patient-documents to PatientUploads (based on actual file structure)
-            relativePath.contains("/patient-documents/") ? 
-                Paths.get(relativePath.replace("/patient-documents/", "PatientUploads/").replaceFirst("^/", "")) : null,
-            // Strategy 9: Map patient-documents to PatientUploads with absolute path from working dir
-            relativePath.startsWith("/patient-documents/") ? 
-                Paths.get(System.getProperty("user.dir"), relativePath.replace("/patient-documents/", "PatientUploads/").substring(1)) : null,
-            // Strategy 10: Use configured upload-patient path + relative path (remove /patient-documents/ prefix)
-            relativePath.startsWith("/patient-documents/") ? 
-                Paths.get(uploadPatient, relativePath.substring("/patient-documents/".length())) : null
+                // Strategy 1: Direct path
+                Paths.get(relativePath),
+                // Strategy 2: Relative to current working directory
+                Paths.get(System.getProperty("user.dir"), relativePath),
+                // Strategy 3: Relative to parent directory (for sb-climasys subdirectory
+                // structure)
+                Paths.get(System.getProperty("user.dir"), "..", relativePath),
+                // Strategy 4: Relative to upload folder path if configured
+                uploadFolderPath != null ? Paths.get(uploadFolderPath, relativePath) : null,
+                // Strategy 5: Remove leading slash if present
+                relativePath.startsWith("/") ? Paths.get(relativePath.substring(1)) : null,
+                // Strategy 6: Try with uploads prefix
+                Paths.get("uploads", relativePath),
+                // Strategy 7: Try with uploads prefix and remove leading slash
+                relativePath.startsWith("/") ? Paths.get("uploads", relativePath.substring(1)) : null,
+                // Strategy 8: Map patient-documents to PatientUploads (based on actual file
+                // structure)
+                relativePath.contains("/patient-documents/")
+                        ? Paths.get(
+                                relativePath.replace("/patient-documents/", "PatientUploads/").replaceFirst("^/", ""))
+                        : null,
+                // Strategy 9: Map patient-documents to PatientUploads with absolute path from
+                // working dir
+                relativePath.startsWith("/patient-documents/") ? Paths.get(System.getProperty("user.dir"),
+                        relativePath.replace("/patient-documents/", "PatientUploads/").substring(1)) : null,
+                // Strategy 10: Use configured upload-patient path + relative path (remove
+                // /patient-documents/ prefix)
+                relativePath.startsWith("/patient-documents/")
+                        ? Paths.get(uploadPatient, relativePath.substring("/patient-documents/".length()))
+                        : null
         };
-        
+
         // Find the first path that exists
         for (Path filePath : possiblePaths) {
             if (filePath != null && Files.exists(filePath)) {
@@ -270,7 +300,7 @@ public class FileStorageService {
                 return filePath;
             }
         }
-        
+
         // If no existing path found, return the most likely candidate (Strategy 10)
         if (relativePath.startsWith("/patient-documents/")) {
             // Most likely: map to PatientUploads using configured upload-patient path
@@ -280,11 +310,10 @@ public class FileStorageService {
             }
             return mappedPath;
         }
-        
+
         // Fallback: relative to working directory without leading slash
-        Path fallbackPath = relativePath.startsWith("/") ? 
-            Paths.get(relativePath.substring(1)) : 
-            Paths.get(relativePath);
+        Path fallbackPath = relativePath.startsWith("/") ? Paths.get(relativePath.substring(1))
+                : Paths.get(relativePath);
         if (detailedLogging) {
             logger.debug("Using fallback path: {}", fallbackPath.toAbsolutePath());
         }
@@ -302,22 +331,22 @@ public class FileStorageService {
         return switch (uploadType.toLowerCase()) {
             // UPLOADPATIENT - Main patient documents (used in treatment screen)
             case "patient", "patient-documents", "uploadpatient" -> uploadPatient;
-            
+
             // UPLOADPROFILE - MR profile photos
             case "mr-profile", "profile", "uploadprofile" -> uploadProfile;
-            
+
             // UPLOADTREATMENTDETAILS - Treatment details documents
             case "treatment", "treatment-details", "uploadtreatmentdetails" -> uploadTreatmentDetails;
-            
+
             // UPLOADREMINDERS - Reminder attachments
             case "reminders", "uploadreminders" -> uploadReminders;
-            
+
             // UPLOADFOLDERPATH - General attached documents
             case "attached-documents", "uploadfolderpath" -> uploadFolderPath;
-            
+
             // UPLOADKEYWORDINVESTIGATIONS - Keyword investigations
             case "keyword-investigations", "uploadkeywordinvestigations" -> uploadKeywordInvestigations;
-            
+
             default -> uploadPatient; // Default to patient documents
         };
     }
@@ -332,10 +361,10 @@ public class FileStorageService {
     private String cleanFilename(String filename) {
         // Remove any path components
         String cleaned = Paths.get(filename).getFileName().toString();
-        
+
         // Replace any remaining problematic characters
         cleaned = cleaned.replaceAll("[^a-zA-Z0-9._-]", "_");
-        
+
         return cleaned;
     }
 
@@ -343,7 +372,7 @@ public class FileStorageService {
      * Validate file size
      * Equivalent to .NET: if (filesize > 4)
      *
-     * @param file File to validate
+     * @param file      File to validate
      * @param maxSizeMB Maximum size in MB
      * @return true if valid, false otherwise
      */
@@ -359,7 +388,7 @@ public class FileStorageService {
     /**
      * Validate multiple files size
      *
-     * @param files Array of files
+     * @param files     Array of files
      * @param maxSizeMB Maximum size per file in MB
      * @return true if all files are valid, false otherwise
      */
@@ -399,13 +428,13 @@ public class FileStorageService {
     /**
      * Validate file extension
      *
-     * @param filename Filename
+     * @param filename          Filename
      * @param allowedExtensions Array of allowed extensions
      * @return true if extension is allowed, false otherwise
      */
     public boolean validateFileExtension(String filename, String[] allowedExtensions) {
         String extension = getFileExtension(filename);
-        
+
         for (String allowed : allowedExtensions) {
             if (extension.equalsIgnoreCase(allowed)) {
                 return true;
@@ -415,4 +444,3 @@ public class FileStorageService {
         return false;
     }
 }
-
