@@ -105,23 +105,26 @@ climasys:
   # File upload configuration - mapped from Web.config appSettings
   # .NET uses ~ for application root, Java uses ./ for relative paths
   file-upload:
+    # Base directory for all uploads - can be overridden by environment variable CLIMASYS_UPLOAD_BASE
+    base-dir: ${CLIMASYS_UPLOAD_BASE:.}
+    
     # UPLOADPATIENT - Main patient documents upload folder
-    upload-patient: "./PatientUploads"
+    upload-patient: "${climasys.file-upload.base-dir}/PatientUploads"
     
     # UPLOADFOLDERPATH - Attached documents folder (base path for all uploads)
-    upload-folder-path: "./PatientUploads"
+    upload-folder-path: "${climasys.file-upload.base-dir}/PatientUploads"
     
     # UPLOADPROFILE - MR profile photos
-    upload-profile: "./MRProfile"
+    upload-profile: "${climasys.file-upload.base-dir}/MRProfile"
     
     # UPLOADREMINDERS - Reminder attachments
-    upload-reminders: "./AttachReminders"
+    upload-reminders: "${climasys.file-upload.base-dir}/AttachReminders"
     
     # UPLOADTREATMENTDETAILS - Treatment details documents
-    upload-treatment-details: "./Treatment_Details"
+    upload-treatment-details: "${climasys.file-upload.base-dir}/Treatment_Details"
     
     # UPLOADKEYWORDINVESTIGATIONS - Keyword investigations
-    upload-keyword-investigations: "./KeywordInvestiations"
+    upload-keyword-investigations: "${climasys.file-upload.base-dir}/KeywordInvestiations"
     
     # File upload limits
     max-file-size: "150"
