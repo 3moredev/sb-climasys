@@ -336,8 +336,10 @@ public class PatientController {
     }
 
     @PutMapping("/{id}")
+    @Transactional
     public ResponseEntity<?> updatePatient(@PathVariable String id, @RequestBody FullRegistrationRequest req) {
         try {
+            System.out.println("DEBUG - Updating patient ID: " + id + " with referral: " + req.referDoctorDetails());
             // Use direct SQL UPDATE instead of stored procedure for PostgreSQL
             // compatibility
             String sql = "UPDATE patient_master SET " +
