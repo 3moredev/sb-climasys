@@ -22,7 +22,7 @@ spring:
     multipart:
       enabled: true
       max-file-size: 150MB
-      max-request-size: 160MB
+      max-request-size: 150MB
       file-size-threshold: 2KB
   jpa:
     hibernate:
@@ -43,8 +43,8 @@ spring:
 server:
   port: 8080
   tomcat:
-    max-swallow-size: 160MB
-    max-http-form-post-size: 160MB
+    max-swallow-size: 150MB
+    max-http-form-post-size: 150MB
   servlet:
     session:
       timeout: 2h

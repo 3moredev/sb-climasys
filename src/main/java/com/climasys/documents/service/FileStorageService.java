@@ -60,12 +60,14 @@ public class FileStorageService {
      * Save a single file for a patient
      * Equivalent to .NET: Server.MapPath + SaveAs
      *
-     * @param file       MultipartFile to save
-     * @param patientId  Patient ID for directory structure
-     * @param uploadType Type of upload (patient, mr-profile, treatment, etc.)
-     * @return Relative path to saved file
+     * /**
+     * Helper class to return file save result
      */
-    public String saveFile(MultipartFile file, String patientId, String uploadType) throws IOException {
+    public record FileUploadResult(String relativePath, long fileSize) {
+    }
+
+    public FileUploadResult saveFileWithResult(MultipartFile file, String patientId, String uploadType)
+            throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File is empty or null");
         }
@@ -112,17 +114,21 @@ public class FileStorageService {
         try {
             // Save the file - Equivalent to: hpf.SaveAs(Server.MapPath(Savepath));
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-            logger.info("File saved successfully to absolute path: {}", absoluteFilePath);
+            long size = file.getSize();
+            logger.info("File saved successfully ({} bytes) to: {}", size, absoluteFilePath);
+
+            // Return relative path for database storage and file size
+            String relativePath = "/" + uploadType + "/" + patientId + "/" + cleanFilename;
+            return new FileUploadResult(relativePath, size);
         } catch (IOException e) {
             logger.error("Failed to save file to: {}. Reason: {}", absoluteFilePath, e.getMessage());
             throw new IOException("Failed to save file to " + absoluteFilePath + ". Check disk space and permissions.",
                     e);
         }
+    }
 
-        // Return relative path for database storage
-        // Format: /PatientUploads/patientId/filename
-        String relativePath = "/" + uploadType + "/" + patientId + "/" + cleanFilename;
-        return relativePath;
+    public String saveFile(MultipartFile file, String patientId, String uploadType) throws IOException {
+        return saveFileWithResult(file, patientId, uploadType).relativePath();
     }
 
     /**
@@ -386,10 +392,33 @@ public class FileStorageService {
     }
 
     /**
-     * Validate multiple files size
+     * Validate total size of multiple files
      *
-     * @param files     Array of files
-     * @param maxSizeMB Maximum size per file in MB
+     * @param files          Array of files
+     * @param maxTotalSizeMB Maximum total size in MB
+     * @return true if total size is valid, false otherwise
+     */
+    public boolean validateTotalFilesSize(MultipartFile[] files, long maxTotalSizeMB) {
+        if (files == null || files.length == 0) {
+            return false;
+        }
+
+        long totalSizeBytes = 0;
+        for (MultipartFile file : files) {
+            if (!file.isEmpty()) {
+                totalSizeBytes += file.getSize();
+            }
+        }
+
+        long totalSizeInMB = totalSizeBytes / (1024 * 1024);
+        return totalSizeInMB <= maxTotalSizeMB;
+    }
+
+    /**
+     * Validate multiple files size individually
+     *
+     * @param filesArray Array of files
+     * @param maxSizeMB  Maximum size per file in MB
      * @return true if all files are valid, false otherwise
      */
     public boolean validateMultipleFilesSize(MultipartFile[] files, long maxSizeMB) {

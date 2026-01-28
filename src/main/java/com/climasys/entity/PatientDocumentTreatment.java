@@ -49,6 +49,9 @@ public class PatientDocumentTreatment {
     @Column(name = "visit_date")
     private LocalDateTime visitDate;
 
+    @Column(name = "file_size")
+    private Long fileSize;
+
     // Constructors
     public PatientDocumentTreatment() {
     }
@@ -150,6 +153,14 @@ public class PatientDocumentTreatment {
         this.visitDate = visitDate;
     }
 
+    public Long getFileSize() {
+        return fileSize;
+    }
+
+    public void setFileSize(Long fileSize) {
+        this.fileSize = fileSize;
+    }
+
     @Override
     public String toString() {
         return "PatientDocumentTreatment{" +
@@ -164,4 +175,3 @@ public class PatientDocumentTreatment {
                 '}';
     }
 }
-
