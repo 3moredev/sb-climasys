@@ -60,7 +60,8 @@ public class PatientDocumentTreatmentService {
             String documentName,
             String createdByName,
             Integer patientVisitNo,
-            LocalDateTime visitDate) {
+            LocalDateTime visitDate,
+            Long fileSize) {
 
         logger.info("Inserting patient document treatment - PatientId: {}, DocumentName: {}, VisitNo: {}",
                 patientId, documentName, patientVisitNo);
@@ -79,6 +80,7 @@ public class PatientDocumentTreatmentService {
             document.setVisitDate(visitDate);
             document.setCreatedOn(LocalDateTime.now());
             document.setDeleteFlag(false);
+            document.setFileSize(fileSize);
 
             // Save to database
             PatientDocumentTreatment savedDocument = repository.save(document);
@@ -97,6 +99,7 @@ public class PatientDocumentTreatmentService {
             response.put("visitDate", savedDocument.getVisitDate());
             response.put("createdOn", savedDocument.getCreatedOn());
             response.put("createdBy", savedDocument.getCreatedbyName());
+            response.put("fileSize", savedDocument.getFileSize());
 
         } catch (Exception e) {
             logger.error("Error inserting patient document treatment: {}", e.getMessage(), e);
@@ -422,9 +425,12 @@ public class PatientDocumentTreatmentService {
 
             // Save file to file system - Equivalent to:
             // hpf.SaveAs(Server.MapPath(Savepath));
-            String savedFilePath = fileStorageService.saveFile(file, patientId, "patient-documents");
+            FileStorageService.FileUploadResult uploadResult = fileStorageService.saveFileWithResult(file, patientId,
+                    "patient-documents");
+            String savedFilePath = uploadResult.relativePath();
+            long size = uploadResult.fileSize();
 
-            logger.info("File saved to: {} for patient: {}", savedFilePath, patientId);
+            logger.info("File saved ({} bytes) to: {} for patient: {}", size, savedFilePath, patientId);
 
             // Save document record to database
             Map<String, Object> dbResult = insertPatientDocumentTreatment(
@@ -434,7 +440,8 @@ public class PatientDocumentTreatmentService {
                     savedFilePath,
                     createdByName,
                     patientVisitNo,
-                    visitDate);
+                    visitDate,
+                    size);
 
             return dbResult;
 
@@ -486,10 +493,19 @@ public class PatientDocumentTreatmentService {
                 return response;
             }
 
-            // Validate file count and sizes
+            // Validate total file count and individual sizes
             if (!fileStorageService.validateMultipleFilesSize(files, maxFileSizeMB)) {
                 response.put("success", false);
-                response.put("error", "One or more files exceed maximum allowed size of " + maxFileSizeMB + " MB");
+                response.put("error",
+                        "One or more files exceed individual maximum allowed size of " + maxFileSizeMB + " MB");
+                return response;
+            }
+
+            // Validate total size of all files combined
+            if (!fileStorageService.validateTotalFilesSize(files, maxFileSizeMB)) {
+                response.put("success", false);
+                response.put("error",
+                        "Total size of all files combined exceeds the maximum limit of " + maxFileSizeMB + " MB");
                 return response;
             }
 
@@ -506,13 +522,17 @@ public class PatientDocumentTreatmentService {
 
             // Save files to file system - Equivalent to: for (int i = 0; i < hfc.Count - 1;
             // i++)
-            List<String> savedFilePaths = fileStorageService.saveMultipleFiles(files, patientId, "patient-documents");
+            List<FileStorageService.FileUploadResult> uploadResults = fileStorageService
+                    .saveMultipleFilesWithResults(files, patientId, "patient-documents");
 
-            logger.info("Saved {} files for patient: {}", savedFilePaths.size(), patientId);
+            logger.info("Saved {} files for patient: {}", uploadResults.size(), patientId);
 
             // Save each document record to database
-            for (String filePath : savedFilePaths) {
+            for (FileStorageService.FileUploadResult resultObj : uploadResults) {
                 try {
+                    String filePath = resultObj.relativePath();
+                    long size = resultObj.fileSize();
+
                     Map<String, Object> dbResult = insertPatientDocumentTreatment(
                             patientId,
                             doctorId,
@@ -520,7 +540,8 @@ public class PatientDocumentTreatmentService {
                             filePath,
                             createdByName,
                             patientVisitNo,
-                            visitDate);
+                            visitDate,
+                            size);
 
                     if ((Boolean) dbResult.get("success")) {
                         uploadedDocuments.add(dbResult);
@@ -529,7 +550,7 @@ public class PatientDocumentTreatmentService {
                     }
                 } catch (Exception e) {
                     logger.error("Error saving document record: {}", e.getMessage(), e);
-                    errors.add("Error saving file " + filePath + ": " + e.getMessage());
+                    errors.add("Error saving record for file: " + e.getMessage());
                 }
             }
 
