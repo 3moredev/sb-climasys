@@ -11,9 +11,15 @@ import java.util.Optional;
 @Repository
 public interface PatientRepository extends JpaRepository<Patient, Long> {
     Optional<Patient> findByFolderNo(String folderNo);
+
     boolean existsByFolderNo(String folderNo);
+
     boolean existsByEmailId(String emailId);
-    
+
     @Query("SELECT COUNT(p.id) FROM Patient p WHERE p.areaId = :areaId")
     Long countByAreaId(@Param("areaId") Integer areaId);
+
+    // Find patient by String ID (Patient.id is String, not Long)
+    @Query("SELECT p FROM Patient p WHERE p.id = :id")
+    Optional<Patient> findByIdString(@Param("id") String id);
 }
