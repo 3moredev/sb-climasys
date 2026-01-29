@@ -54,30 +54,26 @@ public class PatientDocumentTreatmentController {
             @NotBlank(message = "Document name is required") String documentName,
             @NotBlank(message = "Created by name is required") String createdByName,
             @NotNull(message = "Patient visit number is required") Integer patientVisitNo,
-            String visitDate  // Optional, will use current date/time if not provided
-    ) {}
+            String visitDate // Optional, will use current date/time if not provided
+    ) {
+    }
 
     /**
      * Request DTO for updating document
      */
     public record UpdateDocumentRequest(
             @NotBlank(message = "Document name is required") String documentName,
-            @NotBlank(message = "User ID is required") String userId
-    ) {}
+            @NotBlank(message = "User ID is required") String userId) {
+    }
 
     /**
      * Insert a new patient document treatment record
      * Equivalent to: USP_INSERT_PatientDocuments_Treatment
      */
-    @Operation(
-        summary = "Insert Patient Document Treatment",
-        description = "Creates a new patient document treatment record. Equivalent to USP_INSERT_PatientDocuments_Treatment stored procedure."
-    )
+    @Operation(summary = "Insert Patient Document Treatment", description = "Creates a new patient document treatment record. Equivalent to USP_INSERT_PatientDocuments_Treatment stored procedure.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Document inserted successfully",
-            content = @Content(schema = @Schema(implementation = Map.class))),
-        @ApiResponse(responseCode = "400", description = "Bad request - Invalid input data",
-            content = @Content(schema = @Schema(implementation = Map.class)))
+            @ApiResponse(responseCode = "200", description = "Document inserted successfully", content = @Content(schema = @Schema(implementation = Map.class))),
+            @ApiResponse(responseCode = "400", description = "Bad request - Invalid input data", content = @Content(schema = @Schema(implementation = Map.class)))
     })
     @PostMapping
     public ResponseEntity<?> insertDocument(@Valid @RequestBody InsertDocumentRequest request) {
@@ -91,14 +87,14 @@ public class PatientDocumentTreatmentController {
             }
 
             Map<String, Object> result = service.insertPatientDocumentTreatment(
-                request.patientId(),
-                request.doctorId(),
-                request.clinicId(),
-                request.documentName(),
-                request.createdByName(),
-                request.patientVisitNo(),
-                visitDate
-            );
+                    request.patientId(),
+                    request.doctorId(),
+                    request.clinicId(),
+                    request.documentName(),
+                    request.createdByName(),
+                    request.patientVisitNo(),
+                    visitDate,
+                    null);
 
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
@@ -107,9 +103,8 @@ public class PatientDocumentTreatmentController {
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "error", "Failed to insert document: " + e.getMessage()
-            ));
+                    "success", false,
+                    "error", "Failed to insert document: " + e.getMessage()));
         }
     }
 
@@ -117,23 +112,18 @@ public class PatientDocumentTreatmentController {
      * Get all documents for a specific patient visit
      * Equivalent to: USP_Get_PatientDocumentListsforTreatment
      */
-    @Operation(
-        summary = "Get Documents by Patient Visit",
-        description = "Retrieves all treatment documents for a specific patient visit"
-    )
+    @Operation(summary = "Get Documents by Patient Visit", description = "Retrieves all treatment documents for a specific patient visit")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Documents retrieved successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request")
+            @ApiResponse(responseCode = "200", description = "Documents retrieved successfully"),
+            @ApiResponse(responseCode = "400", description = "Bad request")
     })
     @GetMapping("/patient/{patientId}/visit/{visitNo}")
     public ResponseEntity<?> getDocumentsByPatientVisit(
-            @Parameter(description = "Patient ID", required = true, example = "P-00001")
-            @PathVariable String patientId,
-            @Parameter(description = "Patient visit number", required = true, example = "1")
-            @PathVariable Integer visitNo) {
+            @Parameter(description = "Patient ID", required = true, example = "P-00001") @PathVariable String patientId,
+            @Parameter(description = "Patient visit number", required = true, example = "1") @PathVariable Integer visitNo) {
         try {
             Map<String, Object> result = service.getDocumentsByPatientVisit(patientId, visitNo);
-            
+
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
             } else {
@@ -141,30 +131,25 @@ public class PatientDocumentTreatmentController {
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "error", "Failed to retrieve documents: " + e.getMessage()
-            ));
+                    "success", false,
+                    "error", "Failed to retrieve documents: " + e.getMessage()));
         }
     }
 
     /**
      * Get all documents for a patient
      */
-    @Operation(
-        summary = "Get All Documents by Patient",
-        description = "Retrieves all treatment documents for a specific patient"
-    )
+    @Operation(summary = "Get All Documents by Patient", description = "Retrieves all treatment documents for a specific patient")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Documents retrieved successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request")
+            @ApiResponse(responseCode = "200", description = "Documents retrieved successfully"),
+            @ApiResponse(responseCode = "400", description = "Bad request")
     })
     @GetMapping("/patient/{patientId}")
     public ResponseEntity<?> getDocumentsByPatient(
-            @Parameter(description = "Patient ID", required = true, example = "P-00001")
-            @PathVariable String patientId) {
+            @Parameter(description = "Patient ID", required = true, example = "P-00001") @PathVariable String patientId) {
         try {
             Map<String, Object> result = service.getDocumentsByPatient(patientId);
-            
+
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
             } else {
@@ -172,9 +157,8 @@ public class PatientDocumentTreatmentController {
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "error", "Failed to retrieve documents: " + e.getMessage()
-            ));
+                    "success", false,
+                    "error", "Failed to retrieve documents: " + e.getMessage()));
         }
     }
 
@@ -182,23 +166,18 @@ public class PatientDocumentTreatmentController {
      * Delete a document (soft delete)
      * Equivalent to: USP_Delete_PatientDocument_treatment
      */
-    @Operation(
-        summary = "Delete Patient Document Treatment",
-        description = "Soft deletes a document by setting deleteFlag to true. Equivalent to USP_Delete_PatientDocument_treatment stored procedure."
-    )
+    @Operation(summary = "Delete Patient Document Treatment", description = "Soft deletes a document by setting deleteFlag to true. Equivalent to USP_Delete_PatientDocument_treatment stored procedure.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Document deleted successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request - Document not found")
+            @ApiResponse(responseCode = "200", description = "Document deleted successfully"),
+            @ApiResponse(responseCode = "400", description = "Bad request - Document not found")
     })
     @DeleteMapping("/{documentId}")
     public ResponseEntity<?> deleteDocument(
-            @Parameter(description = "Document ID", required = true, example = "1")
-            @PathVariable Integer documentId,
-            @Parameter(description = "User ID performing the deletion", required = false, example = "admin")
-            @RequestParam(defaultValue = "system") String userId) {
+            @Parameter(description = "Document ID", required = true, example = "1") @PathVariable Integer documentId,
+            @Parameter(description = "User ID performing the deletion", required = false, example = "admin") @RequestParam(defaultValue = "system") String userId) {
         try {
             Map<String, Object> result = service.deleteDocument(documentId, userId);
-            
+
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
             } else {
@@ -206,33 +185,28 @@ public class PatientDocumentTreatmentController {
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "error", "Failed to delete document: " + e.getMessage()
-            ));
+                    "success", false,
+                    "error", "Failed to delete document: " + e.getMessage()));
         }
     }
 
     /**
      * Delete a document with physical file deletion (transactional)
-     * This endpoint ensures both file system and database operations succeed or fail together
+     * This endpoint ensures both file system and database operations succeed or
+     * fail together
      */
-    @Operation(
-        summary = "Delete Patient Document with Physical File",
-        description = "Deletes both the physical file from file system and soft deletes the database record as part of a transaction. Ensures data consistency."
-    )
+    @Operation(summary = "Delete Patient Document with Physical File", description = "Deletes both the physical file from file system and soft deletes the database record as part of a transaction. Ensures data consistency.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Document and file deleted successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request - Document not found or deletion failed")
+            @ApiResponse(responseCode = "200", description = "Document and file deleted successfully"),
+            @ApiResponse(responseCode = "400", description = "Bad request - Document not found or deletion failed")
     })
     @DeleteMapping("/{documentId}/with-file")
     public ResponseEntity<?> deleteDocumentWithPhysicalFile(
-            @Parameter(description = "Document ID", required = true, example = "1")
-            @PathVariable Integer documentId,
-            @Parameter(description = "User ID performing the deletion", required = false, example = "admin")
-            @RequestParam(defaultValue = "system") String userId) {
+            @Parameter(description = "Document ID", required = true, example = "1") @PathVariable Integer documentId,
+            @Parameter(description = "User ID performing the deletion", required = false, example = "admin") @RequestParam(defaultValue = "system") String userId) {
         try {
             Map<String, Object> result = service.deleteDocumentWithPhysicalFile(documentId, userId);
-            
+
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
             } else {
@@ -240,35 +214,29 @@ public class PatientDocumentTreatmentController {
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "error", "Failed to delete document with file: " + e.getMessage()
-            ));
+                    "success", false,
+                    "error", "Failed to delete document with file: " + e.getMessage()));
         }
     }
 
     /**
      * Update document name
      */
-    @Operation(
-        summary = "Update Document Name",
-        description = "Updates the document name for a treatment document"
-    )
+    @Operation(summary = "Update Document Name", description = "Updates the document name for a treatment document")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Document updated successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request - Document not found")
+            @ApiResponse(responseCode = "200", description = "Document updated successfully"),
+            @ApiResponse(responseCode = "400", description = "Bad request - Document not found")
     })
     @PutMapping("/{documentId}")
     public ResponseEntity<?> updateDocument(
-            @Parameter(description = "Document ID", required = true, example = "1")
-            @PathVariable Integer documentId,
+            @Parameter(description = "Document ID", required = true, example = "1") @PathVariable Integer documentId,
             @Valid @RequestBody UpdateDocumentRequest request) {
         try {
             Map<String, Object> result = service.updateDocument(
-                documentId, 
-                request.documentName(), 
-                request.userId()
-            );
-            
+                    documentId,
+                    request.documentName(),
+                    request.userId());
+
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
             } else {
@@ -276,9 +244,8 @@ public class PatientDocumentTreatmentController {
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "error", "Failed to update document: " + e.getMessage()
-            ));
+                    "success", false,
+                    "error", "Failed to update document: " + e.getMessage()));
         }
     }
 
@@ -286,30 +253,20 @@ public class PatientDocumentTreatmentController {
      * Upload a single file for patient treatment
      * Equivalent to .NET: UploadFileSubmit() method
      */
-    @Operation(
-        summary = "Upload Patient Document",
-        description = "Uploads a single file for patient treatment and saves it to the file system. Equivalent to .NET UploadFileSubmit() method."
-    )
+    @Operation(summary = "Upload Patient Document", description = "Uploads a single file for patient treatment and saves it to the file system. Equivalent to .NET UploadFileSubmit() method.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Document uploaded successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request - Invalid file or parameters")
+            @ApiResponse(responseCode = "200", description = "Document uploaded successfully"),
+            @ApiResponse(responseCode = "400", description = "Bad request - Invalid file or parameters")
     })
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadDocument(
-            @Parameter(description = "File to upload", required = true)
-            @RequestParam("file") MultipartFile file,
-            @Parameter(description = "Patient ID", required = true)
-            @RequestParam("patientId") String patientId,
-            @Parameter(description = "Doctor ID", required = true)
-            @RequestParam("doctorId") String doctorId,
-            @Parameter(description = "Clinic ID", required = true)
-            @RequestParam("clinicId") String clinicId,
-            @Parameter(description = "User who uploaded the file", required = true)
-            @RequestParam("createdByName") String createdByName,
-            @Parameter(description = "Patient visit number", required = true)
-            @RequestParam("patientVisitNo") Integer patientVisitNo,
-            @Parameter(description = "Visit date (optional, defaults to current date/time)")
-            @RequestParam(value = "visitDate", required = false) String visitDate) {
+            @Parameter(description = "File to upload", required = true) @RequestParam("file") MultipartFile file,
+            @Parameter(description = "Patient ID", required = true) @RequestParam("patientId") String patientId,
+            @Parameter(description = "Doctor ID", required = true) @RequestParam("doctorId") String doctorId,
+            @Parameter(description = "Clinic ID", required = true) @RequestParam("clinicId") String clinicId,
+            @Parameter(description = "User who uploaded the file", required = true) @RequestParam("createdByName") String createdByName,
+            @Parameter(description = "Patient visit number", required = true) @RequestParam("patientVisitNo") Integer patientVisitNo,
+            @Parameter(description = "Visit date (optional, defaults to current date/time)") @RequestParam(value = "visitDate", required = false) String visitDate) {
         try {
             // Parse visit date or use current date/time
             LocalDateTime visitDateTime;
@@ -320,14 +277,13 @@ public class PatientDocumentTreatmentController {
             }
 
             Map<String, Object> result = service.uploadAndSaveDocument(
-                file,
-                patientId,
-                doctorId,
-                clinicId,
-                createdByName,
-                patientVisitNo,
-                visitDateTime
-            );
+                    file,
+                    patientId,
+                    doctorId,
+                    clinicId,
+                    createdByName,
+                    patientVisitNo,
+                    visitDateTime);
 
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
@@ -336,9 +292,8 @@ public class PatientDocumentTreatmentController {
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "error", "Failed to upload document: " + e.getMessage()
-            ));
+                    "success", false,
+                    "error", "Failed to upload document: " + e.getMessage()));
         }
     }
 
@@ -346,30 +301,20 @@ public class PatientDocumentTreatmentController {
      * Upload multiple files for patient treatment
      * Equivalent to .NET: UploadFileSubmit() with HttpFileCollection
      */
-    @Operation(
-        summary = "Upload Multiple Patient Documents",
-        description = "Uploads multiple files for patient treatment. Equivalent to .NET file collection upload."
-    )
+    @Operation(summary = "Upload Multiple Patient Documents", description = "Uploads multiple files for patient treatment. Equivalent to .NET file collection upload.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Documents uploaded successfully"),
-        @ApiResponse(responseCode = "400", description = "Bad request - Invalid files or parameters")
+            @ApiResponse(responseCode = "200", description = "Documents uploaded successfully"),
+            @ApiResponse(responseCode = "400", description = "Bad request - Invalid files or parameters")
     })
     @PostMapping(value = "/upload-multiple", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> uploadMultipleDocuments(
-            @Parameter(description = "Files to upload (max 5)", required = true)
-            @RequestParam("files") MultipartFile[] files,
-            @Parameter(description = "Patient ID", required = true)
-            @RequestParam("patientId") String patientId,
-            @Parameter(description = "Doctor ID", required = true)
-            @RequestParam("doctorId") String doctorId,
-            @Parameter(description = "Clinic ID", required = true)
-            @RequestParam("clinicId") String clinicId,
-            @Parameter(description = "User who uploaded the files", required = true)
-            @RequestParam("createdByName") String createdByName,
-            @Parameter(description = "Patient visit number", required = true)
-            @RequestParam("patientVisitNo") Integer patientVisitNo,
-            @Parameter(description = "Visit date (optional, defaults to current date/time)")
-            @RequestParam(value = "visitDate", required = false) String visitDate) {
+            @Parameter(description = "Files to upload (max 5)", required = true) @RequestParam("files") MultipartFile[] files,
+            @Parameter(description = "Patient ID", required = true) @RequestParam("patientId") String patientId,
+            @Parameter(description = "Doctor ID", required = true) @RequestParam("doctorId") String doctorId,
+            @Parameter(description = "Clinic ID", required = true) @RequestParam("clinicId") String clinicId,
+            @Parameter(description = "User who uploaded the files", required = true) @RequestParam("createdByName") String createdByName,
+            @Parameter(description = "Patient visit number", required = true) @RequestParam("patientVisitNo") Integer patientVisitNo,
+            @Parameter(description = "Visit date (optional, defaults to current date/time)") @RequestParam(value = "visitDate", required = false) String visitDate) {
         try {
             // Parse visit date or use current date/time
             LocalDateTime visitDateTime;
@@ -380,14 +325,13 @@ public class PatientDocumentTreatmentController {
             }
 
             Map<String, Object> result = service.uploadAndSaveMultipleDocuments(
-                files,
-                patientId,
-                doctorId,
-                clinicId,
-                createdByName,
-                patientVisitNo,
-                visitDateTime
-            );
+                    files,
+                    patientId,
+                    doctorId,
+                    clinicId,
+                    createdByName,
+                    patientVisitNo,
+                    visitDateTime);
 
             if ((Boolean) result.get("success")) {
                 return ResponseEntity.ok(result);
@@ -396,9 +340,8 @@ public class PatientDocumentTreatmentController {
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of(
-                "success", false,
-                "error", "Failed to upload documents: " + e.getMessage()
-            ));
+                    "success", false,
+                    "error", "Failed to upload documents: " + e.getMessage()));
         }
     }
 
@@ -406,18 +349,14 @@ public class PatientDocumentTreatmentController {
      * Download a document file
      * Equivalent to .NET: lnkDocumentName_Click with req.DownloadData
      */
-    @Operation(
-        summary = "Download Patient Document",
-        description = "Downloads a patient document file. Equivalent to .NET document download with WebClient.DownloadData."
-    )
+    @Operation(summary = "Download Patient Document", description = "Downloads a patient document file. Equivalent to .NET document download with WebClient.DownloadData.")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Document downloaded successfully"),
-        @ApiResponse(responseCode = "404", description = "Document not found")
+            @ApiResponse(responseCode = "200", description = "Document downloaded successfully"),
+            @ApiResponse(responseCode = "404", description = "Document not found")
     })
     @GetMapping("/download/{documentId}")
     public ResponseEntity<Resource> downloadDocument(
-            @Parameter(description = "Document ID", required = true, example = "1")
-            @PathVariable Integer documentId) {
+            @Parameter(description = "Document ID", required = true, example = "1") @PathVariable Integer documentId) {
         try {
             Map<String, Object> result = service.getDocumentFile(documentId);
 
@@ -429,9 +368,9 @@ public class PatientDocumentTreatmentController {
                 ByteArrayResource resource = new ByteArrayResource(fileBytes);
 
                 return ResponseEntity.ok()
-                    .contentType(MediaType.parseMediaType(contentType))
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
-                    .body(resource);
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                        .body(resource);
             } else {
                 return ResponseEntity.notFound().build();
             }

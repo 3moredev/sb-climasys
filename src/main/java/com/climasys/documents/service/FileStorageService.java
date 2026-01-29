@@ -166,6 +166,38 @@ public class FileStorageService {
     }
 
     /**
+     * Save multiple files and return detailed results for each
+     *
+     * @param files      Array of MultipartFiles
+     * @param patientId  Patient ID
+     * @param uploadType Type of upload
+     * @return List of FileUploadResult objects
+     */
+    public List<FileUploadResult> saveMultipleFilesWithResults(MultipartFile[] files, String patientId,
+            String uploadType)
+            throws IOException {
+        if (files == null || files.length == 0) {
+            throw new IllegalArgumentException("No files provided");
+        }
+
+        if (files.length > maxFilesPerUpload) {
+            throw new IllegalArgumentException("Too many files. Maximum allowed: " + maxFilesPerUpload);
+        }
+
+        List<FileUploadResult> results = new ArrayList<>();
+
+        for (MultipartFile file : files) {
+            if (!file.isEmpty()) {
+                FileUploadResult result = saveFileWithResult(file, patientId, uploadType);
+                results.add(result);
+            }
+        }
+
+        logger.info("Saved {} files with results for patient: {}", results.size(), patientId);
+        return results;
+    }
+
+    /**
      * Delete a file from the file system
      *
      * @param relativePath Relative path to the file
