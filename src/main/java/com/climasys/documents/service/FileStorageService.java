@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -66,7 +65,7 @@ public class FileStorageService {
     public record FileUploadResult(String relativePath, long fileSize) {
     }
 
-    public FileUploadResult saveFileWithResult(MultipartFile file, String patientId, String uploadType)
+    public FileUploadResult saveFileWithResult(MultipartFile file, String patientId, String clinicId, String uploadType)
             throws IOException {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("File is empty or null");
@@ -75,8 +74,18 @@ public class FileStorageService {
         // Get the base path based on upload type
         String basePath = getBasePathForType(uploadType);
 
-        // Create directory structure: basePath/patientId/
-        Path directoryPath = Paths.get(basePath, patientId);
+        // Get current date for folder structure
+        String dateStr = java.time.LocalDate.now().toString();
+
+        // Create directory structure: basePath/clinicId/patientId/date/
+        Path directoryPath;
+        if (clinicId != null && !clinicId.isEmpty()) {
+            directoryPath = Paths.get("files", clinicId, basePath, patientId, dateStr);
+        } else {
+            // Fallback if clinicId is not provided (though it should be)
+            directoryPath = Paths.get("files", basePath, patientId, dateStr);
+        }
+
         Path absoluteDirPath = directoryPath.toAbsolutePath();
 
         // Equivalent to: if (!Directory.Exists(folder)) {
@@ -112,13 +121,27 @@ public class FileStorageService {
         Path absoluteFilePath = filePath.toAbsolutePath();
 
         try {
-            // Save the file - Equivalent to: hpf.SaveAs(Server.MapPath(Savepath));
-            Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+            // Save the file - Optimized: Use transferTo which may move the temp file
+            // (zero-copy)
+            file.transferTo(filePath);
             long size = file.getSize();
             logger.info("File saved successfully ({} bytes) to: {}", size, absoluteFilePath);
 
-            // Return relative path for database storage and file size
-            String relativePath = "/" + uploadType + "/" + patientId + "/" + cleanFilename;
+            // Return relative path for database storage and file size            
+            String folderType = uploadType;
+            // Fix path mismatch if using patient-documents generic type
+            if ("patient-documents".equalsIgnoreCase(uploadType)) {
+                folderType = "patient-uploads";
+            }
+
+            String relativePath;
+            if (clinicId != null && !clinicId.isEmpty()) {
+                relativePath = "/files/" + clinicId + "/file-uploads/" + folderType + "/" + patientId + "/" + dateStr + "/"
+                        + cleanFilename;
+            } else {
+                relativePath = "/files/file-uploads/" + folderType + "/" + patientId + "/" + dateStr + "/" + cleanFilename;
+            }
+
             return new FileUploadResult(relativePath, size);
         } catch (IOException e) {
             logger.error("Failed to save file to: {}. Reason: {}", absoluteFilePath, e.getMessage());
@@ -127,8 +150,9 @@ public class FileStorageService {
         }
     }
 
-    public String saveFile(MultipartFile file, String patientId, String uploadType) throws IOException {
-        return saveFileWithResult(file, patientId, uploadType).relativePath();
+    public String saveFile(MultipartFile file, String patientId, String clinicId, String uploadType)
+            throws IOException {
+        return saveFileWithResult(file, patientId, clinicId, uploadType).relativePath();
     }
 
     /**
@@ -137,10 +161,11 @@ public class FileStorageService {
      *
      * @param files      Array of MultipartFiles
      * @param patientId  Patient ID
+     * @param clinicId   Clinic ID
      * @param uploadType Type of upload
      * @return List of relative paths to saved files
      */
-    public List<String> saveMultipleFiles(MultipartFile[] files, String patientId, String uploadType)
+    public List<String> saveMultipleFiles(MultipartFile[] files, String patientId, String clinicId, String uploadType)
             throws IOException {
         if (files == null || files.length == 0) {
             throw new IllegalArgumentException("No files provided");
@@ -156,7 +181,7 @@ public class FileStorageService {
         // Equivalent to: for (int i = 0; i < hfc.Count - 1; i++)
         for (MultipartFile file : files) {
             if (!file.isEmpty()) {
-                String filePath = saveFile(file, patientId, uploadType);
+                String filePath = saveFile(file, patientId, clinicId, uploadType);
                 savedFilePaths.add(filePath);
             }
         }
@@ -170,10 +195,11 @@ public class FileStorageService {
      *
      * @param files      Array of MultipartFiles
      * @param patientId  Patient ID
+     * @param clinicId   Clinic ID
      * @param uploadType Type of upload
      * @return List of FileUploadResult objects
      */
-    public List<FileUploadResult> saveMultipleFilesWithResults(MultipartFile[] files, String patientId,
+    public List<FileUploadResult> saveMultipleFilesWithResults(MultipartFile[] files, String patientId, String clinicId,
             String uploadType)
             throws IOException {
         if (files == null || files.length == 0) {
@@ -188,7 +214,7 @@ public class FileStorageService {
 
         for (MultipartFile file : files) {
             if (!file.isEmpty()) {
-                FileUploadResult result = saveFileWithResult(file, patientId, uploadType);
+                FileUploadResult result = saveFileWithResult(file, patientId, clinicId, uploadType);
                 results.add(result);
             }
         }
@@ -283,6 +309,24 @@ public class FileStorageService {
     }
 
     /**
+     * Get file input stream for streaming download
+     *
+     * @param relativePath Relative path to file
+     * @return InputStream of the file
+     */
+    public java.io.InputStream getFileInputStream(String relativePath) throws IOException {
+        Path resolvedPath = resolveFilePath(relativePath);
+
+        if (resolvedPath == null || !Files.exists(resolvedPath)) {
+            String resolvedStr = resolvedPath != null ? resolvedPath.toAbsolutePath().toString() : "null";
+            throw new IOException("File not found: " + relativePath + " (resolved to: " + resolvedStr + ")");
+        }
+
+        logger.debug("Opening file stream from: {}", resolvedPath.toAbsolutePath());
+        return Files.newInputStream(resolvedPath);
+    }
+
+    /**
      * Resolve a relative path stored in the database to the actual file system path
      * Maps database paths like /patient-documents/ to actual folder structure like
      * PatientUploads/
@@ -326,6 +370,10 @@ public class FileStorageService {
                 // /patient-documents/ prefix)
                 relativePath.startsWith("/patient-documents/")
                         ? Paths.get(uploadPatient, relativePath.substring("/patient-documents/".length()))
+                        : null,
+                // Strategy 11: Handle new patient-uploads path format
+                relativePath.startsWith("/patient-uploads/")
+                        ? Paths.get(uploadPatient, relativePath.substring("/patient-uploads/".length()))
                         : null
         };
 
@@ -339,10 +387,17 @@ public class FileStorageService {
             }
         }
 
-        // If no existing path found, return the most likely candidate (Strategy 10)
+        // If no existing path found, return the most likely candidate
         if (relativePath.startsWith("/patient-documents/")) {
-            // Most likely: map to PatientUploads using configured upload-patient path
+            // Legacy mapping
             Path mappedPath = Paths.get(uploadPatient, relativePath.substring("/patient-documents/".length()));
+            if (detailedLogging) {
+                logger.debug("No existing path found, using mapped path (legacy): {}", mappedPath.toAbsolutePath());
+            }
+            return mappedPath;
+        } else if (relativePath.startsWith("/patient-uploads/")) {
+            // New mapping
+            Path mappedPath = Paths.get(uploadPatient, relativePath.substring("/patient-uploads/".length()));
             if (detailedLogging) {
                 logger.debug("No existing path found, using mapped path: {}", mappedPath.toAbsolutePath());
             }

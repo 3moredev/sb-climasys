@@ -4,9 +4,9 @@ spring:
   profiles:
     active: dev
   datasource:
-    url: jdbc:postgresql://localhost:5432/climasys?currentSchema=public
+    url: jdbc:postgresql://localhost:5432/climasys_new?currentSchema=public
     username: postgres
-    password: root
+    password: admin@123
     driverClassName: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
@@ -106,25 +106,25 @@ climasys:
   # .NET uses ~ for application root, Java uses ./ for relative paths
   file-upload:
     # Base directory for all uploads - can be overridden by environment variable CLIMASYS_UPLOAD_BASE
-    base-dir: ${CLIMASYS_UPLOAD_BASE:.}
+    base-dir: ${CLIMASYS_UPLOAD_BASE:./file-uploads}
     
     # UPLOADPATIENT - Main patient documents upload folder
-    upload-patient: "${climasys.file-upload.base-dir}/PatientUploads"
+    upload-patient: "${climasys.file-upload.base-dir}/patient-uploads"
     
     # UPLOADFOLDERPATH - Attached documents folder (base path for all uploads)
-    upload-folder-path: "${climasys.file-upload.base-dir}/PatientUploads"
+    upload-folder-path: "${climasys.file-upload.base-dir}/patient-uploads"
     
     # UPLOADPROFILE - MR profile photos
-    upload-profile: "${climasys.file-upload.base-dir}/MRProfile"
+    upload-profile: "${climasys.file-upload.base-dir}/mr-profile"
     
     # UPLOADREMINDERS - Reminder attachments
-    upload-reminders: "${climasys.file-upload.base-dir}/AttachReminders"
+    upload-reminders: "${climasys.file-upload.base-dir}/attach-reminders"
     
     # UPLOADTREATMENTDETAILS - Treatment details documents
-    upload-treatment-details: "${climasys.file-upload.base-dir}/Treatment_Details"
+    upload-treatment-details: "${climasys.file-upload.base-dir}/treatment-details"
     
     # UPLOADKEYWORDINVESTIGATIONS - Keyword investigations
-    upload-keyword-investigations: "${climasys.file-upload.base-dir}/KeywordInvestiations"
+    upload-keyword-investigations: "${climasys.file-upload.base-dir}/keyword-investigations"
     
     # File upload limits
     max-file-size: "150"

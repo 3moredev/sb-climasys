@@ -380,6 +380,46 @@ public class PatientDocumentTreatmentController {
     }
 
     /**
+     * Stream a document file
+     * Use for large files to avoid loading entire file into memory
+     */
+    @Operation(summary = "Stream Patient Document", description = "Streams a patient document file. Use for large files to avoid memory issues.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Document streamed successfully"),
+            @ApiResponse(responseCode = "404", description = "Document not found")
+    })
+    @GetMapping("/stream/{documentId}")
+    public ResponseEntity<Resource> streamDocument(
+            @Parameter(description = "Document ID", required = true, example = "1") @PathVariable Integer documentId) {
+        try {
+            Map<String, Object> result = service.getDocumentStream(documentId);
+
+            if ((Boolean) result.get("success")) {
+                java.io.InputStream inputStream = (java.io.InputStream) result.get("fileStream");
+                String filename = (String) result.get("filename");
+                String contentType = (String) result.get("contentType");
+                Long fileSize = (Long) result.get("fileSize");
+
+                org.springframework.core.io.InputStreamResource resource = new org.springframework.core.io.InputStreamResource(
+                        inputStream);
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"");
+
+                return ResponseEntity.ok()
+                        .headers(headers)
+                        .contentLength(fileSize)
+                        .contentType(MediaType.parseMediaType(contentType))
+                        .body(resource);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    /**
      * Parse date/time string with multiple format support
      */
     private LocalDateTime parseDateTime(String dateTimeStr) {

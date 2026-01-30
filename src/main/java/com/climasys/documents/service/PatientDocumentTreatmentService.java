@@ -426,7 +426,7 @@ public class PatientDocumentTreatmentService {
             // Save file to file system - Equivalent to:
             // hpf.SaveAs(Server.MapPath(Savepath));
             FileStorageService.FileUploadResult uploadResult = fileStorageService.saveFileWithResult(file, patientId,
-                    "patient-documents");
+                    clinicId, "patient-uploads");
             String savedFilePath = uploadResult.relativePath();
             long size = uploadResult.fileSize();
 
@@ -471,7 +471,6 @@ public class PatientDocumentTreatmentService {
      * @param visitDate      Visit date
      * @return Map containing success status and list of uploaded documents
      */
-    @Transactional
     public Map<String, Object> uploadAndSaveMultipleDocuments(
             MultipartFile[] files,
             String patientId,
@@ -520,17 +519,16 @@ public class PatientDocumentTreatmentService {
                 }
             }
 
-            // Save files to file system - Equivalent to: for (int i = 0; i < hfc.Count - 1;
-            // i++)
+            // Save files to file system - I/O happens HERE, outside of DB transaction
             List<FileStorageService.FileUploadResult> uploadResults = fileStorageService
-                    .saveMultipleFilesWithResults(files, patientId, "patient-documents");
+                    .saveMultipleFilesWithResults(files, patientId, clinicId, "patient-uploads");
 
             logger.info("Saved {} files for patient: {}", uploadResults.size(), patientId);
 
             // Save each document record to database
             for (FileStorageService.FileUploadResult resultObj : uploadResults) {
+                String filePath = resultObj.relativePath();
                 try {
-                    String filePath = resultObj.relativePath();
                     long size = resultObj.fileSize();
 
                     Map<String, Object> dbResult = insertPatientDocumentTreatment(
@@ -546,16 +544,21 @@ public class PatientDocumentTreatmentService {
                     if ((Boolean) dbResult.get("success")) {
                         uploadedDocuments.add(dbResult);
                     } else {
+                        // COMPENSATION: Delete file if DB insert fails
+                        logger.error("DB insert failed for file: {}. Deleting file.", filePath);
+                        fileStorageService.deleteFile(filePath);
                         errors.add("Failed to save record for file: " + filePath);
                     }
                 } catch (Exception e) {
-                    logger.error("Error saving document record: {}", e.getMessage(), e);
+                    // COMPENSATION: Delete file if exception occurs
+                    logger.error("Error saving document record for file: {}. Deleting file.", filePath, e);
+                    fileStorageService.deleteFile(filePath);
                     errors.add("Error saving record for file: " + e.getMessage());
                 }
             }
 
             // Build response
-            response.put("success", uploadedDocuments.size() > 0);
+            response.put("success", uploadedDocuments.size() > 0); // Consider success if at least one uploaded
             response.put("message", "Uploaded " + uploadedDocuments.size() + " of " + files.length + " files");
             response.put("uploadedCount", uploadedDocuments.size());
             response.put("totalFiles", files.length);
@@ -621,6 +624,52 @@ public class PatientDocumentTreatmentService {
             logger.error("Error retrieving document file: {}", e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to retrieve document: " + e.getMessage());
+        }
+
+        return response;
+    }
+
+    /**
+     * Get document input stream for streaming download
+     * 
+     * @param documentId Document ID
+     * @return Map with file input stream and metadata
+     */
+    public Map<String, Object> getDocumentStream(Integer documentId) {
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            Optional<PatientDocumentTreatment> documentOpt = repository.findById(documentId);
+
+            if (documentOpt.isPresent()) {
+                PatientDocumentTreatment document = documentOpt.get();
+                String filePath = document.getDocumentName();
+
+                // Get file input stream
+                java.io.InputStream inputStream = fileStorageService.getFileInputStream(filePath);
+
+                // Extract filename from path
+                String filename = filePath.substring(filePath.lastIndexOf('/') + 1);
+
+                response.put("success", true);
+                response.put("fileStream", inputStream);
+                response.put("filename", filename);
+                response.put("documentId", documentId);
+                response.put("contentType", determineContentType(filename));
+                response.put("fileSize", document.getFileSize());
+            } else {
+                response.put("success", false);
+                response.put("error", "Document not found with ID: " + documentId);
+            }
+
+        } catch (IOException e) {
+            logger.error("Error opening file stream for document ID {}: {}", documentId, e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to open file stream: " + e.getMessage());
+        } catch (Exception e) {
+            logger.error("Error retrieving document stream: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("error", "Failed to retrieve document stream: " + e.getMessage());
         }
 
         return response;
