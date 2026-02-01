@@ -47,18 +47,18 @@ public class ReferralController {
     public ResponseEntity<?> getReferByTranslations(@RequestParam Integer languageId) {
         try {
             List<ReferByTranslation> result = referralService.getReferByTranslations(languageId);
-            
+
             // Log for debugging
             System.out.println("=== REFERRAL CONTROLLER DEBUG ===");
             System.out.println("Language ID: " + languageId);
             System.out.println("Number of translations returned: " + result.size());
             for (int i = 0; i < result.size(); i++) {
                 ReferByTranslation t = result.get(i);
-                System.out.println("Translation " + i + ": ID=" + t.getId().getReferId() + 
-                                 ", Description=" + t.getReferByDescription());
+                System.out.println("Translation " + i + ": ID=" + t.getId().getReferId() +
+                        ", Description=" + t.getReferByDescription());
             }
             System.out.println("=== END REFERRAL CONTROLLER DEBUG ===");
-            
+
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -135,23 +135,23 @@ public class ReferralController {
                 error.put("error", "Doctor name is required");
                 return ResponseEntity.badRequest().body(error);
             }
-            
+
             if (referralDoctor.getReferId() == null || referralDoctor.getReferId().trim().isEmpty()) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("error", "Refer ID is required");
                 return ResponseEntity.badRequest().body(error);
             }
-            
+
             // Set default values
             if (referralDoctor.getDeleteFlag() == null) {
                 referralDoctor.setDeleteFlag(false);
             }
-            
+
             ReferralDoctor result = referralService.saveReferralDoctor(referralDoctor);
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
-            error.put("error", "Failed to save referral doctor: " + e.getMessage());
+            error.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
     }

@@ -92,7 +92,7 @@ public class ReferralService {
 
                 if (isDuplicate) {
                     throw new IllegalArgumentException(
-                            "Referral doctor with name '" + trimmedName + "' already exists in this clinic.");
+                            trimmedName + " Duplicate doctor names are not allowed");
                 }
             }
 
