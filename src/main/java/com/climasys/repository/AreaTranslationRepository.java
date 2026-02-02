@@ -23,6 +23,10 @@ public interface AreaTranslationRepository extends JpaRepository<AreaTranslation
         List<AreaTranslation> findByAreaNameAndLanguageId(@Param("areaName") String areaName,
                         @Param("languageId") Integer languageId);
 
+        @Query("SELECT at FROM AreaTranslation at WHERE LOWER(at.areaName) = LOWER(:areaName) AND at.id.languageId = :languageId")
+        List<AreaTranslation> findByAreaNameIgnoreCaseAndLanguageId(@Param("areaName") String areaName,
+                        @Param("languageId") Integer languageId);
+
         @Query("SELECT at FROM AreaTranslation at INNER JOIN Area a ON at.id.areaId = a.id " +
                         "AND at.id.cityId = a.cityId AND at.id.countryId = a.countryId " +
                         "WHERE at.id.languageId = :languageId AND LOWER(at.areaName) LIKE LOWER(CONCAT('%', :searchStr, '%')) AND a.isActivate = true")
