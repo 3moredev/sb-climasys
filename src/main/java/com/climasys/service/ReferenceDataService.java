@@ -579,8 +579,10 @@ public class ReferenceDataService {
             }
 
             // Check if area already exists with the same name, city, state, country
-            List<AreaTranslation> existingTranslations = areaTranslationRepository.findByAreaNameAndLanguageId(areaName,
-                    languageId);
+            // (case-insensitive)
+            List<AreaTranslation> existingTranslations = areaTranslationRepository
+                    .findByAreaNameIgnoreCaseAndLanguageId(areaName,
+                            languageId);
 
             if (existingTranslations != null && !existingTranslations.isEmpty()) {
                 for (AreaTranslation existingTranslation : existingTranslations) {
