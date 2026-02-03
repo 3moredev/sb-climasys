@@ -22,14 +22,14 @@ FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 
 # Create non-root user
-RUN addgroup -S climasys && adduser -S climasys -G climasys
+# RUN addgroup -S climasys && adduser -S climasys -G climasys
 
 # Copy the built jar from build stage
 COPY --from=build /app/target/*.jar app.jar
 
 # Change ownership to non-root user
-RUN chown -R climasys:climasys /app
-USER climasys
+# RUN chown -R climasys:climasys /app
+# USER climasys
 
 # Expose port
 EXPOSE 8080
