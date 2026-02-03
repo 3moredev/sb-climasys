@@ -6,7 +6,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/climasys?currentSchema=public
     username: postgres
-    password: root
+    password: root@123
     driverClassName: org.postgresql.Driver
     hikari:
       maximum-pool-size: 20
