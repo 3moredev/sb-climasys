@@ -44,4 +44,5 @@ Desktop.ini
 *.ipr
 
 node_modules/
+files/
 

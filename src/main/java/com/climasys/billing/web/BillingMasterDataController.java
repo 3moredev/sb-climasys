@@ -39,8 +39,10 @@ public class BillingMasterDataController {
      * - sequenceNo (p_var_Sequence_no): Sequence Number
      * - isDefault (p_var_Isdefault): Is Default (Boolean)
      * - visitType (p_var_VisitType): Visit Type
-     * - billingDataTable (p_var_Insert_Billing_Data): Optional DataTable with billing details
-     *   (OLD_GROUP, OLD_SUBGROUP, OLD_DETAILS, OLD_AMOUNT, NEW_GROUP, NEW_SUBGROUP, NEW_DETAILS, NEW_AMOUNT, DOCTOR_ID, NEW_VISIT_TYPE, OLD_VISIT_TYPE)
+     * - billingDataTable (p_var_Insert_Billing_Data): Optional DataTable with
+     * billing details
+     * (OLD_GROUP, OLD_SUBGROUP, OLD_DETAILS, OLD_AMOUNT, NEW_GROUP, NEW_SUBGROUP,
+     * NEW_DETAILS, NEW_AMOUNT, DOCTOR_ID, NEW_VISIT_TYPE, OLD_VISIT_TYPE)
      */
     @PostMapping
     public ResponseEntity<Map<String, Object>> insertBillingMasterData(@RequestBody Map<String, Object> request) {
@@ -56,7 +58,8 @@ public class BillingMasterDataController {
      * Update billing master data
      * PUT /api/billing/master-data
      * 
-     * Corresponds to USP_Insert_Billing_MasterData stored procedure (handles both insert and update)
+     * Corresponds to USP_Insert_Billing_MasterData stored procedure (handles both
+     * insert and update)
      * Used in: AddBillingDetails.aspx.cs - btnSubmit_Click() method
      * Service method: SaveBilling_MasterData()
      * 
@@ -70,8 +73,10 @@ public class BillingMasterDataController {
      * - sequenceNo (p_var_Sequence_no): Sequence Number
      * - isDefault (p_var_Isdefault): Is Default (Boolean)
      * - visitType (p_var_VisitType): Visit Type
-     * - billingDataTable (p_var_Insert_Billing_Data): Optional DataTable with billing details
-     *   (OLD_GROUP, OLD_SUBGROUP, OLD_DETAILS, OLD_AMOUNT, NEW_GROUP, NEW_SUBGROUP, NEW_DETAILS, NEW_AMOUNT, DOCTOR_ID, NEW_VISIT_TYPE, OLD_VISIT_TYPE)
+     * - billingDataTable (p_var_Insert_Billing_Data): Optional DataTable with
+     * billing details
+     * (OLD_GROUP, OLD_SUBGROUP, OLD_DETAILS, OLD_AMOUNT, NEW_GROUP, NEW_SUBGROUP,
+     * NEW_DETAILS, NEW_AMOUNT, DOCTOR_ID, NEW_VISIT_TYPE, OLD_VISIT_TYPE)
      */
     @PutMapping
     public ResponseEntity<Map<String, Object>> updateBillingMasterData(@RequestBody Map<String, Object> request) {
@@ -94,10 +99,12 @@ public class BillingMasterDataController {
 
     /**
      * Get billing sub-groups based on selected group/category
-     * GET /api/billing/master-data/sub-categories?groupName={groupName}&doctorId={doctorId}
+     * GET
+     * /api/billing/master-data/sub-categories?groupName={groupName}&doctorId={doctorId}
      * 
      * This corresponds to USP_Get_SubCatagoryData stored procedure
-     * Used in: AddBillingDetails.aspx.cs - ddlCatagory_SelectedIndexChanged() method
+     * Used in: AddBillingDetails.aspx.cs - ddlCatagory_SelectedIndexChanged()
+     * method
      */
     @GetMapping("/sub-categories")
     public ResponseEntity<List<Map<String, Object>>> getBillingSubCategories(
@@ -147,8 +154,11 @@ public class BillingMasterDataController {
      * Delete master billing detail
      */
     @DeleteMapping("/billing-details/{billingDetailId}")
-    public ResponseEntity<List<Map<String, Object>>> deleteMasterBillingDetail(@PathVariable String billingDetailId) {
-        List<Map<String, Object>> result = billingMasterDataService.deleteMasterBillingDetail(billingDetailId);
+    public ResponseEntity<List<Map<String, Object>>> deleteMasterBillingDetail(
+            @PathVariable String billingDetailId,
+            @RequestParam(required = true) String doctorId) {
+        List<Map<String, Object>> result = billingMasterDataService.deleteMasterBillingDetail(billingDetailId,
+                doctorId);
         return ResponseEntity.ok(result);
     }
 

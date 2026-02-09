@@ -106,7 +106,7 @@ climasys:
   # .NET uses ~ for application root, Java uses ./ for relative paths
   file-upload:
     # Base directory for all uploads - can be overridden by environment variable CLIMASYS_UPLOAD_BASE
-    base-dir: ${CLIMASYS_UPLOAD_BASE:./file-uploads}
+    base-dir: ${CLIMASYS_UPLOAD_BASE:file-uploads}
     
     # UPLOADPATIENT - Main patient documents upload folder
     upload-patient: "${climasys.file-upload.base-dir}/patient-uploads"

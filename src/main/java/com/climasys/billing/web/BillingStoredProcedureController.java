@@ -56,7 +56,7 @@ public class BillingStoredProcedureController {
                 ORDER BY bdm.billing_group_name, bdm.billing_subgroup_name, 
                          COALESCE(bdm.sequence_no, 0) ASC
                 """;
-            
+             
             List<Map<String, Object>> result;
             try {
                 result = jdbcTemplate.queryForList(sql, doctorId);
