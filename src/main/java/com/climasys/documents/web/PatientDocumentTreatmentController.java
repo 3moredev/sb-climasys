@@ -1,6 +1,8 @@
 package com.climasys.documents.web;
 
 import com.climasys.auth.annotation.RefreshSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.climasys.documents.service.PatientDocumentTreatmentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -38,6 +40,8 @@ import java.util.Map;
 @Tag(name = "Patient Document Treatment", description = "Manage patient treatment-related documents")
 @RefreshSession
 public class PatientDocumentTreatmentController {
+
+    private static final Logger logger = LoggerFactory.getLogger(PatientDocumentTreatmentController.class);
 
     @Autowired
     private PatientDocumentTreatmentService service;
@@ -122,6 +126,7 @@ public class PatientDocumentTreatmentController {
             @Parameter(description = "Patient ID", required = true, example = "P-00001") @PathVariable String patientId,
             @Parameter(description = "Patient visit number", required = true, example = "1") @PathVariable Integer visitNo) {
         try {
+            logger.info("Received request to get documents for patient: {}, visitNo: {}", patientId, visitNo);
             Map<String, Object> result = service.getDocumentsByPatientVisit(patientId, visitNo);
 
             if ((Boolean) result.get("success")) {
