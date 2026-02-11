@@ -126,7 +126,8 @@ public class PatientDocumentTreatmentService {
             response.put("visitNo", visitNo);
 
         } catch (Exception e) {
-            logger.error("Error retrieving patient documents: {}", e.getMessage(), e);
+            logger.error("Error retrieving patient documents for patientId: {} and visitNo: {}. Error: {}",
+                    patientId, visitNo, e.getMessage(), e);
             response.put("success", false);
             response.put("error", "Failed to retrieve documents: " + e.getMessage());
         }

@@ -372,17 +372,6 @@ public class AppointmentJpaService {
                 patientId, patientVisitNo, doctorId, statusId);
 
         try {
-            // Get existing refer_id logic (same as stored procedure)
-            String referId = "S"; // Default value
-            try {
-                Optional<PatientVisit> existingVisit = appointmentRepository.findByPatientVisitNo(patientVisitNo);
-                if (existingVisit.isPresent() && existingVisit.get().getReferId() != null) {
-                    referId = existingVisit.get().getReferId();
-                }
-            } catch (Exception e) {
-                logger.warn("Could not retrieve existing refer_id, using default: {}", e.getMessage());
-            }
-
             // Convert online appointment time
             java.sql.Time onlineTime = null;
             if (onlineAppointmentTime != null && !onlineAppointmentTime.trim().isEmpty()) {
@@ -399,13 +388,13 @@ public class AppointmentJpaService {
             // Log the exact parameters being used in the WHERE clause
             logger.info("UPDATE WHERE clause parameters: patientId={}, visitNo={}, shiftId={}, clinicId={}",
                     patientId, patientVisitNo, shiftId, clinicId);
-            logger.info("UPDATE SET values: onlineTime={}, doctorId={}, statusId={}, referId={}",
-                    onlineTime, doctorId, statusId, referId);
+            logger.info("UPDATE SET values: onlineTime={}, doctorId={}, statusId={}",
+                    onlineTime, doctorId, statusId);
 
             // Update appointment
             int updatedCount = appointmentRepository.updateAppointmentOnlineTimeAndDoctor(
                     patientId, patientVisitNo, shiftId, clinicId, onlineTime, doctorId,
-                    statusId, LocalDateTime.now(), userId, referId);
+                    statusId, LocalDateTime.now(), userId);
 
             logger.info("UPDATE result: {} row(s) affected", updatedCount);
 
