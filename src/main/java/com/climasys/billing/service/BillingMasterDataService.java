@@ -206,29 +206,53 @@ public class BillingMasterDataService {
 
     /**
      * Delete master billing detail
+     * 
+     * @param billingGroupName    Billing group name
+     * @param billingSubgroupName Billing subgroup name
+     * @param billingDetails      Billing details
+     * @param doctorId            Doctor ID
+     * @return List of result map
      */
-    public List<Map<String, Object>> deleteMasterBillingDetail(String billingDetailId, String doctorId) {
+    @Transactional
+    public List<Map<String, Object>> deleteMasterBillingDetail(
+            String billingGroupName,
+            String billingSubgroupName,
+            String billingDetails,
+            String doctorId) {
         try {
-            // Assuming billingDetailId is in format:
-            // billing_group_name*billing_subgroup_name*billing_details
-            String[] parts = billingDetailId.split("\\*");
-            if (parts.length == 3) {
-                String sql = """
-                        DELETE FROM billing_details_master
-                        WHERE billing_group_name = ?
-                          AND billing_subgroup_name = ?
-                          AND billing_details = ?
-                        """;
-                jdbcTemplate.update(sql, parts[0], parts[1], parts[2]);
-            } else {
-                throw new IllegalArgumentException("Invalid billing detail ID format");
+            // Trim inputs to handle potential whitespace issues
+            String trimmedGroup = billingGroupName != null ? billingGroupName.trim() : null;
+            String trimmedSubgroup = billingSubgroupName != null ? billingSubgroupName.trim() : null;
+            String trimmedDetails = billingDetails != null ? billingDetails.trim() : null;
+            String trimmedDoctorId = doctorId != null ? doctorId.trim() : null;
+
+            logger.info("Deleting billing detail: group='{}', subgroup='{}', details='{}', doctorId='{}'",
+                    trimmedGroup, trimmedSubgroup, trimmedDetails, trimmedDoctorId);
+
+            String sql = """
+                    DELETE FROM billing_details_master
+                    WHERE TRIM(billing_group_name) = TRIM(?)
+                      AND TRIM(billing_subgroup_name) = TRIM(?)
+                      AND TRIM(billing_details) = TRIM(?)
+                      AND TRIM(doctor_id) = TRIM(?)
+                    """;
+
+            int rowsDeleted = jdbcTemplate.update(sql, trimmedGroup, trimmedSubgroup, trimmedDetails, trimmedDoctorId);
+
+            logger.info("Delete result: {} row(s) deleted", rowsDeleted);
+
+            if (rowsDeleted == 0) {
+                logger.warn("No rows deleted - record not found");
             }
 
             Map<String, Object> result = new HashMap<>();
-            result.put("message", "Master billing detail deleted successfully");
-            result.put("billingDetailId", billingDetailId);
+            result.put("success", rowsDeleted > 0);
+            result.put("message", rowsDeleted > 0 ? "Master billing detail deleted successfully"
+                    : "No matching record found to delete");
+            result.put("rowsDeleted", rowsDeleted);
             return List.of(result);
         } catch (Exception e) {
+            logger.error("Failed to delete master billing detail: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to delete master billing detail: " + e.getMessage(), e);
         }
     }
@@ -267,6 +291,13 @@ public class BillingMasterDataService {
             String userId = getStringValue(request, "userId", "user_Id");
             String doctorId = getStringValue(request, "doctorId", "doctor_ID");
             String clinicId = getStringValue(request, "clinicId", "clinic_id");
+
+            // If clinicId is not provided, use a default value
+            if (clinicId == null || clinicId.trim().isEmpty()) {
+                clinicId = "1"; // Default clinic ID
+                logger.info("clinic_id not provided, using default: {}", clinicId);
+            }
+
             String groupName = getStringValue(request, "groupName", "group");
             String subgroupName = getStringValue(request, "subgroupName", "subgroup");
             String detail = getStringValue(request, "detail");

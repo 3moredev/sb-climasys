@@ -152,13 +152,28 @@ public class BillingMasterDataController {
 
     /**
      * Delete master billing detail
+     * Request body should contain:
+     * - billingGroupName: Billing group name
+     * - billingSubgroupName: Billing subgroup name
+     * - billingDetails: Billing details
+     * - doctorId: Doctor ID
      */
-    @DeleteMapping("/billing-details/{billingDetailId}")
+    @DeleteMapping("/billing-details")
     public ResponseEntity<List<Map<String, Object>>> deleteMasterBillingDetail(
-            @PathVariable String billingDetailId,
-            @RequestParam(required = true) String doctorId) {
-        List<Map<String, Object>> result = billingMasterDataService.deleteMasterBillingDetail(billingDetailId,
-                doctorId);
+            @RequestBody Map<String, Object> request) {
+        String billingGroupName = (String) request.get("billingGroupName");
+        String billingSubgroupName = (String) request.get("billingSubgroupName");
+        String billingDetails = (String) request.get("billingDetails");
+        String doctorId = (String) request.get("doctorId");
+
+        if (billingGroupName == null || billingSubgroupName == null || billingDetails == null || doctorId == null) {
+            throw new IllegalArgumentException(
+                    "billingGroupName, billingSubgroupName, billingDetails, and doctorId are required");
+        }
+
+        // Pass individual fields directly to service
+        List<Map<String, Object>> result = billingMasterDataService.deleteMasterBillingDetail(
+                billingGroupName, billingSubgroupName, billingDetails, doctorId);
         return ResponseEntity.ok(result);
     }
 
