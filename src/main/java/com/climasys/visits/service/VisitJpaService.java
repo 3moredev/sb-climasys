@@ -2000,6 +2000,19 @@ public class VisitJpaService {
         visitMap.put("Tobaco", visit.getTobaco());
         visitMap.put("Alchohol", visit.getAlchohol());
 
+        // Derive In_Person from statusId for consistency
+        // WAITING (1) -> true, WITH DOCTOR (2) -> true, CONSULT ON CALL (3) -> false
+        Boolean derivedInPerson = visit.getInPerson();
+        if (visit.getStatusId() != null) {
+            short sid = visit.getStatusId();
+            if (sid == 1 || sid == 2) {
+                derivedInPerson = true;
+            } else if (sid == 3) {
+                derivedInPerson = false;
+            }
+        }
+        visitMap.put("In_Person", derivedInPerson != null ? derivedInPerson : false);
+
         // Audit fields
         visitMap.put("Created_On", visit.getCreatedOn());
         visitMap.put("Created_By", visit.getCreatedbyName());
@@ -2047,7 +2060,18 @@ public class VisitJpaService {
         visitMap.put("habitDetails", visit.getHabitsComments());
         visitMap.put("allergyDetails", visit.getAllergyDtls());
         visitMap.put("observation", visit.getObservation());
-        visitMap.put("inPerson", visit.getInPerson());
+        // Derive inPerson from statusId for consistency
+        // WAITING (1) -> true, WITH DOCTOR (2) -> true, CONSULT ON CALL (3) -> false
+        Boolean derivedInPerson = visit.getInPerson();
+        if (visit.getStatusId() != null) {
+            short sid = visit.getStatusId();
+            if (sid == 1 || sid == 2) {
+                derivedInPerson = true;
+            } else if (sid == 3) {
+                derivedInPerson = false;
+            }
+        }
+        visitMap.put("inPerson", derivedInPerson != null ? derivedInPerson : false);
         visitMap.put("symptomComment", visit.getSymptomComment());
         visitMap.put("impression", visit.getImpression());
         visitMap.put("attendedBy", visit.getAttendedBy());
