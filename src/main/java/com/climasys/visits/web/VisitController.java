@@ -426,7 +426,12 @@ public class VisitController {
                         "TO_CHAR(PV.visit_date, 'YYYY-MM-DD') AS visitDate, " +
                         "PV.shift_id AS shiftId, " +
                         "PV.status_id AS status, " +
-                        "PV.patient_visit_no AS visitId " +
+                        "PV.patient_visit_no AS visitId, " +
+                        "CASE " +
+                        "  WHEN PV.status_id IN (1, 2) THEN true " +
+                        "  WHEN PV.status_id = 3 THEN false " +
+                        "  ELSE COALESCE(PV.in_person, false) " +
+                        "END AS \"inPerson\" " +
                         "FROM patient_visits PV " +
                         "INNER JOIN patient_master PM ON PV.patient_id = PM.id " +
                         "INNER JOIN doctor_master DM ON PV.doctor_id = DM.doctor_id " +
