@@ -26,13 +26,13 @@ import java.util.Optional;
 public class LabTestResultService {
 
     private static final Logger logger = LoggerFactory.getLogger(LabTestResultService.class);
-    
+
     @Autowired
     private PatientVisitLabTestResultRepository patientVisitLabTestResultRepository;
-    
+
     @Autowired
     private PatientVisitRepository patientVisitRepository;
-    
+
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /**
@@ -44,50 +44,53 @@ public class LabTestResultService {
      */
     @Transactional
     public LabTestResultResponse saveLabTestResults(LabTestResultRequest request) {
-        logger.info("Saving lab test results for patient: {}, visit: {}", request.patientId(), request.patientVisitNo());
-        
+        logger.info("Saving lab test results for patient: {}, visit: {}", request.patientId(),
+                request.patientVisitNo());
+
         try {
             // Validate request
             List<String> validationErrors = validateRequest(request);
             if (!validationErrors.isEmpty()) {
                 return LabTestResultResponse.error("Validation failed", validationErrors);
             }
-            
+
             // Parse visit date from the first test parameter
             LocalDateTime visitDate = parseVisitDate(request.testReportData().get(0).visitDate());
-            
+
             int recordsInserted = 0;
             int recordsUpdated = 0;
             List<String> errors = new ArrayList<>();
-            
+
             // Process each test parameter
             for (LabTestResultRequest.LabTestParameterData testData : request.testReportData()) {
                 try {
                     // Note: Lab test date can be different from visit date
-                    // Find the visit using composite key (excluding date) to get the actual visit date for FK
+                    // Find the visit using composite key (excluding date) to get the actual visit
+                    // date for FK
                     var visitOptional = patientVisitRepository
                             .findFirstByCompositeKeyWithoutDate(
                                     testData.patientId(),
                                     testData.doctorId(),
                                     testData.clinicId(),
                                     testData.shiftId(),
-                                    testData.patientVisitNo()
-                            );
+                                    testData.patientVisitNo());
                     boolean visitExists = visitOptional.isPresent();
-                    
+
                     if (!visitExists) {
-                        String errorMsg = String.format("Patient visit does not exist for patient: %s, visit: %s, doctor: %s, clinic: %s, shift: %s", 
-                                testData.patientId(), testData.patientVisitNo(), testData.doctorId(), 
+                        String errorMsg = String.format(
+                                "Patient visit does not exist for patient: %s, visit: %s, doctor: %s, clinic: %s, shift: %s",
+                                testData.patientId(), testData.patientVisitNo(), testData.doctorId(),
                                 testData.clinicId(), testData.shiftId());
                         errors.add(errorMsg);
                         logger.error(errorMsg);
                         continue; // Skip this test parameter and continue with the next one
                     }
-                    
+
                     // Use the exact visitDate from patient_visits to satisfy FK constraint
-                    // The lab test date (testData.visitDate()) may be different, but we must use the visit's actual date for FK
+                    // The lab test date (testData.visitDate()) may be different, but we must use
+                    // the visit's actual date for FK
                     LocalDateTime exactVisitDate = visitOptional.get().getVisitDate();
-                    logger.debug("Lab test date from request: {}, Using actual visit date for FK: {}", 
+                    logger.debug("Lab test date from request: {}, Using actual visit date for FK: {}",
                             testData.visitDate(), exactVisitDate);
 
                     // Create composite key
@@ -99,12 +102,12 @@ public class LabTestResultService {
                             testData.doctorId(),
                             testData.patientId(),
                             testData.labTestDescription(),
-                            testData.parameterName()
-                    );
-                    
+                            testData.parameterName());
+
                     // Check if record already exists
-                    Optional<PatientVisitLabTestResult> existingResult = patientVisitLabTestResultRepository.findById(id);
-                    
+                    Optional<PatientVisitLabTestResult> existingResult = patientVisitLabTestResultRepository
+                            .findById(id);
+
                     if (existingResult.isPresent()) {
                         // Update existing record
                         PatientVisitLabTestResult existing = existingResult.get();
@@ -116,11 +119,11 @@ public class LabTestResultService {
                         existing.setReportDate(request.reportDate());
                         existing.setComment(request.comment());
                         existing.setDeleteFlag(false);
-                        
+
                         patientVisitLabTestResultRepository.save(existing);
                         recordsUpdated++;
                         logger.debug("Updated lab test result: {}", id);
-                        
+
                     } else {
                         // Create new record
                         PatientVisitLabTestResult newResult = new PatientVisitLabTestResult(
@@ -132,9 +135,8 @@ public class LabTestResultService {
                                 testData.patientId(),
                                 testData.labTestDescription(),
                                 testData.parameterName(),
-                                testData.testParameterValue()
-                        );
-                        
+                                testData.testParameterValue());
+
                         // Set additional fields
                         newResult.setCreatedbyName(request.userId());
                         newResult.setModifiedbyName(request.userId());
@@ -142,29 +144,29 @@ public class LabTestResultService {
                         newResult.setLabName(request.labName());
                         newResult.setReportDate(request.reportDate());
                         newResult.setComment(request.comment());
-                        
+
                         patientVisitLabTestResultRepository.save(newResult);
                         recordsInserted++;
                         logger.debug("Inserted new lab test result: {}", id);
                     }
-                    
+
                 } catch (Exception e) {
-                    String errorMsg = String.format("Failed to process test parameter %s: %s", 
+                    String errorMsg = String.format("Failed to process test parameter %s: %s",
                             testData.parameterName(), e.getMessage());
                     errors.add(errorMsg);
                     logger.error(errorMsg, e);
                 }
             }
-            
+
             // Check if any records were processed successfully
             if (recordsInserted == 0 && recordsUpdated == 0 && !errors.isEmpty()) {
                 return LabTestResultResponse.error("Failed to save any lab test results", errors);
             }
-            
+
             // Log summary
-            logger.info("Lab test results saved successfully - Inserted: {}, Updated: {}, Errors: {}", 
+            logger.info("Lab test results saved successfully - Inserted: {}, Updated: {}, Errors: {}",
                     recordsInserted, recordsUpdated, errors.size());
-            
+
             // Return success response
             return LabTestResultResponse.success(
                     request.patientId(),
@@ -174,56 +176,61 @@ public class LabTestResultService {
                     request.shiftId(),
                     visitDate,
                     recordsInserted,
-                    recordsUpdated
-            );
-            
+                    recordsUpdated);
+
         } catch (Exception e) {
-            logger.error("Error saving lab test results for patient: {}, visit: {}", 
+            logger.error("Error saving lab test results for patient: {}, visit: {}",
                     request.patientId(), request.patientVisitNo(), e);
             return LabTestResultResponse.error("Failed to save lab test results: " + e.getMessage());
         }
     }
-    
+
     /**
      * Get lab test results for a specific patient visit
      * First finds the actual visit to get the exact visit date used when saving,
-     * then queries lab test results using that exact date for correct appointment matching
+     * then queries lab test results using that exact date for correct appointment
+     * matching
      */
-    public List<PatientVisitLabTestResult> getLabTestResultsWithExactVisitDate(String patientId, Integer patientVisitNo, 
-                                                           Short shiftId, String clinicId, String doctorId, 
-                                                           LocalDateTime providedVisitDate) {
-        logger.info("Getting lab test results for patient: {}, visit: {}, provided date: {}", 
+    public List<PatientVisitLabTestResult> getLabTestResultsWithExactVisitDate(String patientId, Integer patientVisitNo,
+            Short shiftId, String clinicId, String doctorId,
+            LocalDateTime providedVisitDate) {
+        logger.info("Getting lab test results for patient: {}, visit: {}, provided date: {}",
                 patientId, patientVisitNo, providedVisitDate);
-        
+
         // Strategy: Match stored procedure USP_Get_PreviousLabReports behavior
         // The stored procedure uses DATE comparison (date-only, ignoring time)
         // So we should prioritize date-only comparison over exact timestamp matching
-        
-        // First attempt: Try date-only comparison with provided date (matches stored procedure logic)
+
+        // First attempt: Try date-only comparison with provided date (matches stored
+        // procedure logic)
         // This is the primary method as it matches USP_Get_PreviousLabReports behavior
         List<PatientVisitLabTestResult> results = patientVisitLabTestResultRepository.findByPatientVisitByDateOnly(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, providedVisitDate);
-        
+
         if (!results.isEmpty()) {
-            logger.info("Found {} lab test results using date-only comparison (provided date): {}", results.size(), providedVisitDate);
+            logger.info("Found {} lab test results using date-only comparison (provided date): {}", results.size(),
+                    providedVisitDate);
             return results;
         }
-        
+
         logger.debug("No results found with provided date (date-only), trying to find visit and use its exact date...");
-        
-        // Second attempt: Find the actual visit to get the exact visit date used when saving
+
+        // Second attempt: Find the actual visit to get the exact visit date used when
+        // saving
         var visitOptional = patientVisitRepository.findFirstByCompositeKeyWithoutDate(
                 patientId, doctorId, clinicId, shiftId, patientVisitNo);
-        
+
         if (!visitOptional.isPresent()) {
-            logger.warn("Patient visit not found for patient: {}, visit: {}, doctor: {}, clinic: {}, shift: {}", 
+            logger.warn("Patient visit not found for patient: {}, visit: {}, doctor: {}, clinic: {}, shift: {}",
                     patientId, patientVisitNo, doctorId, clinicId, shiftId);
-            
+
             // Last attempt: Try without exact date to see if any results exist
-            List<PatientVisitLabTestResult> allResults = patientVisitLabTestResultRepository.findByPatientVisitWithoutExactDate(
-                    patientId, patientVisitNo, shiftId, clinicId, doctorId);
+            List<PatientVisitLabTestResult> allResults = patientVisitLabTestResultRepository
+                    .findByPatientVisitWithoutExactDate(
+                            patientId, patientVisitNo, shiftId, clinicId, doctorId);
             if (!allResults.isEmpty()) {
-                logger.error("Visit not found but {} lab test results exist for this composite key! This indicates data inconsistency.", 
+                logger.error(
+                        "Visit not found but {} lab test results exist for this composite key! This indicates data inconsistency.",
                         allResults.size());
                 logger.error("Results found with dates: {}", allResults.stream()
                         .map(r -> r.getVisitDate().toString())
@@ -232,77 +239,89 @@ public class LabTestResultService {
             }
             return new ArrayList<>();
         }
-        
-        // Get the exact visit date from the visit record (this is what was used when saving)
+
+        // Get the exact visit date from the visit record (this is what was used when
+        // saving)
         LocalDateTime exactVisitDate = visitOptional.get().getVisitDate();
         logger.info("Found visit with exact date: {} (provided date: {})", exactVisitDate, providedVisitDate);
-        
-        // Third attempt: Try date-only comparison with exact visit date (matches stored procedure)
+
+        // Third attempt: Try date-only comparison with exact visit date (matches stored
+        // procedure)
         results = patientVisitLabTestResultRepository.findByPatientVisitByDateOnly(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate);
-        
+
         if (!results.isEmpty()) {
-            logger.info("Found {} lab test results using date-only comparison (exact visit date): {}", results.size(), exactVisitDate);
+            logger.info("Found {} lab test results using date-only comparison (exact visit date): {}", results.size(),
+                    exactVisitDate);
             return results;
         }
-        
-        // Fourth attempt: Try exact timestamp match with exact visit date (for precision)
+
+        // Fourth attempt: Try exact timestamp match with exact visit date (for
+        // precision)
         logger.debug("No results found with date-only comparison, trying exact timestamp match...");
         results = patientVisitLabTestResultRepository.findByPatientVisit(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate);
-        
+
         if (!results.isEmpty()) {
             logger.info("Found {} lab test results using exact timestamp match: {}", results.size(), exactVisitDate);
             return results;
         }
-        
+
         // Debug: If still no results found, check what dates exist in the database
         logger.warn("No results found with any date matching method. Checking database directly...");
-        logger.warn("Query parameters - patientId: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}, visitDate: {}", 
+        logger.warn(
+                "Query parameters - patientId: {}, patientVisitNo: {}, shiftId: {}, clinicId: {}, doctorId: {}, visitDate: {}",
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate);
-        
+
         // Try to find any results for this composite key without date restriction
-        List<PatientVisitLabTestResult> allResults = patientVisitLabTestResultRepository.findByPatientVisitWithoutExactDate(
-                patientId, patientVisitNo, shiftId, clinicId, doctorId);
-        logger.warn("Found {} total lab test results for this composite key (without date restriction): {}", 
+        List<PatientVisitLabTestResult> allResults = patientVisitLabTestResultRepository
+                .findByPatientVisitWithoutExactDate(
+                        patientId, patientVisitNo, shiftId, clinicId, doctorId);
+        logger.warn("Found {} total lab test results for this composite key (without date restriction): {}",
                 allResults.size(), allResults.stream()
-                    .map(r -> "date=" + r.getVisitDate() + ", test=" + r.getLabTestDescription())
-                    .collect(java.util.stream.Collectors.joining("; ")));
-        
+                        .map(r -> "date=" + r.getVisitDate() + ", test=" + r.getLabTestDescription())
+                        .collect(java.util.stream.Collectors.joining("; ")));
+
         if (!allResults.isEmpty()) {
             LocalDateTime firstResultDate = allResults.get(0).getVisitDate();
             long diffMs = java.time.Duration.between(exactVisitDate, firstResultDate).toMillis();
-            logger.error("DATE MISMATCH DETECTED! Visit date: {}, First result date: {}, Difference: {}ms", 
+            logger.error("DATE MISMATCH DETECTED! Visit date: {}, First result date: {}, Difference: {}ms",
                     exactVisitDate, firstResultDate, diffMs);
-            
+
             // Last resort: Try date-only comparison with result's date
             results = patientVisitLabTestResultRepository.findByPatientVisitByDateOnly(
                     patientId, patientVisitNo, shiftId, clinicId, doctorId, firstResultDate);
             if (!results.isEmpty()) {
-                logger.info("Found {} results using date-only comparison with result date: {}", results.size(), firstResultDate);
+                logger.info("Found {} results using date-only comparison with result date: {}", results.size(),
+                        firstResultDate);
             }
         }
-        
+
         return results;
     }
-    
+
     /**
-     * Get lab test results for a specific patient visit (legacy method - kept for backward compatibility)
-     * Note: This method tries exact date match first, then falls back to composite key lookup
-     * For correct appointment matching, use getLabTestResultsWithExactVisitDate instead
+     * Get lab test results for a specific patient visit (legacy method - kept for
+     * backward compatibility)
+     * Note: This method tries exact date match first, then falls back to composite
+     * key lookup
+     * For correct appointment matching, use getLabTestResultsWithExactVisitDate
+     * instead
      */
-    public List<PatientVisitLabTestResult> getLabTestResults(String patientId, Integer patientVisitNo, 
-                                                           Short shiftId, String clinicId, String doctorId, 
-                                                           LocalDateTime visitDate) {
-        logger.info("Getting lab test results for patient: {}, visit: {}, date: {}", patientId, patientVisitNo, visitDate);
-        
+    public List<PatientVisitLabTestResult> getLabTestResults(String patientId, Integer patientVisitNo,
+            Short shiftId, String clinicId, String doctorId,
+            LocalDateTime visitDate) {
+        logger.info("Getting lab test results for patient: {}, visit: {}, date: {}", patientId, patientVisitNo,
+                visitDate);
+
         // First try exact date match
         List<PatientVisitLabTestResult> results = patientVisitLabTestResultRepository.findByPatientVisit(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate);
-        
-        // If not found with exact date, try without exact date (fallback - not recommended for production)
+
+        // If not found with exact date, try without exact date (fallback - not
+        // recommended for production)
         if (results.isEmpty()) {
-            logger.debug("No results found with exact date match, trying without exact date for patient: {}, visit: {}", 
+            logger.debug("No results found with exact date match, trying without exact date for patient: {}, visit: {}",
                     patientId, patientVisitNo);
             results = patientVisitLabTestResultRepository.findByPatientVisitWithoutExactDate(
                     patientId, patientVisitNo, shiftId, clinicId, doctorId);
@@ -310,158 +329,222 @@ public class LabTestResultService {
                 logger.info("Found {} lab test results using composite key (without exact date match)", results.size());
             }
         }
-        
+
         return results;
     }
-    
+
     /**
-     * Get lab test results by composite key without exact date (for cases where date may differ)
+     * Get lab test results by composite key without exact date (for cases where
+     * date may differ)
      */
-    public List<PatientVisitLabTestResult> getLabTestResultsByCompositeKey(String patientId, Integer patientVisitNo, 
-                                                           Short shiftId, String clinicId, String doctorId) {
-        logger.info("Getting lab test results by composite key (without exact date) for patient: {}, visit: {}", 
+    public List<PatientVisitLabTestResult> getLabTestResultsByCompositeKey(String patientId, Integer patientVisitNo,
+            Short shiftId, String clinicId, String doctorId) {
+        logger.info("Getting lab test results by composite key (without exact date) for patient: {}, visit: {}",
                 patientId, patientVisitNo);
-        
+
         return patientVisitLabTestResultRepository.findByPatientVisitWithoutExactDate(
                 patientId, patientVisitNo, shiftId, clinicId, doctorId);
     }
-    
+
     /**
      * Get all lab test results for a patient
      */
     public List<PatientVisitLabTestResult> getPatientLabTestResults(String patientId) {
         logger.info("Getting all lab test results for patient: {}", patientId);
-        
+
         return patientVisitLabTestResultRepository.findByPatientIdOrderByVisitDateDesc(patientId);
     }
-    
+
     /**
      * Soft delete lab test results for a patient visit
      */
     @Transactional
-    public boolean deleteLabTestResults(String patientId, Integer patientVisitNo, Short shiftId, 
-                                      String clinicId, String doctorId, LocalDateTime visitDate, String userId) {
+    public boolean deleteLabTestResults(String patientId, Integer patientVisitNo, Short shiftId,
+            String clinicId, String doctorId, LocalDateTime visitDate, String userId) {
         logger.info("Deleting lab test results for patient: {}, visit: {}", patientId, patientVisitNo);
-        
+
         try {
             int deletedCount = patientVisitLabTestResultRepository.softDeleteByPatientVisit(
-                    patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate,
                     LocalDateTime.now(), userId);
-            
+
             logger.info("Soft deleted {} lab test results", deletedCount);
             return deletedCount > 0;
-            
+
         } catch (Exception e) {
-            logger.error("Error deleting lab test results for patient: {}, visit: {}", 
+            logger.error("Error deleting lab test results for patient: {}, visit: {}",
                     patientId, patientVisitNo, e);
             return false;
         }
     }
-    
+
     /**
-     * Soft delete a specific lab test result parameter
-     * Equivalent to USP_Delete_LabtestParameter stored procedure
+     * Soft delete a specific lab test result parameter.
+     *
+     * Strategy: find the matching record first using date-only comparison
+     * (tolerant of timestamp differences), extract its exact stored visitDate,
+     * then soft-delete with that exact value. This guarantees the UPDATE
+     * WHERE clause matches the same row that was found.
      */
     @Transactional
     public boolean deleteLabTestResultParameter(String patientId, Integer patientVisitNo, Short shiftId,
-                                              String clinicId, String doctorId, LocalDateTime visitDate,
-                                              String labTestDescription, String parameterName, String userId) {
-        logger.info("Deleting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}", 
+            String clinicId, String doctorId, LocalDateTime visitDate,
+            String labTestDescription, String parameterName, String userId) {
+        logger.info("Deleting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}",
                 patientId, patientVisitNo, labTestDescription, parameterName);
-        
+
         try {
-            // Check if the parameter exists before attempting to delete
-            boolean exists = patientVisitLabTestResultRepository.existsByPatientVisitAndParameter(
-                    patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
-                    labTestDescription, parameterName);
-            
-            if (!exists) {
-                logger.warn("Lab test result parameter not found for deletion: patient={}, visit={}, test={}, parameter={}", 
-                        patientId, patientVisitNo, labTestDescription, parameterName);
+            // Step 1: Try to find the exact record using date-only comparison.
+            // This is the most reliable strategy because:
+            // - The save path stores the visit's actual DB timestamp (not the date the
+            // frontend sends), so exact timestamp matches often fail.
+            // - DATE-only comparison ignores the time component and finds the record
+            // regardless of what time was stored.
+            List<PatientVisitLabTestResult> resultsByDate = patientVisitLabTestResultRepository
+                    .findByPatientVisitByDateOnly(
+                            patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate);
+
+            Optional<PatientVisitLabTestResult> matchingParam = resultsByDate.stream()
+                    .filter(r -> r.getLabTestDescription().equals(labTestDescription)
+                            && r.getParameterName().equals(parameterName)
+                            && !Boolean.TRUE.equals(r.getDeleteFlag()))
+                    .findFirst();
+
+            // Step 2: If date-only didn't find it, try looking up the visit's actual date
+            // via the patient_visits table (handles cases where the date sent is completely
+            // wrong)
+            if (matchingParam.isEmpty()) {
+                logger.debug(
+                        "Date-only match failed for deletion (visitDate={}), trying via patient_visits lookup...",
+                        visitDate);
+
+                var visitOptional = patientVisitRepository.findFirstByCompositeKeyWithoutDate(
+                        patientId, doctorId, clinicId, shiftId, patientVisitNo);
+
+                if (visitOptional.isPresent()) {
+                    LocalDateTime actualVisitDate = visitOptional.get().getVisitDate();
+                    logger.info("Found actual visit date: {} (provided: {})", actualVisitDate, visitDate);
+
+                    List<PatientVisitLabTestResult> resultsByActualDate = patientVisitLabTestResultRepository
+                            .findByPatientVisitByDateOnly(
+                                    patientId, patientVisitNo, shiftId, clinicId, doctorId, actualVisitDate);
+
+                    matchingParam = resultsByActualDate.stream()
+                            .filter(r -> r.getLabTestDescription().equals(labTestDescription)
+                                    && r.getParameterName().equals(parameterName)
+                                    && !Boolean.TRUE.equals(r.getDeleteFlag()))
+                            .findFirst();
+                }
+            }
+
+            // Step 3: Last resort — exact timestamp match (original behaviour)
+            if (matchingParam.isEmpty()) {
+                logger.debug("All date-tolerant lookups failed, trying exact timestamp match...");
+                boolean exists = patientVisitLabTestResultRepository.existsByPatientVisitAndParameter(
+                        patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate,
+                        labTestDescription, parameterName);
+                if (exists) {
+                    // Use the provided visitDate for deletion directly
+                    int deletedCount = patientVisitLabTestResultRepository.softDeleteByPatientVisitAndParameter(
+                            patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate,
+                            labTestDescription, parameterName, LocalDateTime.now(), userId);
+                    logger.info("Soft deleted {} parameter using exact timestamp {}", deletedCount, visitDate);
+                    return deletedCount > 0;
+                }
+
+                logger.warn(
+                        "Lab test result parameter not found for deletion after all lookup strategies: "
+                                + "patient={}, visit={}, shift={}, clinic={}, doctor={}, date={}, test={}, parameter={}",
+                        patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate,
+                        labTestDescription, parameterName);
                 return false;
             }
-            
-            // Perform the soft delete
+
+            // Use the exact visitDate stored in the record for the soft-delete
+            LocalDateTime exactVisitDate = matchingParam.get().getVisitDate();
+            logger.info("Deleting parameter '{}' using stored visitDate: {}", parameterName, exactVisitDate);
+
             int deletedCount = patientVisitLabTestResultRepository.softDeleteByPatientVisitAndParameter(
-                    patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
+                    patientId, patientVisitNo, shiftId, clinicId, doctorId, exactVisitDate,
                     labTestDescription, parameterName, LocalDateTime.now(), userId);
-            
-            logger.info("Soft deleted {} lab test result parameter", deletedCount);
+
+            logger.info("Soft deleted {} lab test result parameter(s)", deletedCount);
             return deletedCount > 0;
-            
+
         } catch (Exception e) {
-            logger.error("Error deleting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}", 
+            logger.error(
+                    "Error deleting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}",
                     patientId, patientVisitNo, labTestDescription, parameterName, e);
             return false;
         }
     }
-    
+
     /**
      * Get a specific lab test result parameter
      */
     public PatientVisitLabTestResult getLabTestResultParameter(String patientId, Integer patientVisitNo, Short shiftId,
-                                                             String clinicId, String doctorId, LocalDateTime visitDate,
-                                                             String labTestDescription, String parameterName) {
-        logger.info("Getting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}", 
+            String clinicId, String doctorId, LocalDateTime visitDate,
+            String labTestDescription, String parameterName) {
+        logger.info("Getting lab test result parameter for patient: {}, visit: {}, test: {}, parameter: {}",
                 patientId, patientVisitNo, labTestDescription, parameterName);
-        
+
         return patientVisitLabTestResultRepository.findByPatientVisitAndTestParameter(
-                patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate, 
+                patientId, patientVisitNo, shiftId, clinicId, doctorId, visitDate,
                 labTestDescription, parameterName);
     }
-    
+
     /**
      * Validate the request data
      */
     private List<String> validateRequest(LabTestResultRequest request) {
         List<String> errors = new ArrayList<>();
-        
+
         if (request.testReportData() == null || request.testReportData().isEmpty()) {
             errors.add("Test report data is required");
             return errors;
         }
-        
+
         // Validate each test parameter
         for (int i = 0; i < request.testReportData().size(); i++) {
             LabTestResultRequest.LabTestParameterData testData = request.testReportData().get(i);
             String prefix = "Test parameter " + (i + 1) + ": ";
-            
+
             if (testData.visitDate() == null || testData.visitDate().trim().isEmpty()) {
                 errors.add(prefix + "Visit date is required");
             }
-            
+
             if (testData.patientVisitNo() == null) {
                 errors.add(prefix + "Patient visit number is required");
             }
-            
+
             if (testData.shiftId() == null) {
                 errors.add(prefix + "Shift ID is required");
             }
-            
+
             if (testData.clinicId() == null || testData.clinicId().trim().isEmpty()) {
                 errors.add(prefix + "Clinic ID is required");
             }
-            
+
             if (testData.doctorId() == null || testData.doctorId().trim().isEmpty()) {
                 errors.add(prefix + "Doctor ID is required");
             }
-            
+
             if (testData.patientId() == null || testData.patientId().trim().isEmpty()) {
                 errors.add(prefix + "Patient ID is required");
             }
-            
+
             if (testData.labTestDescription() == null || testData.labTestDescription().trim().isEmpty()) {
                 errors.add(prefix + "Lab test description is required");
             }
-            
+
             if (testData.parameterName() == null || testData.parameterName().trim().isEmpty()) {
                 errors.add(prefix + "Parameter name is required");
             }
         }
-        
+
         return errors;
     }
-    
+
     /**
      * Parse visit date from string
      */
