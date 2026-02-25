@@ -15,7 +15,8 @@ import java.util.Optional;
 
 /**
  * Service class for PrescriptionMedicines business logic
- * Provides methods for managing prescription medicines master data (Prescription Details)
+ * Provides methods for managing prescription medicines master data
+ * (Prescription Details)
  */
 @Service
 @Transactional
@@ -28,73 +29,88 @@ public class PrescriptionMedicinesService {
 
     /**
      * Get all prescription medicines for a specific doctor
+     * 
      * @param doctorId Doctor ID
      * @return List of prescription medicines for the doctor
      */
     @Transactional(readOnly = true)
     public List<PrescriptionMedicines> getAllPrescriptionMedicinesForDoctor(String doctorId) {
         logger.info("Getting all prescription medicines for doctor: {}", doctorId);
-        return prescriptionMedicinesRepository.findByDoctorIdOrderByPriorityValueAscCatShortNameAscCatsubDescriptionAsc(doctorId);
+        return prescriptionMedicinesRepository
+                .findByDoctorIdOrderByPriorityValueAscCatShortNameAscCatsubDescriptionAsc(doctorId);
     }
 
     /**
      * Get all active prescription medicines for a specific doctor
+     * 
      * @param doctorId Doctor ID
      * @return List of active prescription medicines for the doctor
      */
     @Transactional(readOnly = true)
     public List<PrescriptionMedicines> getActivePrescriptionMedicinesForDoctor(String doctorId) {
         logger.info("Getting active prescription medicines for doctor: {}", doctorId);
-        return prescriptionMedicinesRepository.findByDoctorIdAndActiveOrderByPriorityValueAscCatShortNameAscCatsubDescriptionAsc(doctorId, true);
+        return prescriptionMedicinesRepository
+                .findByDoctorIdAndActiveOrderByPriorityValueAscCatShortNameAscCatsubDescriptionAsc(doctorId, true);
     }
 
     /**
      * Get prescription medicines by category and doctor
+     * 
      * @param catShortName Category short name
-     * @param doctorId Doctor ID
+     * @param doctorId     Doctor ID
      * @return List of prescription medicines for the category and doctor
      */
     @Transactional(readOnly = true)
     public List<PrescriptionMedicines> getPrescriptionMedicinesByCategory(String catShortName, String doctorId) {
         logger.info("Getting prescription medicines for category: {} and doctor: {}", catShortName, doctorId);
-        return prescriptionMedicinesRepository.findByCatShortNameAndDoctorIdOrderByPriorityValueAsc(catShortName, doctorId);
+        return prescriptionMedicinesRepository.findByCatShortNameAndDoctorIdOrderByPriorityValueAsc(catShortName,
+                doctorId);
     }
 
     /**
      * Get prescription medicines by category and subcategory for a specific doctor
-     * @param catShortName Category short name
+     * 
+     * @param catShortName      Category short name
      * @param catsubDescription Subcategory description
-     * @param doctorId Doctor ID
-     * @return List of prescription medicines for the category, subcategory, and doctor
+     * @param doctorId          Doctor ID
+     * @return List of prescription medicines for the category, subcategory, and
+     *         doctor
      */
     @Transactional(readOnly = true)
-    public List<PrescriptionMedicines> getPrescriptionMedicinesByCategoryAndSubCategory(String catShortName, String catsubDescription, String doctorId) {
-        logger.info("Getting prescription medicines for category: {}, subcategory: {} and doctor: {}", catShortName, catsubDescription, doctorId);
-        return prescriptionMedicinesRepository.findByCatShortNameAndCatsubDescriptionAndDoctorIdOrderByPriorityValueAsc(catShortName, catsubDescription, doctorId);
+    public List<PrescriptionMedicines> getPrescriptionMedicinesByCategoryAndSubCategory(String catShortName,
+            String catsubDescription, String doctorId) {
+        logger.info("Getting prescription medicines for category: {}, subcategory: {} and doctor: {}", catShortName,
+                catsubDescription, doctorId);
+        return prescriptionMedicinesRepository.findByCatShortNameAndCatsubDescriptionAndDoctorIdOrderByPriorityValueAsc(
+                catShortName, catsubDescription, doctorId);
     }
 
     /**
      * Get a prescription medicine by all key fields
-     * @param catShortName Category short name
+     * 
+     * @param catShortName      Category short name
      * @param catsubDescription Subcategory description
-     * @param medicineName Medicine name
-     * @param brandName Brand name
-     * @param doctorId Doctor ID
+     * @param medicineName      Medicine name
+     * @param brandName         Brand name
+     * @param doctorId          Doctor ID
      * @return Optional prescription medicine
      */
     @Transactional(readOnly = true)
-    public Optional<PrescriptionMedicines> getPrescriptionMedicine(String catShortName, String catsubDescription, 
-                                                                    String medicineName, String brandName, String doctorId) {
-        logger.info("Getting prescription medicine: {} - {} for category: {}, subcategory: {} and doctor: {}", 
+    public Optional<PrescriptionMedicines> getPrescriptionMedicine(String catShortName, String catsubDescription,
+            String medicineName, String brandName, String doctorId) {
+        logger.info("Getting prescription medicine: {} - {} for category: {}, subcategory: {} and doctor: {}",
                 medicineName, brandName, catShortName, catsubDescription, doctorId);
-        PrescriptionMedicines medicine = prescriptionMedicinesRepository.findByCatShortNameAndCatsubDescriptionAndMedicineNameAndBrandNameAndDoctorId(
-                catShortName, catsubDescription, medicineName, brandName, doctorId);
+        PrescriptionMedicines medicine = prescriptionMedicinesRepository
+                .findByCatShortNameAndCatsubDescriptionAndMedicineNameAndBrandNameAndDoctorId(
+                        catShortName, catsubDescription, medicineName, brandName, doctorId);
         return Optional.ofNullable(medicine);
     }
 
     /**
-     * Search prescription medicines by category, subcategory, medicine name, brand name, or priority for a specific doctor
-     * @param doctorId Doctor ID
+     * Search prescription medicines by category, subcategory, medicine name, brand
+     * name, or priority for a specific doctor
+     * 
+     * @param doctorId   Doctor ID
      * @param searchTerm Search term to match against various fields
      * @return List of matching prescription medicines
      */
@@ -106,72 +122,110 @@ public class PrescriptionMedicinesService {
 
     /**
      * Create a new prescription medicine
+     * 
      * @param prescriptionMedicine Prescription medicine to create
      * @return Created prescription medicine
      */
     public PrescriptionMedicines createPrescriptionMedicine(PrescriptionMedicines prescriptionMedicine) {
-        logger.info("Creating new prescription medicine: {} - {} for category: {}, subcategory: {}", 
-                prescriptionMedicine.getMedicineName(), prescriptionMedicine.getBrandName(), 
+        logger.info("Creating new prescription medicine: {} - {} for category: {}, subcategory: {}",
+                prescriptionMedicine.getMedicineName(), prescriptionMedicine.getBrandName(),
                 prescriptionMedicine.getCatShortName(), prescriptionMedicine.getCatsubDescription());
-        
+
         // Check if prescription medicine already exists
-        if (prescriptionMedicinesRepository.existsByCatShortNameAndCatsubDescriptionAndMedicineNameAndBrandNameAndDoctorId(
-                prescriptionMedicine.getCatShortName(), prescriptionMedicine.getCatsubDescription(),
-                prescriptionMedicine.getMedicineName(), prescriptionMedicine.getBrandName(), prescriptionMedicine.getDoctorId())) {
-            throw new RuntimeException("Prescription medicine with medicine name '" + prescriptionMedicine.getMedicineName() + 
-                    "' and brand name '" + prescriptionMedicine.getBrandName() + 
-                    "' already exists for category " + prescriptionMedicine.getCatShortName() + 
-                    ", subcategory " + prescriptionMedicine.getCatsubDescription() + 
-                    " and doctor " + prescriptionMedicine.getDoctorId());
+        if (prescriptionMedicinesRepository
+                .existsByCatShortNameAndCatsubDescriptionAndMedicineNameAndBrandNameAndDoctorId(
+                        prescriptionMedicine.getCatShortName(), prescriptionMedicine.getCatsubDescription(),
+                        prescriptionMedicine.getMedicineName(), prescriptionMedicine.getBrandName(),
+                        prescriptionMedicine.getDoctorId())) {
+            throw new RuntimeException(
+                    "Prescription medicine with medicine name '" + prescriptionMedicine.getMedicineName() +
+                            "' and brand name '" + prescriptionMedicine.getBrandName() +
+                            "' already exists for category " + prescriptionMedicine.getCatShortName() +
+                            ", subcategory " + prescriptionMedicine.getCatsubDescription() +
+                            " and doctor " + prescriptionMedicine.getDoctorId());
         }
-        
+
         // Set creation timestamp
         prescriptionMedicine.setCreatedOn(LocalDateTime.now());
         prescriptionMedicine.setModifiedOn(LocalDateTime.now());
-        
+
         // Set active to true by default if not set
         if (prescriptionMedicine.getActive() == null) {
             prescriptionMedicine.setActive(true);
         }
-        
+
         return prescriptionMedicinesRepository.save(prescriptionMedicine);
     }
 
     /**
      * Update an existing prescription medicine
+     * 
      * @param prescriptionMedicine Prescription medicine to update
      * @return Updated prescription medicine
      */
     public PrescriptionMedicines updatePrescriptionMedicine(PrescriptionMedicines prescriptionMedicine) {
-        logger.info("Updating prescription medicine: {} - {}", prescriptionMedicine.getMedicineName(), prescriptionMedicine.getBrandName());
-        
-        // Set modification timestamp
-        prescriptionMedicine.setModifiedOn(LocalDateTime.now());
-        
-        return prescriptionMedicinesRepository.save(prescriptionMedicine);
+        logger.info("Updating prescription medicine: {} - {}", prescriptionMedicine.getMedicineName(),
+                prescriptionMedicine.getBrandName());
+
+        PrescriptionMedicinesId id = new PrescriptionMedicinesId(
+                prescriptionMedicine.getCatShortName(),
+                prescriptionMedicine.getCatsubDescription(),
+                prescriptionMedicine.getMedicineName(),
+                prescriptionMedicine.getBrandName(),
+                prescriptionMedicine.getDoctorId());
+
+        Optional<PrescriptionMedicines> existingOpt = prescriptionMedicinesRepository.findById(id);
+        if (existingOpt.isPresent()) {
+            PrescriptionMedicines existing = existingOpt.get();
+
+            // Update fields from input
+            existing.setClinicId(prescriptionMedicine.getClinicId());
+            existing.setMarketedBy(prescriptionMedicine.getMarketedBy());
+            existing.setActive(prescriptionMedicine.getActive());
+            existing.setPriorityValue(prescriptionMedicine.getPriorityValue());
+            existing.setMorning(prescriptionMedicine.getMorning());
+            existing.setAfternoon(prescriptionMedicine.getAfternoon());
+            existing.setNight(prescriptionMedicine.getNight());
+            existing.setNoOfDays(prescriptionMedicine.getNoOfDays());
+            existing.setInstruction(prescriptionMedicine.getInstruction());
+            existing.setModifiedByName(prescriptionMedicine.getModifiedByName());
+            existing.setMarketedByDept(prescriptionMedicine.getMarketedByDept());
+
+            // Set modification timestamp
+            existing.setModifiedOn(LocalDateTime.now());
+
+            return prescriptionMedicinesRepository.save(existing);
+        } else {
+            // Fallback for cases where it doesn't exist (should not happen in normal edit
+            // flow)
+            prescriptionMedicine.setModifiedOn(LocalDateTime.now());
+            return prescriptionMedicinesRepository.save(prescriptionMedicine);
+        }
     }
 
     /**
      * Delete a prescription medicine
-     * @param catShortName Category short name
+     * 
+     * @param catShortName      Category short name
      * @param catsubDescription Subcategory description
-     * @param medicineName Medicine name
-     * @param brandName Brand name
-     * @param doctorId Doctor ID
+     * @param medicineName      Medicine name
+     * @param brandName         Brand name
+     * @param doctorId          Doctor ID
      * @return True if deleted successfully
      */
-    public boolean deletePrescriptionMedicine(String catShortName, String catsubDescription, 
-                                              String medicineName, String brandName, String doctorId) {
-        logger.info("Deleting prescription medicine: {} - {} for category: {}, subcategory: {} and doctor: {}", 
+    public boolean deletePrescriptionMedicine(String catShortName, String catsubDescription,
+            String medicineName, String brandName, String doctorId) {
+        logger.info("Deleting prescription medicine: {} - {} for category: {}, subcategory: {} and doctor: {}",
                 medicineName, brandName, catShortName, catsubDescription, doctorId);
-        
-        Optional<PrescriptionMedicines> medicineOpt = getPrescriptionMedicine(catShortName, catsubDescription, medicineName, brandName, doctorId);
+
+        Optional<PrescriptionMedicines> medicineOpt = getPrescriptionMedicine(catShortName, catsubDescription,
+                medicineName, brandName, doctorId);
         if (medicineOpt.isPresent()) {
-            PrescriptionMedicinesId id = new PrescriptionMedicinesId(catShortName, catsubDescription, medicineName, brandName, doctorId);
+            PrescriptionMedicinesId id = new PrescriptionMedicinesId(catShortName, catsubDescription, medicineName,
+                    brandName, doctorId);
             prescriptionMedicinesRepository.deleteById(id);
             return true;
         }
         return false;
     }
 }
-
