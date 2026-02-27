@@ -66,6 +66,9 @@ public class PatientTrendsDTO {
     @Schema(description = "Additional comments")
     private String additionalComments;
     
+    @Schema(description = "Symptom comment (Detailed History)")
+    private String symptomComment;
+    
     @Schema(description = "Systemic examination findings")
     private String systemic;
     
@@ -126,6 +129,9 @@ public class PatientTrendsDTO {
     
     @Schema(description = "Previous additional comments")
     private String preAdditionalComments;
+    
+    @Schema(description = "Previous symptom comment (Detailed History)")
+    private String preSymptomComment;
     
     @Schema(description = "Previous pallor", example = "Nil")
     private String prePallor;
