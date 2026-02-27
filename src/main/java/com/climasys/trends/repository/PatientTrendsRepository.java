@@ -48,6 +48,7 @@ public interface PatientTrendsRepository extends JpaRepository<PatientVisit, Pat
                 pv.tpr,
                 pv.important_findings,
                 pv.additional_comments,
+                pv.symptom_comment,
                 pv.systemic,
                 pv.odeama,
                 pv.pallor,
@@ -64,7 +65,7 @@ public interface PatientTrendsRepository extends JpaRepository<PatientVisit, Pat
             visit_date, patient_id, status_id, shift_description,
             blood_pressure, sugar, thtext, weight_in_kgs,
             pulse, height_in_cms, tpr, important_findings,
-            additional_comments, systemic, odeama, pallor, gc,
+            additional_comments, symptom_comment, systemic, odeama, pallor, gc,
             patient_visit_no, visit_time, shift_id
         FROM PreviousVisits
         WHERE rownum <= 5

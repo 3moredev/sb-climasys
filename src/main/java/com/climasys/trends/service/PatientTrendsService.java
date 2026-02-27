@@ -100,6 +100,7 @@ public class PatientTrendsService {
         dto.setTpr(getString(row, "tpr"));
         dto.setImportantFindings(getString(row, "important_findings"));
         dto.setAdditionalComments(getString(row, "additional_comments"));
+        dto.setSymptomComment(getString(row, "symptom_comment"));
         dto.setSystemic(getString(row, "systemic"));
         dto.setOdeama(getString(row, "odeama"));
         dto.setPallor(getString(row, "pallor"));
@@ -182,6 +183,7 @@ public class PatientTrendsService {
         dto.setPreHeightInCms(nvl(dto.getHeightInCms() != null ? dto.getHeightInCms().toString() : null));
         dto.setPreImportantFindings(nvl(dto.getImportantFindings()));
         dto.setPreAdditionalComments(nvl(dto.getAdditionalComments()));
+        dto.setPreSymptomComment(nvl(dto.getSymptomComment()));
         dto.setPrePallor(nvl(dto.getPallor()));
         dto.setPreGc(nvl(dto.getGc()));
         
