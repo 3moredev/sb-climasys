@@ -44,10 +44,10 @@ public class ServiceVisitService {
             List<Object[]> rows;
             if (doctorId != null && !doctorId.trim().isEmpty()) {
                 // If doctorId is provided, use the filtered query
-                rows = serviceVisitRepository.findPreviousServiceVisitDates(patientId, doctorId, clinicId, todaysVisitDate);
+                rows = serviceVisitRepository.findPreviousServiceVisitDates(patientId, todaysVisitDate);
             } else {
                 // If doctorId is not provided, fetch all visits for the patient and clinic (ignoring doctor)
-                rows = serviceVisitRepository.findPreviousServiceVisitDatesWithoutDoctor(patientId, clinicId, todaysVisitDate);
+                rows = serviceVisitRepository.findPreviousServiceVisitDatesWithoutDoctor(patientId, todaysVisitDate);
                 logger.info("Fetching previous service visit dates without doctor filter for patient: {}, clinic: {}", 
                     patientId, clinicId);
             }
@@ -198,8 +198,8 @@ public class ServiceVisitService {
                     AND prs.doctor_id = pv.doctor_id
                 WHERE pv.patient_id = ? AND pv.shift_id = ? AND pv.clinic_id = ?
                   """ + doctorIdCondition + """
-                  AND DATE(pv.visit_date) = ? AND pv.patient_visit_no = ?
-                  AND COALESCE(pv.delete_flag,false) = false
+                  AND CAST(pv.visit_date AS date) = ? AND pv.patient_visit_no = ?
+                  AND pv.delete_flag = false
             """;
             logger.info("Executing vitals query with params: patientId={}, shiftId={}, clinicId={}, doctorId={}, visitDate={}, patientVisitNo={}", 
                 patientId, shiftId, clinicId, doctorId != null ? doctorId : "ALL", visitDate, patientVisitNo);

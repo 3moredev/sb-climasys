@@ -24,22 +24,31 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
      * Requires doctorId filter.
      */
     @Query(value = """
-            SELECT CAST(pvs.visit_date AS date)            AS visit_date,
-                   pvs.shift_id                           AS shift_id,
-                   pvs.patient_visit_no                   AS patient_visit_no
-            FROM patient_visits_services pvs
-            WHERE pvs.patient_id = :patientId
-              AND pvs.doctor_id = :doctorId
-              AND pvs.clinic_id = :clinicId
-              AND COALESCE(pvs.delete_flag, false) = false
-              AND pvs.status_id = 8
-              AND CAST(pvs.visit_date AS date) <= CAST(:todaysVisitDate AS date)
-            ORDER BY CAST(pvs.visit_date AS date) DESC, pvs.visit_time DESC
+            SELECT visit_date, shift_id, patient_visit_no
+            FROM (
+                SELECT DISTINCT CAST(pv.visit_date AS date) AS visit_date,
+                       pv.shift_id                AS shift_id,
+                       pv.patient_visit_no        AS patient_visit_no,
+                       pv.visit_time              AS visit_time
+                FROM patient_visits pv
+                WHERE pv.patient_id = :patientId
+                  AND pv.delete_flag = false
+                  AND CAST(pv.visit_date AS date) <= :todaysVisitDate
+                UNION ALL
+                SELECT DISTINCT CAST(pvs.visit_date AS date) AS visit_date,
+                       pvs.shift_id                AS shift_id,
+                       pvs.patient_visit_no        AS patient_visit_no,
+                       pvs.visit_time              AS visit_time
+                FROM patient_visits_services pvs
+                WHERE pvs.patient_id = :patientId
+                  AND pvs.delete_flag = false
+                  AND pvs.status_id = 8
+                  AND CAST(pvs.visit_date AS date) <= :todaysVisitDate
+            ) AS combined_visits
+            ORDER BY visit_date DESC, visit_time DESC
             """, nativeQuery = true)
     List<Object[]> findPreviousServiceVisitDates(
             @Param("patientId") String patientId,
-            @Param("doctorId") String doctorId,
-            @Param("clinicId") String clinicId,
             @Param("todaysVisitDate") LocalDate todaysVisitDate
     );
     
@@ -50,20 +59,31 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
      * This method is used when doctorId is not provided.
      */
     @Query(value = """
-            SELECT CAST(pvs.visit_date AS date)            AS visit_date,
-                   pvs.shift_id                           AS shift_id,
-                   pvs.patient_visit_no                   AS patient_visit_no
-            FROM patient_visits_services pvs
-            WHERE pvs.patient_id = :patientId
-              AND pvs.clinic_id = :clinicId
-              AND COALESCE(pvs.delete_flag, false) = false
-              AND pvs.status_id = 8
-              AND CAST(pvs.visit_date AS date) <= CAST(:todaysVisitDate AS date)
-            ORDER BY CAST(pvs.visit_date AS date) DESC, pvs.visit_time DESC
+            SELECT visit_date, shift_id, patient_visit_no
+            FROM (
+                SELECT DISTINCT CAST(pv.visit_date AS date) AS visit_date,
+                       pv.shift_id                AS shift_id,
+                       pv.patient_visit_no        AS patient_visit_no,
+                       pv.visit_time              AS visit_time
+                FROM patient_visits pv
+                WHERE pv.patient_id = :patientId
+                  AND pv.delete_flag = false
+                  AND CAST(pv.visit_date AS date) <= :todaysVisitDate
+                UNION ALL
+                SELECT DISTINCT CAST(pvs.visit_date AS date) AS visit_date,
+                       pvs.shift_id                AS shift_id,
+                       pvs.patient_visit_no        AS patient_visit_no,
+                       pvs.visit_time              AS visit_time
+                FROM patient_visits_services pvs
+                WHERE pvs.patient_id = :patientId
+                  AND pvs.delete_flag = false
+                  AND pvs.status_id = 8
+                  AND CAST(pvs.visit_date AS date) <= :todaysVisitDate
+            ) AS combined_visits
+            ORDER BY visit_date DESC, visit_time DESC
             """, nativeQuery = true)
     List<Object[]> findPreviousServiceVisitDatesWithoutDoctor(
             @Param("patientId") String patientId,
-            @Param("clinicId") String clinicId,
             @Param("todaysVisitDate") LocalDate todaysVisitDate
     );
 
@@ -76,6 +96,12 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
             SELECT EXISTS(
                 SELECT 1
                 FROM patient_visit_services_billinginfooverwrite
+                WHERE patient_id = :patientId
+                  AND clinic_id = :clinicId
+                  AND patient_visit_no = :visitNo
+                UNION ALL
+                SELECT 1
+                FROM patient_visit_billinginfooverwrite
                 WHERE patient_id = :patientId
                   AND clinic_id = :clinicId
                   AND patient_visit_no = :visitNo
@@ -96,14 +122,34 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
             SELECT billing_group_name,
                    billing_subgroup_name,
                    billing_details,
-                   COALESCE(collected_fees, default_fees) AS amount,
+                   amount,
                    default_fees,
                    collected_fees
-            FROM patient_visit_services_billinginfooverwrite
-            WHERE patient_id = :patientId
-              AND clinic_id = :clinicId
-              AND patient_visit_no = :visitNo
-              AND (delete_flag IS NULL OR delete_flag = false)
+            FROM (
+                SELECT billing_group_name,
+                       billing_subgroup_name,
+                       billing_details,
+                       COALESCE(collected_fees, default_fees) AS amount,
+                       default_fees,
+                       collected_fees
+                FROM patient_visit_services_billinginfooverwrite
+                WHERE patient_id = :patientId
+                  AND clinic_id = :clinicId
+                  AND patient_visit_no = :visitNo
+                  AND (delete_flag IS NULL OR delete_flag = false)
+                UNION ALL
+                SELECT billing_group_name,
+                       billing_subgroup_name,
+                       billing_details,
+                       COALESCE(collected_fees, default_fees) AS amount,
+                       default_fees,
+                       collected_fees
+                FROM patient_visit_billinginfooverwrite
+                WHERE patient_id = :patientId
+                  AND clinic_id = :clinicId
+                  AND patient_visit_no = :visitNo
+                  AND (delete_flag IS NULL OR delete_flag = false)
+            ) AS combined_billing
             ORDER BY billing_group_name, billing_subgroup_name, billing_details
             """, nativeQuery = true)
     List<Object[]> findServiceVisitLineItemsFromOverwrite(
@@ -121,13 +167,32 @@ public interface ServiceVisitRepository extends JpaRepository<com.climasys.entit
             SELECT billing_group_name,
                    billing_subgroup_name,
                    billing_details,
-                   COALESCE(collected_fees, default_fees) AS amount,
+                   amount,
                    default_fees,
                    collected_fees
-            FROM patient_visit_services_billinginfo
-            WHERE patient_id = :patientId
-              AND clinic_id = :clinicId
-              AND patient_visit_no = :visitNo
+            FROM (
+                SELECT billing_group_name,
+                       billing_subgroup_name,
+                       billing_details,
+                       COALESCE(collected_fees, default_fees) AS amount,
+                       default_fees,
+                       collected_fees
+                FROM patient_visit_services_billinginfo
+                WHERE patient_id = :patientId
+                  AND clinic_id = :clinicId
+                  AND patient_visit_no = :visitNo
+                UNION ALL
+                SELECT billing_group_name,
+                       billing_subgroup_name,
+                       billing_details,
+                       COALESCE(collected_fees, default_fees) AS amount,
+                       default_fees,
+                       collected_fees
+                FROM patient_visit_billinginfo
+                WHERE patient_id = :patientId
+                  AND clinic_id = :clinicId
+                  AND patient_visit_no = :visitNo
+            ) AS combined_billing
             ORDER BY billing_group_name, billing_subgroup_name, billing_details
             """, nativeQuery = true)
     List<Object[]> findServiceVisitLineItemsFromBase(
