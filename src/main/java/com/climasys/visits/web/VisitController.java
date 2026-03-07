@@ -903,7 +903,7 @@ public class VisitController {
                 try {
 
                     // Diagnosis
-                    if (req.diagnosisRows() != null && !req.diagnosisRows().isEmpty()) {
+                    if (req.diagnosisRows() != null) {
                         logger.info("Processing {} diagnosis rows for patient: {}, visit: {}",
                                 req.diagnosisRows().size(), patientId, patientVisitNoVal);
 
@@ -942,7 +942,9 @@ public class VisitController {
                             Object diagnosisObj = row.get("diagnosis");
 
                             String shortDesc = (shortDescObj != null) ? shortDescObj.toString().trim() : "";
+                            if (shortDesc.length() > 60) shortDesc = shortDesc.substring(0, 60);
                             String diagnosis = (diagnosisObj != null) ? diagnosisObj.toString().trim() : "";
+                            if (diagnosis.length() > 255) diagnosis = diagnosis.substring(0, 255);
 
                             logger.debug("Processing diagnosis row - shortDesc: '{}', diagnosis: '{}'", shortDesc,
                                     diagnosis);
@@ -1005,12 +1007,10 @@ public class VisitController {
                                         actualCount);
                             }
                         }
-                    } else {
-                        logger.debug("No diagnosis rows to process (null or empty)");
                     }
 
                     // Complaints
-                    if (req.complaintsRows() != null && !req.complaintsRows().isEmpty()) {
+                    if (req.complaintsRows() != null) {
                         logger.info("Processing {} complaints rows for patient: {}, visit: {}",
                                 req.complaintsRows().size(), patientId, patientVisitNoVal);
 
@@ -1051,10 +1051,13 @@ public class VisitController {
                             Object complaintCommentObj = row.get("complaint_comment");
 
                             String shortDesc = (shortDescObj != null) ? shortDescObj.toString().trim() : "";
+                            if (shortDesc.length() > 60) shortDesc = shortDesc.substring(0, 60);
                             String complaintDesc = (complaintDescObj != null) ? complaintDescObj.toString().trim() : "";
+                            if (complaintDesc.length() > 255) complaintDesc = complaintDesc.substring(0, 255);
                             String complaintComment = (complaintCommentObj != null)
                                     ? complaintCommentObj.toString().trim()
                                     : "";
+                            if (complaintComment.length() > 255) complaintComment = complaintComment.substring(0, 255);
 
                             logger.debug(
                                     "Processing complaint row - shortDesc: '{}', complaintDesc: '{}', complaintComment: '{}'",
@@ -1119,12 +1122,10 @@ public class VisitController {
                                         actualCount);
                             }
                         }
-                    } else {
-                        logger.debug("No complaints rows to process (null or empty)");
                     }
 
                     // Medicines
-                    if (req.medicineRows() != null && !req.medicineRows().isEmpty()) {
+                    if (req.medicineRows() != null) {
                         logger.info("Processing {} medicine rows for patient: {}, visit: {}", req.medicineRows().size(),
                                 patientId, patientVisitNoVal);
 
@@ -1159,7 +1160,9 @@ public class VisitController {
                         int insertedCount = 0;
                         for (Map<String, Object> row : req.medicineRows()) {
                             String shortDesc = String.valueOf(row.getOrDefault("short_description", ""));
+                            if (shortDesc.length() > 60) shortDesc = shortDesc.substring(0, 60);
                             String medicine = String.valueOf(row.getOrDefault("medicine", ""));
+                            if (medicine.length() > 255) medicine = medicine.substring(0, 255);
                             Integer morning = toIntSafe(row.get("morning"));
                             Integer afternoon = toIntSafe(row.get("afternoon"));
                             Integer night = toIntSafe(row.get("night"));
@@ -1206,7 +1209,7 @@ public class VisitController {
                     }
 
                     // Prescriptions
-                    if (req.prescriptionRows() != null && !req.prescriptionRows().isEmpty()) {
+                    if (req.prescriptionRows() != null) {
                         logger.info("Processing {} prescription rows for patient: {}, visit: {}",
                                 req.prescriptionRows().size(), patientId, patientVisitNoVal);
 
@@ -1273,6 +1276,8 @@ public class VisitController {
                                     medicineName = prescription.substring(openParen + 1, closeParen).trim();
                                 }
                             }
+                            if (brandName != null && brandName.length() > 255) brandName = brandName.substring(0, 255);
+                            if (medicineName != null && medicineName.length() > 255) medicineName = medicineName.substring(0, 255);
 
                             if ((brandName != null && !brandName.isEmpty())
                                     || (medicineName != null && !medicineName.isEmpty())) {
@@ -1321,7 +1326,7 @@ public class VisitController {
                     }
 
                     // Investigations
-                    if (req.investigationRows() != null && !req.investigationRows().isEmpty()) {
+                    if (req.investigationRows() != null) {
                         logger.info("Processing {} investigation rows for patient: {}, visit: {}",
                                 req.investigationRows().size(), patientId, patientVisitNoVal);
 
@@ -1359,6 +1364,7 @@ public class VisitController {
 
                         for (Map<String, Object> row : req.investigationRows()) {
                             String investigation = String.valueOf(row.getOrDefault("investigation", "")).trim();
+                            if (investigation.length() > 255) investigation = investigation.substring(0, 255);
                             if (investigation != null && !investigation.isEmpty() && !investigation.equals("null")) {
                                 // Check for duplicate lab tests in the same request to avoid primary key
                                 // violations
@@ -1423,8 +1429,6 @@ public class VisitController {
                         logger.info("Successfully inserted {} investigation records for patient: {}, visit: {}",
                                 insertedCount, patientId, patientVisitNoVal);
                         result.put("investigationInsertedCount", insertedCount);
-                    } else {
-                        logger.debug("No investigation rows to process (null or empty)");
                     }
 
                     // Dressing (body parts) - textbox field
