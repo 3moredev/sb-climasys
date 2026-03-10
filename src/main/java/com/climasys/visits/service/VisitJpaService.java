@@ -1897,6 +1897,26 @@ public class VisitJpaService {
         // Status and submission
         visitMap.put("Is_Submit_Patient_Visit_Details", visitData.get("is_submit_patient_visit_details"));
 
+        // In-Person field - read directly from DB value (same as collection screen logic)
+        Object rawInPerson = visitData.get("in_person");
+        Boolean derivedInPerson = null;
+        if (rawInPerson instanceof Boolean) {
+            derivedInPerson = (Boolean) rawInPerson;
+        } else if (rawInPerson != null) {
+            String rawStr = rawInPerson.toString().trim().toLowerCase();
+            if ("true".equals(rawStr) || "1".equals(rawStr) || "yes".equals(rawStr)) {
+                derivedInPerson = true;
+            } else if ("false".equals(rawStr) || "0".equals(rawStr) || "no".equals(rawStr)) {
+                derivedInPerson = false;
+            }
+        }
+        boolean finalInPerson = derivedInPerson != null ? derivedInPerson : false;
+        logger.info("DEBUG: final inPerson mapping for patient {} visit {}: {}", 
+                   visitData.get("patient_id"), visitData.get("patient_visit_no"), finalInPerson);
+        visitMap.put("In_Person", finalInPerson);
+        visitMap.put("inPerson", finalInPerson);
+        visitMap.put("in_person", finalInPerson); // Add third variant just in case
+
         // Referral fields
         visitMap.put("Refer_ID", visitData.get("refer_id"));
         visitMap.put("Refer_Doctor_Details", visitData.get("refer_doctor_details"));
@@ -2000,17 +2020,8 @@ public class VisitJpaService {
         visitMap.put("Tobaco", visit.getTobaco());
         visitMap.put("Alchohol", visit.getAlchohol());
 
-        // Derive In_Person from statusId for consistency
-        // WAITING (1) -> true, WITH DOCTOR (2) -> true, CONSULT ON CALL (3) -> false
+        // In-Person field - read directly from DB value (same as collection screen logic)
         Boolean derivedInPerson = visit.getInPerson();
-        if (visit.getStatusId() != null) {
-            short sid = visit.getStatusId();
-            if (sid == 1 || sid == 2) {
-                derivedInPerson = true;
-            } else if (sid == 3) {
-                derivedInPerson = false;
-            }
-        }
         visitMap.put("In_Person", derivedInPerson != null ? derivedInPerson : false);
 
         // Audit fields
@@ -2060,17 +2071,8 @@ public class VisitJpaService {
         visitMap.put("habitDetails", visit.getHabitsComments());
         visitMap.put("allergyDetails", visit.getAllergyDtls());
         visitMap.put("observation", visit.getObservation());
-        // Derive inPerson from statusId for consistency
-        // WAITING (1) -> true, WITH DOCTOR (2) -> true, CONSULT ON CALL (3) -> false
+        // In-Person field - read directly from DB value (same as collection screen logic)
         Boolean derivedInPerson = visit.getInPerson();
-        if (visit.getStatusId() != null) {
-            short sid = visit.getStatusId();
-            if (sid == 1 || sid == 2) {
-                derivedInPerson = true;
-            } else if (sid == 3) {
-                derivedInPerson = false;
-            }
-        }
         visitMap.put("inPerson", derivedInPerson != null ? derivedInPerson : false);
         visitMap.put("symptomComment", visit.getSymptomComment());
         visitMap.put("impression", visit.getImpression());
