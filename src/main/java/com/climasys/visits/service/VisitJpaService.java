@@ -596,8 +596,16 @@ public class VisitJpaService {
 
             // 6) Investigations/Lab tests
             String labsSql = """
-                        SELECT lab_test_description AS id
+                        SELECT pvla.lab_test_description || CASE WHEN ltp.parameter_name IS NOT NULL THEN ' - ' || ltp.parameter_name ELSE '' END AS id,
+                               pvla.lab_test_description AS investigation,
+                               ltp.parameter_name AS parameter_name
                         FROM patient_visit_labtestasked pvla
+                        LEFT JOIN lab_test_master ltm ON pvla.lab_test_description = ltm.lab_test_description 
+                            AND pvla.doctor_id = ltm.doctor_id 
+                            AND pvla.clinic_id = ltm.clinic_id
+                        LEFT JOIN lab_test_parameter ltp ON ltm.id = ltp.lab_test_id 
+                            AND ltm.doctor_id = ltp.doctor_id 
+                            AND ltm.clinic_id = ltp.clinic_id
                         WHERE pvla.patient_id = ? AND pvla.shift_id = ? AND pvla.clinic_id = ? AND pvla.doctor_id = ?
                           AND DATE(pvla.visit_date) = DATE(?::date) AND pvla.patient_visit_no = ?
                           AND (pvla.delete_flag IS NULL OR pvla.delete_flag = false)
@@ -605,6 +613,7 @@ public class VisitJpaService {
             List<Map<String, Object>> labTests = jdbcTemplate.queryForList(
                     labsSql, patientId, shiftId, clinicId, doctorId, visitDate, patientVisitNo);
             associatedData.put("investigations", labTests);
+
             associatedData.put("labTests", labTests); // Alias for compatibility
 
             // 7) Billing - prefer overwrite

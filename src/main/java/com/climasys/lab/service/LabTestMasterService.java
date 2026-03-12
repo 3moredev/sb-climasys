@@ -3,6 +3,8 @@ package com.climasys.lab.service;
 import com.climasys.entity.LabTestMaster;
 import com.climasys.entity.LabTestMasterId;
 import com.climasys.repository.LabTestMasterRepository;
+import com.climasys.repository.LabTestParameterRepository;
+import com.climasys.entity.LabTestParameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +28,9 @@ public class LabTestMasterService {
     
     @Autowired
     private LabTestMasterRepository labTestMasterRepository;
+    
+    @Autowired
+    private LabTestParameterRepository labTestParameterRepository;
     
     /**
      * Get lab tests for a specific doctor
@@ -60,6 +65,21 @@ public class LabTestMasterService {
                 .map(this::convertToMap)
                 .toList();
             
+            // Try to add parameter_name for each test
+            try {
+                for (Map<String, Object> labTestMap : labTestList) {
+                    Integer testId = (Integer) labTestMap.get("ID");
+                    String clinicId = (String) labTestMap.get("Clinic_ID");
+                    List<LabTestParameter> params = labTestParameterRepository.findByDoctorIdAndClinicIdAndLabTestId(doctorId, clinicId, testId);
+                    if (params != null && !params.isEmpty()) {
+                        String paramNames = params.stream().map(LabTestParameter::getParameterName).filter(name -> name != null && !name.isEmpty()).reduce((a, b) -> a + ", " + b).orElse("");
+                        labTestMap.put("parameter_name", paramNames);
+                    }
+                }
+            } catch (Exception paramEx) {
+                logger.warn("Failed to fetch parameters for doctor {}: {}", doctorId, paramEx.getMessage());
+            }
+            
             response.put("success", true);
             response.put("labTests", labTestList);
             response.put("doctorId", doctorId);
@@ -93,9 +113,29 @@ public class LabTestMasterService {
             // Get lab tests ordered by priority and description (main result set from stored procedure)
             List<LabTestMaster> labTests = labTestMasterRepository.findByDoctorIdAndClinicIdOrderByPriorityAndDescription(doctorId, clinicId);
             
+            // Fetch parameters to add parameter_name
+            List<LabTestParameter> parameters = labTestParameterRepository.findByDoctorIdAndClinicId(doctorId, clinicId);
+            Map<Integer, String> paramMap = new HashMap<>();
+            if (parameters != null) {
+                for (LabTestParameter p : parameters) {
+                    if (p.getParameterName() != null && !p.getParameterName().isEmpty()) {
+                        String existing = paramMap.get(p.getLabTestId());
+                        if (existing == null) {
+                            paramMap.put(p.getLabTestId(), p.getParameterName());
+                        } else {
+                            paramMap.put(p.getLabTestId(), existing + ", " + p.getParameterName());
+                        }
+                    }
+                }
+            }
+            
             // Convert to response format matching the stored procedure output
             List<Map<String, Object>> labTestList = labTests.stream()
-                .map(this::convertToMap)
+                .map(lt -> {
+                    Map<String, Object> map = convertToMap(lt);
+                    map.put("parameter_name", paramMap.getOrDefault(lt.getId(), ""));
+                    return map;
+                })
                 .toList();
             
             response.put("success", true);
